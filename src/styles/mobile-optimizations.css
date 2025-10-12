@@ -1,0 +1,131 @@
+/* Mobile Optimizations for Smallest Breakpoints (320px - 375px) */
+
+/* Extra Small Devices (iPhone SE, older Android phones) */
+@media (max-width: 375px) {
+  /* Container adjustments for very small screens */
+  .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  
+  /* Input fields - ensure proper touch targets */
+  input, select, textarea {
+    min-height: 44px;
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+    padding: 0.75rem;
+  }
+  
+  /* Button minimum touch targets */
+  button, .btn, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+  
+  /* Card padding reduction */
+  .card, [class*="Card"] {
+    padding: 0.75rem;
+  }
+  
+  /* Modal/Dialog spacing */
+  [role="dialog"], .modal {
+    margin: 0.5rem;
+    max-width: calc(100vw - 1rem);
+  }
+  
+  /* Text scaling for readability */
+  h1 { font-size: 1.5rem !important; }
+  h2 { font-size: 1.25rem !important; }
+  h3 { font-size: 1.125rem !important; }
+  h4 { font-size: 1rem !important; }
+  p { font-size: 0.875rem !important; }
+  
+  /* Grid adjustments */
+  [class*="grid-cols"] {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem;
+  }
+  
+  /* Flex gap reduction */
+  .flex {
+    gap: 0.5rem;
+  }
+}
+
+/* Touch Target Optimization (All Mobile) */
+@media (max-width: 768px) {
+  /* Ensure all interactive elements meet 44px minimum */
+  a, button, input, select, textarea, [role="button"], [role="link"] {
+    min-height: 44px;
+  }
+  
+  /* Icon buttons */
+  button[class*="icon"], .icon-button {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.625rem;
+  }
+  
+  /* Form field spacing */
+  .form-group, .field-group {
+    margin-bottom: 1rem;
+  }
+  
+  /* Label spacing */
+  label {
+    margin-bottom: 0.5rem;
+    display: block;
+    font-size: 0.875rem;
+  }
+  
+  /* Prevent horizontal overflow */
+  * {
+    max-width: 100%;
+    word-wrap: break-word;
+  }
+  
+  /* Image responsiveness */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* Landscape Orientation Adjustments */
+@media (max-height: 500px) and (orientation: landscape) {
+  /* Reduce vertical spacing in landscape */
+  .space-y-6 { margin-top: 0.5rem; margin-bottom: 0.5rem; }
+  .py-8 { padding-top: 1rem; padding-bottom: 1rem; }
+  .my-8 { margin-top: 1rem; margin-bottom: 1rem; }
+  
+  /* Compact headers */
+  header, .header {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+}
+
+/* iOS Safe Area Support */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  .fixed-bottom, [class*="bottom-nav"] {
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  }
+  
+  .fixed-top, [class*="top-nav"] {
+    padding-top: calc(0.5rem + env(safe-area-inset-top));
+  }
+}
+
+/* Accessibility - Focus Indicators */
+@media (max-width: 768px) {
+  *:focus-visible {
+    outline: 3px solid var(--emerald-primary);
+    outline-offset: 2px;
+  }
+}

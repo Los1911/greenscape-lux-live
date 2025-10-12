@@ -1,0 +1,278 @@
+#!/usr/bin/env node
+
+const nodemailer = require('nodemailer');
+const fs = require('fs');
+const path = require('path');
+
+// Email notification system for GitHub Actions fallback
+class EmailNotificationSystem {
+  constructor() {
+    this.config = {
+      smtp: {
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: parseInt(process.env.SMTP_PORT) || 587,
+        secure: false,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
+      },
+      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+      recipients: (process.env.EMAIL_RECIPIENTS || '').split(',').filter(Boolean)
+    };
+
+    this.templates = this.loadEmailTemplates();
+  }
+
+  loadEmailTemplates() {
+    const templatesDir = path.join(__dirname, '..', 'email-templates');
+    const templates = {};
+
+    try {
+      if (fs.existsSync(templatesDir)) {
+        const templateFiles = fs.readdirSync(templatesDir);
+        templateFiles.forEach(file => {
+          if (file.endsWith('.html')) {
+            const name = file.replace('.html', '');
+            templates[name] = fs.readFileSync(path.join(templatesDir, file), 'utf8');
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('Could not load email templates:', error.message);
+    }
+
+    return templates;
+  }
+
+  async createTransporter() {
+    try {
+      const transporter = nodemailer.createTransporter(this.config.smtp);
+      await transporter.verify();
+      return transporter;
+    } catch (error) {
+      console.error('SMTP configuration error:', error.message);
+      throw new Error('Failed to create email transporter');
+    }
+  }
+
+  generateEmailContent(type, data) {
+    const templates = {
+      validation_failed: {
+        subject: `🚨 Environment Validation Failed - ${data.commit?.substring(0, 7)}`,
+        html: this.templates.validation_failed || this.getDefaultValidationFailedTemplate(data),
+        text: `Environment validation failed for commit ${data.commit} on ${data.branch} by ${data.actor}.\n\nError: ${data.error}\n\nPlease check your environment configuration.`
+      },
+      sync_failed: {
+        subject: `⚠️ Environment Sync Failed - ${data.commit?.substring(0, 7)}`,
+        html: this.templates.sync_failed || this.getDefaultSyncFailedTemplate(data),
+        text: `Environment sync failed for commit ${data.commit} on ${data.branch} by ${data.actor}.\n\nError: ${data.error}\n\nPlease check Vercel configuration.`
+      },
+      build_failed: {
+        subject: `❌ Build Failed - ${data.commit?.substring(0, 7)}`,
+        html: this.templates.build_failed || this.getDefaultBuildFailedTemplate(data),
+        text: `Build failed for commit ${data.commit} on ${data.branch} by ${data.actor}.\n\nError: ${data.error}\n\nPlease check build logs.`
+      },
+      deployment_success: {
+        subject: `✅ Deployment Successful - ${data.commit?.substring(0, 7)}`,
+        html: this.templates.deployment_success || this.getDefaultDeploymentSuccessTemplate(data),
+        text: `Deployment successful for commit ${data.commit} on ${data.branch} by ${data.actor}.\n\nAll environment checks passed and build completed successfully.`
+      }
+    };
+
+    return templates[type] || templates.validation_failed;
+  }
+
+  getDefaultValidationFailedTemplate(data) {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #dc2626; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0; font-size: 24px;">🚨 Environment Validation Failed</h1>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb;">
+          <h2 style="color: #374151; margin-top: 0;">Deployment Details</h2>
+          <ul style="color: #6b7280;">
+            <li><strong>Commit:</strong> ${data.commit}</li>
+            <li><strong>Branch:</strong> ${data.branch}</li>
+            <li><strong>Actor:</strong> ${data.actor}</li>
+            <li><strong>Timestamp:</strong> ${new Date().toISOString()}</li>
+          </ul>
+          
+          <h3 style="color: #dc2626;">Error Details</h3>
+          <pre style="background: #fee2e2; padding: 15px; border-radius: 4px; overflow-x: auto;">${data.error || 'Environment validation failed'}</pre>
+          
+          <h3 style="color: #374151;">Quick Actions</h3>
+          <ul style="color: #6b7280;">
+            <li>Check environment variables in Vercel dashboard</li>
+            <li>Verify .env.local.template is up to date</li>
+            <li>Run <code>npm run env:validate</code> locally</li>
+            <li>Check GitHub secrets configuration</li>
+          </ul>
+        </div>
+        
+        <div style="background: #374151; color: #9ca3af; padding: 15px; border-radius: 0 0 8px 8px; text-align: center; font-size: 12px;">
+          Auto-generated by GitHub Actions Environment Sync System
+        </div>
+      </div>
+    `;
+  }
+
+  getDefaultSyncFailedTemplate(data) {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #d97706; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0; font-size: 24px;">⚠️ Environment Sync Failed</h1>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb;">
+          <h2 style="color: #374151; margin-top: 0;">Sync Details</h2>
+          <ul style="color: #6b7280;">
+            <li><strong>Commit:</strong> ${data.commit}</li>
+            <li><strong>Branch:</strong> ${data.branch}</li>
+            <li><strong>Actor:</strong> ${data.actor}</li>
+            <li><strong>Timestamp:</strong> ${new Date().toISOString()}</li>
+          </ul>
+          
+          <h3 style="color: #d97706;">Error Details</h3>
+          <pre style="background: #fef3c7; padding: 15px; border-radius: 4px; overflow-x: auto;">${data.error || 'Environment sync failed'}</pre>
+          
+          <h3 style="color: #374151;">Troubleshooting Steps</h3>
+          <ul style="color: #6b7280;">
+            <li>Check Vercel CLI authentication</li>
+            <li>Verify VERCEL_TOKEN in GitHub secrets</li>
+            <li>Ensure project permissions are correct</li>
+            <li>Check Vercel project configuration</li>
+          </ul>
+        </div>
+        
+        <div style="background: #374151; color: #9ca3af; padding: 15px; border-radius: 0 0 8px 8px; text-align: center; font-size: 12px;">
+          Auto-generated by GitHub Actions Environment Sync System
+        </div>
+      </div>
+    `;
+  }
+
+  getDefaultBuildFailedTemplate(data) {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #dc2626; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0; font-size: 24px;">❌ Build Failed</h1>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb;">
+          <h2 style="color: #374151; margin-top: 0;">Build Details</h2>
+          <ul style="color: #6b7280;">
+            <li><strong>Commit:</strong> ${data.commit}</li>
+            <li><strong>Branch:</strong> ${data.branch}</li>
+            <li><strong>Actor:</strong> ${data.actor}</li>
+            <li><strong>Timestamp:</strong> ${new Date().toISOString()}</li>
+          </ul>
+          
+          <h3 style="color: #dc2626;">Build Error</h3>
+          <pre style="background: #fee2e2; padding: 15px; border-radius: 4px; overflow-x: auto;">${data.error || 'Build process failed'}</pre>
+          
+          <h3 style="color: #374151;">Next Steps</h3>
+          <ul style="color: #6b7280;">
+            <li>Check build logs in GitHub Actions</li>
+            <li>Run build locally to reproduce the issue</li>
+            <li>Verify all dependencies are installed</li>
+            <li>Check for TypeScript or linting errors</li>
+          </ul>
+        </div>
+        
+        <div style="background: #374151; color: #9ca3af; padding: 15px; border-radius: 0 0 8px 8px; text-align: center; font-size: 12px;">
+          Auto-generated by GitHub Actions Environment Sync System
+        </div>
+      </div>
+    `;
+  }
+
+  getDefaultDeploymentSuccessTemplate(data) {
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #059669; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0; font-size: 24px;">✅ Deployment Successful</h1>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb;">
+          <h2 style="color: #374151; margin-top: 0;">Deployment Details</h2>
+          <ul style="color: #6b7280;">
+            <li><strong>Commit:</strong> ${data.commit}</li>
+            <li><strong>Branch:</strong> ${data.branch}</li>
+            <li><strong>Actor:</strong> ${data.actor}</li>
+            <li><strong>Timestamp:</strong> ${new Date().toISOString()}</li>
+          </ul>
+          
+          <h3 style="color: #059669;">Status</h3>
+          <div style="background: #d1fae5; padding: 15px; border-radius: 4px;">
+            <p style="margin: 0; color: #065f46;">
+              ✅ Environment validation passed<br>
+              ✅ Environment sync completed<br>
+              ✅ Build successful<br>
+              ✅ Ready for deployment
+            </p>
+          </div>
+        </div>
+        
+        <div style="background: #374151; color: #9ca3af; padding: 15px; border-radius: 0 0 8px 8px; text-align: center; font-size: 12px;">
+          Auto-generated by GitHub Actions Environment Sync System
+        </div>
+      </div>
+    `;
+  }
+
+  async sendEmail(type, data) {
+    try {
+      if (!this.config.recipients.length) {
+        console.warn('No email recipients configured');
+        return false;
+      }
+
+      const transporter = await this.createTransporter();
+      const content = this.generateEmailContent(type, data);
+
+      const mailOptions = {
+        from: this.config.from,
+        to: this.config.recipients.join(', '),
+        subject: content.subject,
+        text: content.text,
+        html: content.html
+      };
+
+      const result = await transporter.sendMail(mailOptions);
+      console.log(`Email notification sent successfully: ${result.messageId}`);
+      return true;
+    } catch (error) {
+      console.error('Failed to send email notification:', error.message);
+      return false;
+    }
+  }
+}
+
+// CLI interface
+async function main() {
+  const [type, commit, branch, actor, error] = process.argv.slice(2);
+
+  if (!type) {
+    console.error('Usage: node email-notification.js <type> [commit] [branch] [actor] [error]');
+    process.exit(1);
+  }
+
+  const emailSystem = new EmailNotificationSystem();
+  const data = { commit, branch, actor, error };
+
+  try {
+    const success = await emailSystem.sendEmail(type, data);
+    process.exit(success ? 0 : 1);
+  } catch (error) {
+    console.error('Email notification failed:', error.message);
+    process.exit(1);
+  }
+}
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = EmailNotificationSystem;

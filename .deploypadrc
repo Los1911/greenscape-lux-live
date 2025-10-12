@@ -1,0 +1,10 @@
+{
+  "spa": true,
+  "fallback": "/index.html",
+  "routes": {
+    "/": "/index.html",
+    "/client-login": "/index.html",
+    "/client-signup": "/index.html",
+    "/quote-form": "/index.html"
+  }
+}
