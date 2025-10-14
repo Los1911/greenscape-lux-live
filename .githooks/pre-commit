@@ -1,0 +1,3 @@
+
+# Prevent accidental Vercel redeployment
+grep -r "vercel" .github/workflows && { echo "❌ Vercel workflow detected — aborting commit."; exit 1; } || echo "✅ Safe: No Vercel workflows found."
