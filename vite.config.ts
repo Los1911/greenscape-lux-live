@@ -8,55 +8,71 @@ const buildHash = Math.random().toString(36).substr(2, 9);
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // Ensures correct relative paths for GitHub Pages
   base: './',
+
   server: {
     host: "::",
     port: 8080,
   },
+
   define: {
     __BUILD_TIME__: buildTimestamp,
     __BUILD_HASH__: JSON.stringify(buildHash),
   },
+
   plugins: [
     react(),
-    // Custom plugin to generate version.json
+    // Custom plugin to generate version.json for build info
     {
       name: 'version-generator',
       generateBundle() {
         this.emitFile({
           type: 'asset',
           fileName: 'version.json',
-          source: JSON.stringify({
-            version: process.env.npm_package_version || '1.0.0',
-            buildTime: buildTimestamp,
-            hash: buildHash,
-            timestamp: new Date().toISOString()
-          }, null, 2)
+          source: JSON.stringify(
+            {
+              version: process.env.npm_package_version || '1.0.0',
+              buildTime: buildTimestamp,
+              hash: buildHash,
+              timestamp: new Date().toISOString(),
+            },
+            null,
+            2
+          ),
         });
-      }
-    }
+      },
+    },
   ].filter(Boolean),
+
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
+
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
     emptyOutDir: true,
+    // ✅ Prevents MIME-type error by enforcing ES module build
+    target: 'esnext',
+    modulePreload: {
+      polyfill: false,
+    },
     rollupOptions: {
       output: {
         manualChunks: undefined,
         entryFileNames: `assets/[name].${buildHash}.[hash].js`,
         chunkFileNames: `assets/[name].${buildHash}.[hash].js`,
-        assetFileNames: `assets/[name].${buildHash}.[hash].[ext]`
+        assetFileNames: `assets/[name].${buildHash}.[hash].[ext]`,
       },
     },
   },
+
   preview: {
     port: 8080,
     host: "::",
   },
-}))
+}));
