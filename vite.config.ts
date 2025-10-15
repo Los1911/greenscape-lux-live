@@ -8,7 +8,7 @@ const buildHash = Math.random().toString(36).substr(2, 9);
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: '/',
+  base: './',
   server: {
     host: "::",
     port: 8080,
