@@ -43,11 +43,18 @@ export function debugEnvironmentVariables(): void {
   const envVars = [
     'VITE_SUPABASE_URL',
     'VITE_SUPABASE_ANON_KEY', 
+<<<<<<< HEAD
     'VITE_STRIPE_PUBLIC_KEY',
     'VITE_GOOGLE_MAPS_API_KEY',
     'VITE_RESEND_API_KEY'
   ];
 
+=======
+    'VITE_STRIPE_PUBLISHABLE_KEY',
+    'VITE_GOOGLE_MAPS_API_KEY',
+    'VITE_RESEND_API_KEY'
+  ];
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
   
   envVars.forEach(key => {
     const value = getBrowserEnv(key);

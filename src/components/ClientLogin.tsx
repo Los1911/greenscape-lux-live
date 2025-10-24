@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import React, { useState, useEffect } from 'react';
+=======
+import React from 'react';
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -12,6 +16,7 @@ import { useFormValidation } from '@/hooks/useFormValidation';
 export default function ClientLogin() {
   const navigate = useNavigate();
   const { role } = useAuth();
+<<<<<<< HEAD
   const [configError, setConfigError] = useState<string | null>(null);
 
   // ✅ Environment Variable Validation & Debugging
@@ -25,6 +30,8 @@ export default function ClientLogin() {
   }, []);
 
 
+=======
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
 
   const {
     values,
@@ -91,19 +98,25 @@ export default function ClientLogin() {
         <div className="bg-black/60 backdrop-blur-xl border border-emerald-500/30 rounded-2xl p-6 md:p-8 shadow-2xl shadow-emerald-500/20 relative">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent rounded-2xl"></div>
           
+<<<<<<< HEAD
           {configError && (
             <Alert className="mb-6 border-yellow-500/50 bg-yellow-900/30 relative z-10">
               <AlertDescription className="text-yellow-300">{configError}</AlertDescription>
             </Alert>
           )}
 
+=======
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
           {submitError && (
             <Alert className="mb-6 border-red-500/50 bg-red-900/30 relative z-10">
               <AlertDescription className="text-red-300">{submitError}</AlertDescription>
             </Alert>
           )}
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
           <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
             <div className="space-y-4">
               <FormField

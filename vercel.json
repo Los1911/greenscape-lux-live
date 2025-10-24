@@ -1,10 +1,27 @@
 {
   "buildCommand": "npm run build",
+<<<<<<< HEAD
   "outputDirectory": "dist",
   "framework": "vite",
   "installCommand": "npm ci",
   "devCommand": "npm run dev",
   "regions": ["iad1"],
+=======
+  "framework": "vite",
+  "env": {
+    "VITE_SUPABASE_URL": "@vite_supabase_url",
+    "VITE_SUPABASE_ANON_KEY": "@vite_supabase_anon_key",
+    "VITE_STRIPE_PUBLISHABLE_KEY": "@vite_stripe_publishable_key"
+  },
+  "build": {
+    "env": {
+      "VITE_SUPABASE_URL": "@vite_supabase_url",
+      "VITE_SUPABASE_ANON_KEY": "@vite_supabase_anon_key",
+      "VITE_STRIPE_PUBLISHABLE_KEY": "@vite_stripe_publishable_key",
+      "SLACK_WEBHOOK_URL": "@slack_webhook_url"
+    }
+  },
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
   "headers": [
     {
       "source": "/(.*)",
@@ -48,4 +65,7 @@
     }
   ]
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706

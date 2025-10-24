@@ -27,7 +27,11 @@ export default defineConfig(({ mode }) => {
   }
   
   return {
+<<<<<<< HEAD
     base: '', // Empty string for GitHub Pages with custom domain
+=======
+    base: '/',
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
     server: {
       host: "::",
       port: 8080,

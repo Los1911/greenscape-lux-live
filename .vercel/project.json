@@ -1,0 +1,16 @@
+{
+  "projectId": "prj_S6SvX1eJlewOtc6REp589yMzpCef",
+  "orgId": "team_yYu25NKgqZ9TZeGwuJl6RSqe",
+  "projectName": "greenscape-lux-live-v2",
+  "settings": {
+    "createdAt": 1759725267841,
+    "framework": "vite",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": "npm run build",
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "22.x"
+  }
+}

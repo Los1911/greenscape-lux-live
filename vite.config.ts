@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { defineConfig, loadEnv } from "vite";
+=======
+import { defineConfig } from "vite";
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
@@ -7,6 +11,7 @@ const buildTimestamp = Date.now();
 const buildHash = Math.random().toString(36).substr(2, 9);
 
 // https://vitejs.dev/config/
+<<<<<<< HEAD
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory
   // Load VITE_ prefixed variables from .env files
@@ -112,3 +117,74 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
+=======
+export default defineConfig(({ mode }) => ({
+  // Ensures correct relative paths for GitHub Pages
+  base: './',
+
+  server: {
+    host: "::",
+    port: 8080,
+  },
+
+  define: {
+    __BUILD_TIME__: buildTimestamp,
+    __BUILD_HASH__: JSON.stringify(buildHash),
+  },
+
+  plugins: [
+    react(),
+    // Custom plugin to generate version.json for build info
+    {
+      name: 'version-generator',
+      generateBundle() {
+        this.emitFile({
+          type: 'asset',
+          fileName: 'version.json',
+          source: JSON.stringify(
+            {
+              version: process.env.npm_package_version || '1.0.0',
+              buildTime: buildTimestamp,
+              hash: buildHash,
+              timestamp: new Date().toISOString(),
+            },
+            null,
+            2
+          ),
+        });
+      },
+    },
+  ].filter(Boolean),
+
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: false,
+    emptyOutDir: true,
+    // ✅ Prevents MIME-type error by enforcing ES module build
+    target: 'esnext',
+    modulePreload: {
+      polyfill: false,
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+        entryFileNames: `assets/[name].${buildHash}.[hash].js`,
+        chunkFileNames: `assets/[name].${buildHash}.[hash].js`,
+        assetFileNames: `assets/[name].${buildHash}.[hash].[ext]`,
+      },
+    },
+  },
+
+  preview: {
+    port: 8080,
+    host: "::",
+  },
+}));
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706

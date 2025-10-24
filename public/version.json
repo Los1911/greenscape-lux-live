@@ -1,7 +1,13 @@
 {
+<<<<<<< HEAD
   "commitHash": "dev-local",
   "buildId": "dev-build",
   "timestamp": 1704067200000,
+=======
+  "commitHash": "PLACEHOLDER",
+  "buildId": "PLACEHOLDER",
+  "timestamp": 0,
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
   "environment": "development",
   "deployedAt": "2025-01-01T00:00:00Z"
 }

@@ -3,6 +3,7 @@ import { logger } from '../utils/logger';
 
 // Environment validation with production logging
 console.log('Supabase URL loaded:', import.meta.env.VITE_SUPABASE_URL);
+<<<<<<< HEAD
 console.log('Stripe key present:', !!import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 logger.debug('Stripe environment check', {
   NODE_ENV: import.meta.env.NODE_ENV,
@@ -15,6 +16,19 @@ const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY || 'pk_live_
 
 if (!stripePublishableKey || stripePublishableKey === 'undefined') {
   const errorMsg = `CRITICAL: VITE_STRIPE_PUBLIC_KEY is ${!stripePublishableKey ? 'missing' : 'undefined string'} in environment variables. Using fallback key.`;
+=======
+console.log('Stripe key present:', !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+logger.debug('Stripe environment check', {
+  NODE_ENV: import.meta.env.NODE_ENV,
+  hasStripeKey: !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+}, 'StripeConfig');
+
+// Get Stripe publishable key from environment variable with fallback
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK';
+
+if (!stripePublishableKey || stripePublishableKey === 'undefined') {
+  const errorMsg = `CRITICAL: VITE_STRIPE_PUBLISHABLE_KEY is ${!stripePublishableKey ? 'missing' : 'undefined string'} in environment variables. Using fallback key.`;
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
   logger.warn(errorMsg, null, 'StripeConfig');
 }
 

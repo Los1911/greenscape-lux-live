@@ -47,6 +47,7 @@ serve(async (req) => {
       case 'payment_intent.payment_failed':
         await handlePaymentFailure(event.data.object as Stripe.PaymentIntent)
         break
+<<<<<<< HEAD
       case 'charge.refunded':
         await handleChargeRefunded(event.data.object as Stripe.Charge)
         break
@@ -58,6 +59,13 @@ serve(async (req) => {
     }
 
 
+=======
+      case 'customer.subscription.updated':
+        await handleSubscriptionUpdate(event.data.object as Stripe.Subscription)
+        break
+    }
+
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
     return new Response(JSON.stringify({ received: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
@@ -84,6 +92,7 @@ async function handlePaymentFailure(paymentIntent: Stripe.PaymentIntent) {
   }).eq('stripe_payment_intent_id', paymentIntent.id)
 }
 
+<<<<<<< HEAD
 async function handleChargeRefunded(charge: Stripe.Charge) {
   console.log('💰 Processing refund for charge:', charge.id)
   await supabase.from('payments').update({
@@ -92,6 +101,8 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
   }).eq('stripe_charge_id', charge.id)
 }
 
+=======
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
 async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   await supabase.from('subscriptions').upsert({
     stripe_subscription_id: subscription.id,
@@ -99,4 +110,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     updated_at: new Date().toISOString()
   })
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
