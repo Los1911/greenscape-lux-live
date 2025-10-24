@@ -1,0 +1,55 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+*.test.ts
+*.test.tsx
+tests/
+playwright.staging.config.ts
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Scripts
+scripts/
+
+# Git
+.git
+.gitignore
+
+# Environment
+.env.local
+.env.development
+.env.test
+.env*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist
+build
+.vercel
+
+# Supabase local
+supabase/.branches
+supabase/.temp
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

@@ -1,0 +1,12 @@
+### Auth Calls
+src/components/auth/UnifiedAuthPage.tsx:43:      const { data, error } = await supabase.auth.signInWithPassword({
+src/components/auth/UnifiedPortalAuth.tsx:49:      const { data, error } = await supabase.auth.signInWithPassword({
+src/components/auth/ConsolidatedAuth.tsx:46:        const { data, error } = await supabase.auth.signInWithPassword({
+src/components/ClientLogin.tsx:45:      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+src/lib/supabaseSecure.ts:64:    const result = await supabase.auth.signInWithPassword({ email, password });
+src/pages/AdminLogin.tsx:31:      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+src/components/auth/UnifiedAuthPage.tsx:70:      const { error } = await supabase.auth.signUp({
+src/components/auth/UnifiedPortalAuth.tsx:106:      const { data, error } = await supabase.auth.signUp(signupPayload);
+src/components/auth/ConsolidatedAuth.tsx:66:        const { data, error } = await supabase.auth.signUp({
+src/components/ClientSignUp.tsx:79:      const { data, error } = await supabase.auth.signUp(signupPayload);
+src/lib/supabaseSecure.ts:83:    return supabase.auth.signUp({ email, password, options });

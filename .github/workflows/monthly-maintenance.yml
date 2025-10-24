@@ -1,0 +1,92 @@
+name: Monthly Repository Maintenance
+
+on:
+  schedule:
+    # Run on the 1st of every month at 2 AM UTC
+    - cron: '0 2 1 * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  maintenance-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for git analysis
+
+      - name: Set up Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Make maintenance script executable
+        run: chmod +x scripts/automated-maintenance.sh
+
+      - name: Run maintenance scan
+        id: scan
+        run: |
+          bash scripts/automated-maintenance.sh
+          echo "scan_complete=true" >> $GITHUB_OUTPUT
+
+      - name: Upload maintenance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintenance-report-${{ github.run_number }}
+          path: maintenance-reports/deprecated-files-*.md
+          retention-days: 90
+
+      - name: Create Issue with Report
+        if: steps.scan.outputs.scan_complete == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Find the latest report
+            const reportDir = 'maintenance-reports';
+            const files = fs.readdirSync(reportDir);
+            const reportFiles = files.filter(f => f.startsWith('deprecated-files-'));
+            
+            if (reportFiles.length > 0) {
+              const latestReport = reportFiles.sort().reverse()[0];
+              const reportPath = path.join(reportDir, latestReport);
+              const reportContent = fs.readFileSync(reportPath, 'utf8');
+              
+              // Create issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Monthly Maintenance Report - ${new Date().toISOString().split('T')[0]}`,
+                body: `## Automated Maintenance Scan Complete\n\n${reportContent}\n\n---\n\n**Action Required:** Review the report and run the approval command if deletion is appropriate.\n\n**To approve deletion:**\n\`\`\`bash\nbash scripts/automated-maintenance.sh --approve\n\`\`\`\n\n**Artifact:** [Download full report](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+                labels: ['maintenance', 'automated']
+              });
+            }
+
+      - name: Comment on PR if exists
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportDir = 'maintenance-reports';
+            const files = fs.readdirSync(reportDir);
+            const reportFiles = files.filter(f => f.startsWith('deprecated-files-'));
+            
+            if (reportFiles.length > 0) {
+              const latestReport = reportFiles.sort().reverse()[0];
+              const reportPath = path.join(reportDir, latestReport);
+              const reportContent = fs.readFileSync(reportPath, 'utf8');
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `## 🧹 Maintenance Scan Results\n\n${reportContent.substring(0, 2000)}...\n\n[View full report in artifacts](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+              });
+            }

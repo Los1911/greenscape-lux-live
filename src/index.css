@@ -1,0 +1,220 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import './styles/mobile-optimizations.css';
+
+/* Glowing text effect */
+.glow-text {
+  text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+
+:root {
+  /* GreenScape Lux Brand Colors - Unified Emerald System */
+  --emerald-glow: #34d399;
+  --emerald-primary: #10b981;
+  --emerald-hover: #059669;
+  --emerald-light: #6ee7b7;
+  --emerald-dark: #047857;
+  
+  /* Dark Theme Variables */
+  --background: 0 0% 0%;
+  --foreground: 210 40% 98%;
+  --card: 222 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 142 76% 36%;
+  --primary-foreground: 355 7% 97%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
+  --ring: 142 76% 36%;
+  --radius: 0.75rem;
+}
+
+html, body, #root {
+  height: 100%;
+  font-family: 'Inter', sans-serif;
+}
+body {
+  background: #000 !important;
+  color: #e5e7eb;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Global safeguard for public routes */
+.public-route {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+/* Typography Standardization */
+h1 {
+  @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight;
+}
+
+h2 {
+  @apply text-xl sm:text-2xl md:text-3xl lg:text-4xl font-semibold text-white leading-tight;
+}
+
+h3 {
+  @apply text-lg sm:text-xl md:text-2xl font-semibold text-white leading-tight;
+}
+
+h4 {
+  @apply text-base sm:text-lg md:text-xl font-medium text-white leading-tight;
+}
+
+p {
+  @apply text-sm sm:text-base text-gray-300 leading-relaxed;
+}
+
+a {
+  color: var(--emerald-light);
+  @apply transition-colors duration-200;
+}
+
+a:hover {
+  color: var(--emerald-primary);
+}
+
+@layer utilities {
+  .glow-emerald {
+    box-shadow: 0 0 20px rgba(52, 211, 153, 0.4);
+  }
+  
+  .glow-emerald-strong {
+    box-shadow: 0 0 30px rgba(52, 211, 153, 0.6);
+  }
+  
+  /* Enhanced focus visibility for dark theme */
+  .focus-visible\:ring-emerald-400:focus-visible {
+    --tw-ring-color: rgb(52 211 153 / 0.8);
+    --tw-ring-offset-color: rgb(17 24 39);
+  }
+  
+  /* Pill-shaped components */
+  .pill-button {
+    @apply rounded-full px-4 sm:px-6 py-2 sm:py-3 font-medium transition-all duration-200 text-sm sm:text-base;
+  }
+  
+  .pill-input {
+    @apply rounded-full px-3 sm:px-4 py-2 sm:py-3 border transition-all duration-200 text-sm sm:text-base;
+  }
+  
+  .pill-card {
+    @apply rounded-2xl sm:rounded-3xl border border-border/40 bg-card shadow-sm;
+  }
+}
+
+.container {
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  max-width: 100%;
+}
+
+@media (min-width: 640px) {
+  .container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    max-width: 1024px;
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .container {
+    max-width: 1280px;
+  }
+}
+
+/* Enhanced Responsive spacing utilities */
+@layer utilities {
+  .space-responsive {
+    @apply space-y-3 sm:space-y-4 md:space-y-6 lg:space-y-8;
+  }
+  
+  .padding-responsive {
+    @apply p-3 sm:p-4 md:p-6 lg:p-8;
+  }
+  
+  .margin-responsive {
+    @apply m-3 sm:m-4 md:m-6 lg:m-8;
+  }
+  
+  /* Mobile-first grid utilities */
+  .grid-responsive-1 {
+    @apply grid grid-cols-1;
+  }
+  
+  .grid-responsive-2 {
+    @apply grid grid-cols-1 sm:grid-cols-2;
+  }
+  
+  .grid-responsive-3 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+  }
+  
+  .grid-responsive-4 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+  
+  /* Mobile-optimized text sizes */
+  .text-responsive-xs {
+    @apply text-xs sm:text-sm;
+  }
+  
+  .text-responsive-sm {
+    @apply text-sm sm:text-base;
+  }
+  
+  .text-responsive-base {
+    @apply text-base sm:text-lg;
+  }
+  
+  .text-responsive-lg {
+    @apply text-lg sm:text-xl md:text-2xl;
+  }
+  
+  .text-responsive-xl {
+    @apply text-xl sm:text-2xl md:text-3xl lg:text-4xl;
+  }
+  
+  /* Mobile-first flex utilities */
+  .flex-responsive-col {
+    @apply flex flex-col sm:flex-row;
+  }
+  
+  .flex-responsive-row {
+    @apply flex flex-row;
+  }
+  
+  /* Mobile gap utilities */
+  .gap-responsive {
+    @apply gap-3 sm:gap-4 md:gap-6 lg:gap-8;
+  }
+  
+  .gap-responsive-sm {
+    @apply gap-2 sm:gap-3 md:gap-4;
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "description": "Configuration for automated maintenance script",
+  "version": "1.0.0",
+  "settings": {
+    "daysThreshold": 90,
+    "reportDirectory": "maintenance-reports",
+    "deletionLogFile": "maintenance-reports/deletion-log.md"
+  },
+  "deprecatedPatterns": [
+    "*AUDIT*.md",
+    "*DIAGNOSTIC*.md",
+    "*FIX*.md",
+    "*REPORT*.md",
+    "*GUIDE*.md",
+    "*IMPLEMENTATION*.md",
+    "*DEPLOYMENT*.md",
+    "*CLEANUP*.md",
+    "*STATUS*.md",
+    "*COMPLETE*.md",
+    "*TODO*.md",
+    "*CHECKLIST*.md",
+    "*VERIFICATION*.md",
+    "*ANALYSIS*.md"
+  ],
+  "protectedPatterns": [
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE.md",
+    "CONTRIBUTING.md",
+    ".github/**/*",
+    "scripts/automated-maintenance.sh",
+    "scripts/maintenance-config.json",
+    "supabase/**/*",
+    "src/**/*",
+    "public/**/*",
+    "package.json",
+    "package-lock.json",
+    "vite.config.ts",
+    "tsconfig*.json",
+    "vercel.json",
+    ".env*",
+    ".gitignore",
+    "components.json",
+    "tailwind.config.ts",
+    "postcss.config.js"
+  ],
+  "protectedDirectories": [
+    ".github",
+    "supabase",
+    "src",
+    "public",
+    "scripts",
+    "tests",
+    "node_modules",
+    "dist",
+    ".git"
+  ],
+  "criticalFiles": [
+    "package.json",
+    "vite.config.ts",
+    "README.md",
+    ".env.production",
+    ".env.example",
+    "vercel.json"
+  ]
+}
