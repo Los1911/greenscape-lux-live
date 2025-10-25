@@ -31,7 +31,7 @@ jobs:
         cache: 'npm'
     
     - name: Install dependencies
-      run: npm ci
+      run: npm install
     
     - name: Create .env.local from secrets
       run: |
@@ -64,6 +64,7 @@ jobs:
       if: failure()
       run: |
         node scripts/slack-webhook.js validation-failed "Environment validation failed with missing or placeholder variables"
+      continue-on-error: true
 
   env-sync:
     name: Sync Environment Variables
@@ -82,7 +83,7 @@ jobs:
         cache: 'npm'
     
     - name: Install dependencies
-      run: npm ci
+      run: npm install
     
     - name: Create .env.local from secrets
       run: |
@@ -156,7 +157,7 @@ jobs:
         cache: 'npm'
     
     - name: Install dependencies
-      run: npm ci
+      run: npm install
     
     - name: Create .env.local from secrets
       run: |
@@ -181,6 +182,7 @@ jobs:
       if: failure()
       run: |
         node scripts/slack-webhook.js build-failed "Build or tests failed after environment sync"
+      continue-on-error: true
 
   deployment-ready:
     name: Deployment Ready Check
@@ -199,7 +201,7 @@ jobs:
         cache: 'npm'
     
     - name: Install dependencies
-      run: npm ci
+      run: npm install
     
     - name: Check deployment readiness
       run: |
@@ -222,3 +224,4 @@ jobs:
       if: success()
       run: |
         node scripts/slack-webhook.js deployment-success "Environment sync and deployment completed successfully"
+      continue-on-error: true
