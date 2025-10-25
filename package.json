@@ -41,11 +41,7 @@
     "@radix-ui/react-tooltip": "^1.1.4",
     "@stripe/react-stripe-js": "^2.8.0",
     "@stripe/stripe-js": "^4.8.0",
-<<<<<<< HEAD
     "@supabase/supabase-js": "^2.76.1",
-=======
-    "@supabase/supabase-js": "^2.75.0",
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
     "@tanstack/react-query": "^5.56.2",
     "@tanstack/react-table": "^8.20.5",
     "@types/uuid": "^10.0.0",
