@@ -17,6 +17,7 @@ jobs:
   validate-environment:
     name: Validate Environment Configuration
     runs-on: ubuntu-latest
+    environment: github-pages
     outputs:
       validation-passed: ${{ steps.validate.outputs.valid }}
 
@@ -33,21 +34,23 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # ✅ Direct secret access (no environment scoping)
+      # ✅ Validate environment configuration using environment variables
       - name: Validate environment configuration
         id: validate
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_SUPABASE_FUNCTIONS_URL: ${{ secrets.VITE_SUPABASE_FUNCTIONS_URL }}
-          VITE_RESEND_API_KEY: ${{ secrets.VITE_RESEND_API_KEY }}
-          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
-          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_FUNCTIONS_URL: ${{ vars.VITE_SUPABASE_FUNCTIONS_URL }}
+          VITE_RESEND_API_KEY: ${{ vars.VITE_RESEND_API_KEY }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ vars.VITE_GOOGLE_MAPS_API_KEY }}
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY }}
         run: |
           echo "🔍 Running environment validation..."
           MISSING=()
 
           for key in \
+            SUPABASE_SERVICE_ROLE_KEY \
             VITE_SUPABASE_URL \
             VITE_SUPABASE_ANON_KEY \
             VITE_SUPABASE_FUNCTIONS_URL \
@@ -77,6 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: validate-environment
     if: needs.validate-environment.outputs.validation-passed == 'true'
+    environment: github-pages
 
     steps:
       - name: Checkout code
@@ -91,18 +95,18 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # ✅ Write secrets to .env.local for build
-      - name: Create .env.local from secrets
+      # ✅ Write environment variables to .env.local for build
+      - name: Create .env.local from environment variables
         run: |
-          echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env.local
-          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env.local
-          echo "VITE_SUPABASE_FUNCTIONS_URL=${{ secrets.VITE_SUPABASE_FUNCTIONS_URL }}" >> .env.local
-          echo "VITE_RESEND_API_KEY=${{ secrets.VITE_RESEND_API_KEY }}" >> .env.local
-          echo "VITE_GOOGLE_MAPS_API_KEY=${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}" >> .env.local
-          echo "VITE_STRIPE_PUBLISHABLE_KEY=${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}" >> .env.local
+          echo "VITE_SUPABASE_URL=${{ vars.VITE_SUPABASE_URL }}" >> .env.local
+          echo "VITE_SUPABASE_ANON_KEY=${{ vars.VITE_SUPABASE_ANON_KEY }}" >> .env.local
+          echo "VITE_SUPABASE_FUNCTIONS_URL=${{ vars.VITE_SUPABASE_FUNCTIONS_URL }}" >> .env.local
+          echo "VITE_RESEND_API_KEY=${{ vars.VITE_RESEND_API_KEY }}" >> .env.local
+          echo "VITE_GOOGLE_MAPS_API_KEY=${{ vars.VITE_GOOGLE_MAPS_API_KEY }}" >> .env.local
+          echo "VITE_STRIPE_PUBLISHABLE_KEY=${{ vars.VITE_STRIPE_PUBLISHABLE_KEY }}" >> .env.local
           echo "✅ .env.local created successfully"
 
-      # 🏗️ Build the project
+      # 🏗️ Build project
       - name: Build project
         run: npm run build
 
