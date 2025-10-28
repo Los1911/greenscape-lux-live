@@ -35,22 +35,39 @@ jobs:
 
       - name: Validate environment configuration
         id: validate
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_FUNCTIONS_URL: ${{ secrets.VITE_SUPABASE_FUNCTIONS_URL }}
+          VITE_RESEND_API_KEY: ${{ secrets.VITE_RESEND_API_KEY }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
         run: |
           echo "🔍 Running environment validation..."
-          REQUIRED_KEYS=("VITE_SUPABASE_URL" "VITE_SUPABASE_ANON_KEY" "VITE_SUPABASE_FUNCTIONS_URL" "VITE_RESEND_API_KEY" "VITE_GOOGLE_MAPS_API_KEY" "VITE_STRIPE_PUBLISHABLE_KEY")
-          MISSING=false
-          for key in "${REQUIRED_KEYS[@]}"; do
-            if [ -z "${{ secrets[$key] }}" ]; then
+          MISSING=()
+
+          for key in \
+            VITE_SUPABASE_URL \
+            VITE_SUPABASE_ANON_KEY \
+            VITE_SUPABASE_FUNCTIONS_URL \
+            VITE_RESEND_API_KEY \
+            VITE_GOOGLE_MAPS_API_KEY \
+            VITE_STRIPE_PUBLISHABLE_KEY; do
+
+            if [ -z "${!key}" ]; then
               echo "❌ Missing env var: $key"
-              MISSING=true
+              MISSING+=("$key")
             else
               echo "✅ Found: $key"
             fi
           done
-          if [ "$MISSING" = true ]; then
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "⚠️ Missing environment variables: ${MISSING[*]}"
             echo "valid=false" >> $GITHUB_OUTPUT
             exit 1
           else
+            echo "✅ All required environment variables are present."
             echo "valid=true" >> $GITHUB_OUTPUT
           fi
 
