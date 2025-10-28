@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { defineConfig, loadEnv } from "vite";
-=======
-import { defineConfig } from "vite";
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
@@ -11,13 +7,11 @@ const buildTimestamp = Date.now();
 const buildHash = Math.random().toString(36).substr(2, 9);
 
 // https://vitejs.dev/config/
-<<<<<<< HEAD
 export default defineConfig(({ mode }) => {
-  // Load env file based on `mode` in the current working directory
-  // Load VITE_ prefixed variables from .env files
+  // Load environment variables based on mode
   const env = loadEnv(mode, process.cwd(), 'VITE_');
-  
-  // Also check process.env for variables set by CI/CD (GitHub Actions)
+
+  // Merge local and CI/CD environment variables
   const finalEnv = {
     VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL,
     VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY,
@@ -29,8 +23,7 @@ export default defineConfig(({ mode }) => {
     VITE_ADMIN_EMAIL: process.env.VITE_ADMIN_EMAIL || env.VITE_ADMIN_EMAIL,
     VITE_APP_ENV: process.env.VITE_APP_ENV || env.VITE_APP_ENV || mode,
   };
-  
-  // Log environment variable status during build
+
   console.log('\n🔧 Vite Build Configuration');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('📦 Build Mode:', mode);
@@ -42,27 +35,19 @@ export default defineConfig(({ mode }) => {
   console.log('  VITE_GOOGLE_MAPS_API_KEY:', finalEnv.VITE_GOOGLE_MAPS_API_KEY ? '✅ SET' : '❌ UNDEFINED');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  // Validate critical environment variables
-  if (!finalEnv.VITE_STRIPE_PUBLIC_KEY) {
-    console.error('⚠️  WARNING: VITE_STRIPE_PUBLIC_KEY is not set!');
-    console.error('   This will cause Stripe integration to fail in production.');
-  }
-  if (!finalEnv.VITE_GOOGLE_MAPS_API_KEY) {
-    console.error('⚠️  WARNING: VITE_GOOGLE_MAPS_API_KEY is not set!');
-    console.error('   This will cause Google Maps integration to fail in production.');
-  }
-  
   return {
-    base: '', // Empty string for GitHub Pages with custom domain
+    // ✅ Ensures correct relative paths for GitHub Pages and custom domains
+    base: './',
+
     server: {
       host: "::",
       port: 8080,
     },
+
     define: {
       __BUILD_TIME__: buildTimestamp,
       __BUILD_HASH__: JSON.stringify(buildHash),
-      // Explicitly inject all VITE_ environment variables
-      // Use || 'undefined' to ensure we always have a string value
+      // Inject VITE_ variables directly
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(finalEnv.VITE_SUPABASE_URL || ''),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(finalEnv.VITE_SUPABASE_ANON_KEY || ''),
       'import.meta.env.VITE_SUPABASE_FUNCTIONS_URL': JSON.stringify(finalEnv.VITE_SUPABASE_FUNCTIONS_URL || ''),
@@ -82,109 +67,49 @@ export default defineConfig(({ mode }) => {
           this.emitFile({
             type: 'asset',
             fileName: 'version.json',
-            source: JSON.stringify({
-              version: process.env.npm_package_version || '1.0.0',
-              buildTime: buildTimestamp,
-              hash: buildHash,
-              timestamp: new Date().toISOString()
-            }, null, 2)
+            source: JSON.stringify(
+              {
+                version: process.env.npm_package_version || '1.0.0',
+                buildTime: buildTimestamp,
+                hash: buildHash,
+                timestamp: new Date().toISOString(),
+              },
+              null,
+              2
+            ),
           });
-        }
-      }
-    ].filter(Boolean),
+        },
+      },
+    ],
+
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+
     build: {
       outDir: 'dist',
       assetsDir: 'assets',
       sourcemap: false,
       emptyOutDir: true,
+      target: 'esnext',
+      modulePreload: {
+        polyfill: false,
+      },
       rollupOptions: {
         output: {
           manualChunks: undefined,
           entryFileNames: `assets/[name].${buildHash}.[hash].js`,
           chunkFileNames: `assets/[name].${buildHash}.[hash].js`,
-          assetFileNames: `assets/[name].${buildHash}.[hash].[ext]`
+          assetFileNames: `assets/[name].${buildHash}.[hash].[ext]`,
         },
       },
     },
+
     preview: {
       port: 8080,
       host: "::",
     },
   };
 });
-=======
-export default defineConfig(({ mode }) => ({
-  // Ensures correct relative paths for GitHub Pages
-  base: './',
-
-  server: {
-    host: "::",
-    port: 8080,
-  },
-
-  define: {
-    __BUILD_TIME__: buildTimestamp,
-    __BUILD_HASH__: JSON.stringify(buildHash),
-  },
-
-  plugins: [
-    react(),
-    // Custom plugin to generate version.json for build info
-    {
-      name: 'version-generator',
-      generateBundle() {
-        this.emitFile({
-          type: 'asset',
-          fileName: 'version.json',
-          source: JSON.stringify(
-            {
-              version: process.env.npm_package_version || '1.0.0',
-              buildTime: buildTimestamp,
-              hash: buildHash,
-              timestamp: new Date().toISOString(),
-            },
-            null,
-            2
-          ),
-        });
-      },
-    },
-  ].filter(Boolean),
-
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-
-  build: {
-    outDir: 'dist',
-    assetsDir: 'assets',
-    sourcemap: false,
-    emptyOutDir: true,
-    // ✅ Prevents MIME-type error by enforcing ES module build
-    target: 'esnext',
-    modulePreload: {
-      polyfill: false,
-    },
-    rollupOptions: {
-      output: {
-        manualChunks: undefined,
-        entryFileNames: `assets/[name].${buildHash}.[hash].js`,
-        chunkFileNames: `assets/[name].${buildHash}.[hash].js`,
-        assetFileNames: `assets/[name].${buildHash}.[hash].[ext]`,
-      },
-    },
-  },
-
-  preview: {
-    port: 8080,
-    host: "::",
-  },
-}));
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
