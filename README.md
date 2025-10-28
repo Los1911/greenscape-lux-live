@@ -71,3 +71,4 @@ The application is configured for deployment on Vercel with automatic builds fro
 ## License
 
 Private - All rights reserved# GreenScape Lux CI/CD verified
+trigger redeploy
