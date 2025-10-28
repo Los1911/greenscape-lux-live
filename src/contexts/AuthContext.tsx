@@ -41,14 +41,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const getUserRole = async (user: User): Promise<string | null> => {
     try {
       console.log('🔍 Looking up role for user ID:', user.id);
-      
+
       // First try user metadata from session
       const roleFromMetadata = user.user_metadata?.role;
       if (roleFromMetadata) {
         console.log('✅ Got role from metadata:', roleFromMetadata);
         return roleFromMetadata;
       }
-      
+
       // Fallback to database lookup using user ID
       console.log('🔍 No role in metadata, querying database...');
       const { data: userData, error } = await supabase
@@ -56,17 +56,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select('role')
         .eq('id', user.id)
         .single();
-      
+
       if (error) {
         console.error('❌ Database role lookup error:', error);
         return 'client'; // Safe fallback
       }
-      
+
       if (userData?.role) {
         console.log('✅ Got role from database:', userData.role);
         return userData.role;
       }
-      
+
       console.log('🔍 No role found, defaulting to client');
       return 'client'; // Safe fallback
     } catch (error) {
@@ -79,47 +79,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const ensureUserRecord = async (authUser: User): Promise<void> => {
     try {
       if (!authUser.id || !authUser.email) return;
-      
+
       // Check if user exists
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
         .eq('id', authUser.id)
         .single();
-      
+
       if (existingUser) {
         return; // User already exists
       }
-      
-<<<<<<< HEAD
-      // Upsert user record (insert or update if exists)
-      const { error } = await supabase
-        .from('users')
-        .upsert({
-=======
-      // Create user record
-      const { error } = await supabase
-        .from('users')
-        .insert({
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
-          id: authUser.id,
-          email: authUser.email,
-          role: authUser.user_metadata?.role || 'client',
-          first_name: authUser.user_metadata?.first_name || null,
-          last_name: authUser.user_metadata?.last_name || null
-<<<<<<< HEAD
-        }, {
-          onConflict: 'id'
-        });
 
-=======
-        });
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
-      
+      // ✅ Upsert user record (insert or update if exists)
+      const { error } = await supabase
+        .from('users')
+        .upsert(
+          {
+            id: authUser.id,
+            email: authUser.email,
+            role: authUser.user_metadata?.role || 'client',
+            first_name: authUser.user_metadata?.first_name || null,
+            last_name: authUser.user_metadata?.last_name || null,
+          },
+          { onConflict: 'id' }
+        );
+
       if (error) {
-        console.error('❌ Error creating user record:', error);
+        console.error('❌ Error creating or updating user record:', error);
       } else {
-        console.log('✅ Created user record for:', authUser.email);
+        console.log('✅ Created or updated user record for:', authUser.email);
       }
     } catch (error) {
       console.error('❌ Exception in ensureUserRecord:', error);
@@ -128,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUserRole = async () => {
     if (!user) return;
-    
+
     console.log('🔄 Refreshing user role for:', user.email);
     const role = await getUserRole(user);
     setUserRole(role);
@@ -137,15 +126,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       console.log('🔄 AuthContext signOut called');
-      
+
       // Clear local state first
       setUser(null);
       setSession(null);
       setUserRole(null);
-      
+
       // Sign out from Supabase
       await supabase.auth.signOut();
-      
+
       // Redirect to home page
       window.location.href = '/';
     } catch (error) {
@@ -162,31 +151,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!mounted) return;
 
       console.log('🔄 Auth state change:', event, session?.user?.email || 'no user');
-      
+
       setSession(session);
       setUser(session?.user || null);
-      
+
       if (session?.user?.email) {
         // Ensure user record exists
         await ensureUserRecord(session.user);
-        
+
         // Get user role
         const role = await getUserRole(session.user);
         if (mounted) {
           setUserRole(role);
-          
+
           // Handle redirect after successful login (only on SIGNED_IN event)
           if (event === 'SIGNED_IN' && role) {
             console.log('✅ Login successful, redirecting based on role:', role);
-            
+
             // Determine redirect path based on role
-            const redirectPath = 
-              role === 'admin' ? '/admin-dashboard' :
-              role === 'landscaper' ? '/landscaper-dashboard' :
-              '/client-dashboard';
-            
+            const redirectPath =
+              role === 'admin'
+                ? '/admin-dashboard'
+                : role === 'landscaper'
+                ? '/landscaper-dashboard'
+                : '/client-dashboard';
+
             console.log('🔀 Redirecting to:', redirectPath);
-            
+
             // Use a small delay to ensure state is updated
             setTimeout(() => {
               window.location.href = redirectPath;
@@ -198,7 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUserRole(null);
         }
       }
-      
+
       if (mounted) {
         setLoading(false);
       }
@@ -212,7 +203,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(handleAuthStateChange);
 
     return () => {
       mounted = false;
@@ -229,9 +222,5 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUserRole,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
