@@ -22,7 +22,7 @@ export interface StrictConfig {
 // Debug logging for Vercel env var injection
 console.log("🔍 Vercel Env Check (Build Time):", {
   supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+  anonKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
   stripeKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
   googleMapsKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
   mode: import.meta.env.MODE,
@@ -32,13 +32,13 @@ console.log("🔍 Vercel Env Check (Build Time):", {
 
 export function getStrictConfig(): StrictConfig {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
   const googleMapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   // Critical validation - fail fast if missing
   if (!supabaseUrl || !anonKey) {
-    const error = '🚨 CRITICAL: Missing Supabase environment variables. Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel Dashboard.';
+    const error = '🚨 CRITICAL: Missing Supabase environment variables. Configure VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in Vercel Dashboard.';
     console.error(error);
     throw new Error(error);
   }

@@ -63,7 +63,7 @@ export function AutoSyncManager() {
               </p>
               <div className="text-xs text-yellow-600 space-y-1">
                 <p>• Go to Vercel Dashboard → Settings → Environment Variables</p>
-                <p>• Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY</p>
+                <p>• Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY</p>
                 <p>• Set for Production, Preview, and Development</p>
                 <p>• Redeploy your application</p>
               </div>

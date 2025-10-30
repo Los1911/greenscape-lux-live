@@ -24,6 +24,6 @@ export const safeGetEnvBoolean = (key: string, fallback: boolean = false): boole
 
 // Pre-configured getters for common environment variables
 export const getSupabaseUrl = () => safeGetEnv('VITE_SUPABASE_URL', 'https://mwvcbedvnimabfwubazz.supabase.co');
-export const getSupabaseAnonKey = () => safeGetEnv('VITE_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2XfXwRvar5UqQSZVK5WTtFfmPZ0HskSY');
+export const getSupabaseAnonKey = () => safeGetEnv('VITE_SUPABASE_PUBLISHABLE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2XfXwRvar5UqQSZVK5WTtFfmPZ0HskSY');
 export const getAdminEmail = () => safeGetEnv('VITE_ADMIN_EMAIL', 'cmatthews@greenscapelux.com');
 export const isDev = () => safeGetEnvBoolean('DEV') || safeGetEnv('MODE') === 'development';

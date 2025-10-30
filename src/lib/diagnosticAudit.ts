@@ -46,7 +46,7 @@ export function runDiagnosticAudit(): DiagnosticReport {
   
   // Build time environment variables
   const viteSupabaseUrl = env.VITE_SUPABASE_URL;
-  const viteSupabaseAnonKey = env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON;
+  const viteSupabaseAnonKey = env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON;
   const envVarsPresent = !!(viteSupabaseUrl && viteSupabaseAnonKey);
   
   // All environment variables audit
@@ -138,7 +138,7 @@ export function runDiagnosticAudit(): DiagnosticReport {
   // Recommendations
   const recommendations: string[] = [];
   if (!envVarsPresent) {
-    recommendations.push('Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables');
+    recommendations.push('Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY environment variables');
   }
   if (conflicts.length > 0) {
     recommendations.push('Resolve configuration conflicts between different systems');

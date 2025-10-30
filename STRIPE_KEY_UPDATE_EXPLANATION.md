@@ -5,7 +5,7 @@
 
 ### Variable Name Standardization
 **Old Name:** `VITE_STRIPE_PUBLISHABLE_KEY`  
-**New Name:** `VITE_STRIPE_PUBLIC_KEY`  
+**New Name:** `VITE_STRIPE_PUBLISHABLE_KEY`  
 **Reason:** Consistency with Stripe's official terminology and codebase standards
 
 ## ✅ Files Updated
@@ -21,7 +21,7 @@
 - ✅ `.github/workflows/env-validation.yml` - Updated
 
 ### 3. Application Code
-- ✅ `src/lib/stripe.ts` - Already uses `VITE_STRIPE_PUBLIC_KEY`
+- ✅ `src/lib/stripe.ts` - Already uses `VITE_STRIPE_PUBLISHABLE_KEY`
 
 ## 🎯 Required Actions
 
@@ -30,7 +30,7 @@ Go to: **Repository → Settings → Secrets and variables → Actions**
 
 Create or update this secret:
 ```
-Name: VITE_STRIPE_PUBLIC_KEY
+Name: VITE_STRIPE_PUBLISHABLE_KEY
 Value: pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK
 ```
 
@@ -80,7 +80,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 VITE_SUPABASE_FUNCTIONS_URL=https://mwvcbedvnimabfwubazz.functions.supabase.co
 
 # Stripe (UPDATED NAME)
-VITE_STRIPE_PUBLIC_KEY=pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85...
+VITE_STRIPE_PUBLISHABLE_KEY=pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85...
 
 # Google Maps
 VITE_GOOGLE_MAPS_API_KEY=AIzaSyDGAU0VsZYL67arpQfGy-1vWSANqe-mKo4
@@ -97,7 +97,7 @@ VITE_APP_ENV=production
 ## 🚨 Common Issues & Solutions
 
 ### Issue: "Stripe key undefined"
-**Solution:** Ensure GitHub Secret is named exactly `VITE_STRIPE_PUBLIC_KEY`
+**Solution:** Ensure GitHub Secret is named exactly `VITE_STRIPE_PUBLISHABLE_KEY`
 
 ### Issue: "Invalid API key"
 **Solution:** Verify the key starts with `pk_live_` and matches the value above

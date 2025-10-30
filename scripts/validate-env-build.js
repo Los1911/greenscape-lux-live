@@ -11,14 +11,14 @@ const path = require('path');
 // Critical environment variables that MUST be present
 const CRITICAL_VARS = [
   'VITE_SUPABASE_URL',
-  'VITE_SUPABASE_ANON_KEY',
+  'VITE_SUPABASE_PUBLISHABLE_KEY',
   'VITE_STRIPE_PUBLISHABLE_KEY'
 ];
 
 // All expected environment variables from .env.example
 const EXPECTED_VARS = [
   'VITE_SUPABASE_URL',
-  'VITE_SUPABASE_ANON_KEY',
+  'VITE_SUPABASE_PUBLISHABLE_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
   'VITE_STRIPE_PUBLISHABLE_KEY',
   'STRIPE_SECRET_KEY',

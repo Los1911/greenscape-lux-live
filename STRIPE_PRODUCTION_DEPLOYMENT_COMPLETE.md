@@ -4,10 +4,10 @@
 ## 🎯 What Was Fixed
 
 The Stripe public key was showing as "UNDEFINED" in production because:
-- **Code expected**: `VITE_STRIPE_PUBLIC_KEY`
+- **Code expected**: `VITE_STRIPE_PUBLISHABLE_KEY`
 - **Vercel had**: `VITE_STRIPE_PUBLISHABLE_KEY` (wrong name)
 
-All code has been updated to use the correct variable name: `VITE_STRIPE_PUBLIC_KEY`
+All code has been updated to use the correct variable name: `VITE_STRIPE_PUBLISHABLE_KEY`
 
 ---
 
@@ -20,7 +20,7 @@ All code has been updated to use the correct variable name: `VITE_STRIPE_PUBLIC_
 3. **Settings** → **Environment Variables**
 4. **Delete**: `VITE_STRIPE_PUBLISHABLE_KEY` (if exists)
 5. **Add New**:
-   - Name: `VITE_STRIPE_PUBLIC_KEY`
+   - Name: `VITE_STRIPE_PUBLISHABLE_KEY`
    - Value: `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
    - Environment: ✅ Production
 6. **Save** → **Deployments** → **Redeploy** latest
@@ -62,7 +62,7 @@ After deployment:
 3. Console tab
 4. Look for:
    ```
-   VITE_STRIPE_PUBLIC_KEY: pk_live_51S1Ht0K6kWkUsx...
+   VITE_STRIPE_PUBLISHABLE_KEY: pk_live_51S1Ht0K6kWkUsx...
    ```
 
 ### ✅ Success = Key shows (not "UNDEFINED")
@@ -83,7 +83,7 @@ After deployment:
 ## 🆘 Troubleshooting
 
 **Still seeing UNDEFINED?**
-1. Verify variable name is exactly: `VITE_STRIPE_PUBLIC_KEY`
+1. Verify variable name is exactly: `VITE_STRIPE_PUBLISHABLE_KEY`
 2. Verify it's enabled for Production environment
 3. Wait 2-3 minutes for cache to clear
 4. Hard refresh browser (Ctrl+Shift+R)

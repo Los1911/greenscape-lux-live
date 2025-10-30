@@ -93,7 +93,7 @@ supabase functions logs stripe-webhook --tail 20
 3. Look for:
    ```
    ✅ Stripe connected successfully
-   VITE_STRIPE_PUBLIC_KEY: pk_live_51S1Ht0K6kWkUsx...
+   VITE_STRIPE_PUBLISHABLE_KEY: pk_live_51S1Ht0K6kWkUsx...
    ```
 
 ---
@@ -176,7 +176,7 @@ supabase functions logs stripe-webhook --tail 50
 - ✅ `SUPABASE_SERVICE_ROLE_KEY` = `eyJ...`
 
 ### Vercel Environment Variables (Frontend)
-- ✅ `VITE_STRIPE_PUBLIC_KEY` = `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
+- ✅ `VITE_STRIPE_PUBLISHABLE_KEY` = `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
 
 ---
 

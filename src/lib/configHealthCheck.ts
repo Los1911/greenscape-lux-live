@@ -39,7 +39,7 @@ export function checkSupabaseConfigHealth(): SupabaseConfigHealth {
   
   const envVars = {
     url: env.VITE_SUPABASE_URL || env.VITE_database_URL || undefined,
-    anonKey: env.VITE_SUPABASE_ANON_KEY || env.VITE_database_ANON_KEY || env.VITE_SUPABASE_ANON || undefined
+    anonKey: env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_database_ANON_KEY || env.VITE_SUPABASE_ANON || undefined
   };
 
   const localStorage = getFromLocalStorage();

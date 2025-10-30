@@ -14,7 +14,7 @@ The Stripe public key is showing as "UNDEFINED" in production because the enviro
 4. Add or update the following variable:
 
 ```
-Name: VITE_STRIPE_PUBLIC_KEY
+Name: VITE_STRIPE_PUBLISHABLE_KEY
 Value: pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK
 Environment: Production, Preview, Development (select all)
 ```
@@ -43,7 +43,7 @@ git push origin main
 3. Open browser DevTools (F12)
 4. Go to **Console** tab
 5. Look for environment variable logs
-6. Verify `VITE_STRIPE_PUBLIC_KEY` shows: `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
+6. Verify `VITE_STRIPE_PUBLISHABLE_KEY` shows: `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
 
 ### Step 4: Test Stripe Integration
 
@@ -62,7 +62,7 @@ If using GitHub Pages instead of Vercel:
 2. Click **New repository secret**
 3. Add:
 ```
-Name: VITE_STRIPE_PUBLIC_KEY
+Name: VITE_STRIPE_PUBLISHABLE_KEY
 Value: pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK
 ```
 
@@ -72,7 +72,7 @@ The workflow file `.github/workflows/github-pages-deploy.yml` already includes:
 
 ```yaml
 env:
-  VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
+  VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
 ```
 
 ### Trigger Deployment

@@ -20,7 +20,7 @@ You'll see two types of keys:
 - Starts with: `pk_live_`
 - Safe to expose in browser
 - Used for Stripe Elements (payment forms)
-- **Add to Vercel** as `VITE_STRIPE_PUBLIC_KEY`
+- **Add to Vercel** as `VITE_STRIPE_PUBLISHABLE_KEY`
 
 #### **Secret Key** (Server-Side)
 - Starts with: `sk_live_`
@@ -45,7 +45,7 @@ You'll see two types of keys:
 2. Select **greenscape-lux-live** project
 3. Go to **Settings** → **Environment Variables**
 4. Add new variable:
-   - **Name:** `VITE_STRIPE_PUBLIC_KEY`
+   - **Name:** `VITE_STRIPE_PUBLISHABLE_KEY`
    - **Value:** `pk_live_your_actual_key_here`
    - **Environment:** ✅ Production, ✅ Preview, ✅ Development
 5. Click **Save**
@@ -106,7 +106,7 @@ You'll see two types of keys:
 ## ✅ Verification Checklist
 
 - [ ] Stripe publishable key obtained from dashboard
-- [ ] `VITE_STRIPE_PUBLIC_KEY` added to Vercel
+- [ ] `VITE_STRIPE_PUBLISHABLE_KEY` added to Vercel
 - [ ] Stripe secret key obtained from dashboard
 - [ ] `STRIPE_SECRET_KEY` added to Supabase Secrets
 - [ ] Webhook endpoint created in Stripe
@@ -157,7 +157,7 @@ You'll see two types of keys:
 ## 🆘 Troubleshooting
 
 **Payment not processing?**
-- Verify `VITE_STRIPE_PUBLIC_KEY` is set in Vercel
+- Verify `VITE_STRIPE_PUBLISHABLE_KEY` is set in Vercel
 - Check browser console for Stripe errors
 - Ensure key starts with `pk_live_` (not `pk_test_`)
 

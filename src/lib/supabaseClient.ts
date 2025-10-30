@@ -16,12 +16,12 @@ const getEnvironmentVariable = (key: string, fallback: string): string => {
 // Production-ready fallback configuration
 const FALLBACK_CONFIG = {
   VITE_SUPABASE_URL: 'https://mwvcbedvnimabfwubazz.supabase.co',
-  VITE_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2XfXwRvar5UqQSZVK5WTtFfmPZ0HskSY'
+  VITE_SUPABASE_PUBLISHABLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2XfXwRvar5UqQSZVK5WTtFfmPZ0HskSY'
 };
 
 // Get configuration with robust fallback system
 const supabaseUrl = getEnvironmentVariable('VITE_SUPABASE_URL', FALLBACK_CONFIG.VITE_SUPABASE_URL);
-const supabaseAnonKey = getEnvironmentVariable('VITE_SUPABASE_ANON_KEY', FALLBACK_CONFIG.VITE_SUPABASE_ANON_KEY);
+const supabaseAnonKey = getEnvironmentVariable('VITE_SUPABASE_PUBLISHABLE_KEY', FALLBACK_CONFIG.VITE_SUPABASE_PUBLISHABLE_KEY);
 
 // Validate configuration
 if (!supabaseUrl || !supabaseAnonKey) {

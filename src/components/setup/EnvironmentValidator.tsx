@@ -22,7 +22,7 @@ const REQUIRED_ENV_VARS: EnvVariable[] = [
     example: 'https://your-project.supabase.co'
   },
   {
-    key: 'VITE_SUPABASE_ANON_KEY',
+    key: 'VITE_SUPABASE_PUBLISHABLE_KEY',
     required: true,
     description: 'Supabase anonymous key',
     pattern: /^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,

@@ -25,7 +25,7 @@ export const getAutoConfig = (): AutoConfig => {
 
   // Try environment variables first
   const envUrl = import.meta.env?.VITE_SUPABASE_URL;
-  const envKey = import.meta.env?.VITE_SUPABASE_ANON_KEY;
+  const envKey = import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY;
   const envAdmin = import.meta.env?.VITE_ADMIN_EMAIL;
 
   if (envUrl && envKey) {

@@ -6,7 +6,7 @@ console.log('================================');
 
 const requiredVars = [
   'VITE_SUPABASE_URL',
-  'VITE_SUPABASE_ANON_KEY'
+  'VITE_SUPABASE_PUBLISHABLE_KEY'
 ];
 
 let allVarsPresent = true;
@@ -39,7 +39,7 @@ const env = (typeof import !== 'undefined' && import.meta?.env) || {};
 // Export for use in other modules
 export const buildTimeEnvCheck = {
   supabaseUrl: env.VITE_SUPABASE_URL,
-  supabaseAnonKey: env.VITE_SUPABASE_ANON_KEY,
+  supabaseAnonKey: env.VITE_SUPABASE_PUBLISHABLE_KEY,
   isValid: allVarsPresent
 };
 

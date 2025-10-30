@@ -12,7 +12,7 @@ console.log('===============================================');
 const requiredEnvVars = {
   client: [
     'VITE_SUPABASE_URL',
-    'VITE_SUPABASE_ANON_KEY',
+    'VITE_SUPABASE_PUBLISHABLE_KEY',
     'VITE_STRIPE_PUBLISHABLE_KEY'
   ],
   server: [

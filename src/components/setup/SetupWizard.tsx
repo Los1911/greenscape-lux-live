@@ -135,7 +135,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
         '2. In your project settings, copy the Project URL',
         '3. Copy the anon/public API key',
         '4. Add to .env.local: VITE_SUPABASE_URL=your-url',
-        '5. Add to .env.local: VITE_SUPABASE_ANON_KEY=your-key'
+        '5. Add to .env.local: VITE_SUPABASE_PUBLISHABLE_KEY=your-key'
       ]
     },
     {

@@ -3,7 +3,7 @@
 
 ## Current Status
 - ❌ **Production site showing Stripe key as "UNDEFINED"**
-- ✅ Code updated to use correct variable name: `VITE_STRIPE_PUBLIC_KEY`
+- ✅ Code updated to use correct variable name: `VITE_STRIPE_PUBLISHABLE_KEY`
 - ✅ Local environment files configured correctly
 - ❌ **Vercel/GitHub Pages environment variables NOT YET UPDATED**
 
@@ -32,7 +32,7 @@ The code is ready, but **you must update the environment variable in your deploy
    - Click **Add New** (or edit existing if found)
    - Enter:
      ```
-     Name: VITE_STRIPE_PUBLIC_KEY
+     Name: VITE_STRIPE_PUBLISHABLE_KEY
      Value: pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK
      ```
    - Select environments: **Production**, **Preview**, **Development**
@@ -47,7 +47,7 @@ The code is ready, but **you must update the environment variable in your deploy
 5. **Verify**
    - Visit https://greenscapelux.com
    - Open browser console (F12)
-   - Look for: `VITE_STRIPE_PUBLIC_KEY: pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
+   - Look for: `VITE_STRIPE_PUBLISHABLE_KEY: pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
 
 ---
 
@@ -64,7 +64,7 @@ The code is ready, but **you must update the environment variable in your deploy
    - Click **New repository secret**
    - Enter:
      ```
-     Name: VITE_STRIPE_PUBLIC_KEY
+     Name: VITE_STRIPE_PUBLISHABLE_KEY
      Secret: pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK
      ```
    - Click **Add secret**
@@ -93,7 +93,7 @@ After deployment, run these checks:
 ### Browser Console Check
 ```javascript
 // Should show the live key
-console.log(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+console.log(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 ```
 
 ### Network Tab Check
@@ -106,7 +106,7 @@ console.log(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 ## What Was Fixed in the Code
 
-✅ **src/lib/config.ts** - Changed to use `VITE_STRIPE_PUBLIC_KEY`
+✅ **src/lib/config.ts** - Changed to use `VITE_STRIPE_PUBLISHABLE_KEY`
 ✅ **src/lib/browserEnv.ts** - Updated debug logging
 ✅ **.env.local** - Created with correct variable
 ✅ **.env.production** - Already had correct variable
@@ -117,7 +117,7 @@ console.log(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 ## Why This Happened
 
 The codebase had an inconsistency:
-- Environment files used: `VITE_STRIPE_PUBLIC_KEY` ✓
+- Environment files used: `VITE_STRIPE_PUBLISHABLE_KEY` ✓
 - Code was reading: `VITE_STRIPE_PUBLISHABLE_KEY` ✗
 
 This mismatch caused the "UNDEFINED" error because the code was looking for a variable that didn't exist.

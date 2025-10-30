@@ -4,7 +4,7 @@ import { getSafeConfig } from './environmentFallback';
 // 🔍 DEBUG: Log raw import.meta.env values to verify Vercel injection
 console.log("🔍 Vercel Env Check (Build Time):", {
   supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+  anonKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
   stripeKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
   googleMapsKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
   mode: import.meta.env.MODE,
@@ -19,7 +19,7 @@ function createConfig() {
     const standardConfig = {
       supabase: {
         url: getBrowserEnv('VITE_SUPABASE_URL') || '',
-        anonKey: getBrowserEnv('VITE_SUPABASE_ANON_KEY') || ''
+        anonKey: getBrowserEnv('VITE_SUPABASE_PUBLISHABLE_KEY') || ''
       },
       stripe: {
         publishableKey: getBrowserEnv('VITE_STRIPE_PUBLISHABLE_KEY') || ''

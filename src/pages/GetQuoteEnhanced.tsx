@@ -198,7 +198,7 @@ export default function GetQuoteEnhanced() {
       console.log('📧 Preparing to send email notification via unified-email...');
       
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mwvcbedvnimabfwubazz.supabase.co';
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       
       // Prepare unified-email payload with required fields
       const emailPayload = {

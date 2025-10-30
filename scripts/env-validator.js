@@ -12,7 +12,7 @@ const path = require('path');
 const isGitHubActions = process.argv.includes('--github') || process.env.GITHUB_ACTIONS;
     this.requiredKeys = [
       'VITE_SUPABASE_URL',
-      'VITE_SUPABASE_ANON_KEY',
+      'VITE_SUPABASE_PUBLISHABLE_KEY',
       'RESEND_API_KEY'
     ];
     
@@ -102,7 +102,7 @@ const isGitHubActions = process.argv.includes('--github') || process.env.GITHUB_
   validateSupabaseKeys(env) {
     const results = {
       url: { key: 'VITE_SUPABASE_URL', valid: false, message: '' },
-      anonKey: { key: 'VITE_SUPABASE_ANON_KEY', valid: false, message: '' }
+      anonKey: { key: 'VITE_SUPABASE_PUBLISHABLE_KEY', valid: false, message: '' }
     };
 
     // Validate URL
@@ -119,7 +119,7 @@ const isGitHubActions = process.argv.includes('--github') || process.env.GITHUB_
     }
 
     // Validate anon key
-    const anonKey = env['VITE_SUPABASE_ANON_KEY'];
+    const anonKey = env['VITE_SUPABASE_PUBLISHABLE_KEY'];
     if (!anonKey) {
       results.anonKey.message = 'Missing';
     } else if (this.isPlaceholder(anonKey)) {

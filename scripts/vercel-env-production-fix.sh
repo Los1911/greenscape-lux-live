@@ -34,7 +34,7 @@ echo -e "${GREEN}✅ Vercel CLI ready${NC}"
 declare -A ENV_VARS=(
     # Client variables (exposed to browser)
     ["VITE_SUPABASE_URL"]="https://mwvcbedvnimabfwubazz.supabase.co"
-    ["VITE_SUPABASE_ANON_KEY"]="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2FfXwRvar5UqQSZVK5WTtFfmPZ0HskSY"
+    ["VITE_SUPABASE_PUBLISHABLE_KEY"]="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2FfXwRvar5UqQSZVK5WTtFfmPZ0HskSY"
     ["VITE_GOOGLE_MAPS_API_KEY"]="AIzaSyDGAU0VsZYL67arpQfGy-1vWSANqe-mKo4"
     
     # Server variables (secure, not exposed)

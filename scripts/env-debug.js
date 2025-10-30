@@ -28,9 +28,9 @@ envFiles.forEach(file => {
       
       // Check for required Vite variables
       const hasSupabaseUrl = content.includes('VITE_SUPABASE_URL');
-      const hasSupabaseKey = content.includes('VITE_SUPABASE_ANON_KEY');
+      const hasSupabaseKey = content.includes('VITE_SUPABASE_PUBLISHABLE_KEY');
       console.log(`    VITE_SUPABASE_URL: ${hasSupabaseUrl ? '✅' : '❌'}`);
-      console.log(`    VITE_SUPABASE_ANON_KEY: ${hasSupabaseKey ? '✅' : '❌'}`);
+      console.log(`    VITE_SUPABASE_PUBLISHABLE_KEY: ${hasSupabaseKey ? '✅' : '❌'}`);
     } catch (error) {
       console.log(`    Error reading file: ${error.message}`);
     }
@@ -62,7 +62,7 @@ console.log('   npm run dev (or yarn dev)');
 console.log('');
 console.log('3. For Vercel deployment:');
 console.log('   vercel env add VITE_SUPABASE_URL');
-console.log('   vercel env add VITE_SUPABASE_ANON_KEY');
+console.log('   vercel env add VITE_SUPABASE_PUBLISHABLE_KEY');
 console.log('');
 console.log('4. Verify in browser console:');
 console.log('   Look for "Environment Variables Check" logs');

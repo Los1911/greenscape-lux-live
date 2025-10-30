@@ -26,7 +26,7 @@ export class EnvironmentValidator {
       error: 'Must be a valid Supabase URL'
     },
     {
-      key: 'VITE_SUPABASE_ANON_KEY', 
+      key: 'VITE_SUPABASE_PUBLISHABLE_KEY', 
       required: true,
       validator: (value: string) => value.startsWith('eyJ') && value.length > 100,
       error: 'Must be a valid Supabase anon key (JWT token)'

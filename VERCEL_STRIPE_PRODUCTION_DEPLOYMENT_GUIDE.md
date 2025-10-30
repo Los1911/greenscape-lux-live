@@ -24,7 +24,7 @@ Click on: **GreenScape Lux** (or your project name)
    - Confirm deletion
 4. **Add new variable**:
    - Click: **Add New** button
-   - **Name**: `VITE_STRIPE_PUBLIC_KEY`
+   - **Name**: `VITE_STRIPE_PUBLISHABLE_KEY`
    - **Value**: `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
    - **Environments**: Check ✅ **Production**
    - Click: **Save**
@@ -43,7 +43,7 @@ Click on: **GreenScape Lux** (or your project name)
 3. Go to: **Console** tab
 4. Look for:
    ```
-   VITE_STRIPE_PUBLIC_KEY: pk_live_51S1Ht0K6kWkUsx...
+   VITE_STRIPE_PUBLISHABLE_KEY: pk_live_51S1Ht0K6kWkUsx...
    ```
 5. ✅ If you see the key → SUCCESS!
 6. ❌ If still "UNDEFINED" → Hard refresh (Ctrl+Shift+R)
@@ -78,15 +78,15 @@ Click on: **GreenScape Lux** (or your project name)
 
 ### Before (Broken)
 ```
-Code expects: VITE_STRIPE_PUBLIC_KEY
+Code expects: VITE_STRIPE_PUBLISHABLE_KEY
 Vercel has:   VITE_STRIPE_PUBLISHABLE_KEY ❌ (wrong name)
 Result:       "UNDEFINED" error
 ```
 
 ### After (Fixed)
 ```
-Code expects: VITE_STRIPE_PUBLIC_KEY
-Vercel has:   VITE_STRIPE_PUBLIC_KEY ✅ (correct name)
+Code expects: VITE_STRIPE_PUBLISHABLE_KEY
+Vercel has:   VITE_STRIPE_PUBLISHABLE_KEY ✅ (correct name)
 Result:       pk_live_51S1Ht0K6kWkUsx... (working!)
 ```
 
@@ -117,7 +117,7 @@ After deployment:
 
 **Issue**: Still seeing "UNDEFINED" after deployment
 **Solution**: 
-1. Verify variable name is exactly: `VITE_STRIPE_PUBLIC_KEY`
+1. Verify variable name is exactly: `VITE_STRIPE_PUBLISHABLE_KEY`
 2. Verify it's enabled for Production environment
 3. Clear browser cache completely
 4. Try incognito/private browsing mode
@@ -133,7 +133,7 @@ After deployment:
 ## ✅ Success Confirmation
 
 You'll know it's working when:
-1. Console shows: `VITE_STRIPE_PUBLIC_KEY: pk_live_51S1Ht0K6kWkUsx...`
+1. Console shows: `VITE_STRIPE_PUBLISHABLE_KEY: pk_live_51S1Ht0K6kWkUsx...`
 2. No Stripe-related errors in console
 3. Payment pages load without issues
 4. Stripe Elements render correctly

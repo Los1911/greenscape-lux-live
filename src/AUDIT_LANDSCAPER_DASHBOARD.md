@@ -2,7 +2,7 @@
 
 ## Environment Status
 - **VITE_SUPABASE_URL**: Environment variable check added to `src/main.tsx` line 9
-- **VITE_SUPABASE_ANON_KEY**: Environment variable check added to `src/main.tsx` line 9
+- **VITE_SUPABASE_PUBLISHABLE_KEY**: Environment variable check added to `src/main.tsx` line 9
 - **Status**: Will log `[AUDIT] Missing Supabase envs` if either is missing
 
 ## Database Views Status

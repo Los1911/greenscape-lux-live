@@ -115,7 +115,7 @@ export default function ClientQuoteForm() {
     console.log('🔍 Environment check:', {
       mode: import.meta.env.MODE,
       supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-      hasAnonKey: !!import.meta.env.VITE_SUPABASE_ANON_KEY,
+      hasAnonKey: !!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       urlLength: import.meta.env.VITE_SUPABASE_URL?.length || 0
     });
 
@@ -168,7 +168,7 @@ export default function ClientQuoteForm() {
 
       // Send email notification (BLOCKING - wait for completion)
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       
       console.log('🎯 STEP 6: Checking environment variables for email...');
       console.log('📋 Environment variables status:', {

@@ -32,7 +32,7 @@ class WebSocketManager {
 
     try {
       // Use Supabase realtime for WebSocket connection
-      const wsUrl = `wss://mwvcbedvnimabfwubazz.supabase.co/realtime/v1/websocket?apikey=${import.meta.env.VITE_SUPABASE_ANON_KEY}&vsn=1.0.0`;
+      const wsUrl = `wss://mwvcbedvnimabfwubazz.supabase.co/realtime/v1/websocket?apikey=${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}&vsn=1.0.0`;
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {

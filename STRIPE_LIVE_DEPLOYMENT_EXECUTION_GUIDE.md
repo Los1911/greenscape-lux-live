@@ -2,10 +2,10 @@
 # 🚀 GreenScape Lux - Stripe Live Key Deployment Guide
 
 ## Critical Issue Resolved
-The Stripe public key was showing as "UNDEFINED" because the environment variable name in code (`VITE_STRIPE_PUBLIC_KEY`) didn't match what was configured in Vercel/GitHub Pages (`VITE_STRIPE_PUBLISHABLE_KEY`).
+The Stripe public key was showing as "UNDEFINED" because the environment variable name in code (`VITE_STRIPE_PUBLISHABLE_KEY`) didn't match what was configured in Vercel/GitHub Pages (`VITE_STRIPE_PUBLISHABLE_KEY`).
 
 ## ✅ Code Changes Complete
-All code has been updated to use: `VITE_STRIPE_PUBLIC_KEY`
+All code has been updated to use: `VITE_STRIPE_PUBLISHABLE_KEY`
 
 ---
 
@@ -56,7 +56,7 @@ chmod +x scripts/vercel-stripe-production-deployment.sh
    - Find: `VITE_STRIPE_PUBLISHABLE_KEY`
    - Click trash icon → Delete
 5. **Add new variable**:
-   - Name: `VITE_STRIPE_PUBLIC_KEY`
+   - Name: `VITE_STRIPE_PUBLISHABLE_KEY`
    - Value: `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
    - Environment: Production
    - Click: Save
@@ -77,7 +77,7 @@ After deployment completes:
 4. **Look for this log**:
    ```
    🔧 Environment Variables:
-   VITE_STRIPE_PUBLIC_KEY: pk_live_51S1Ht0K6kWkUsx...
+   VITE_STRIPE_PUBLISHABLE_KEY: pk_live_51S1Ht0K6kWkUsx...
    ```
 
 ### ✅ Success Indicators
@@ -97,7 +97,7 @@ After deployment completes:
 
 Ensure ALL these are set in Vercel Production:
 
-- ✅ `VITE_STRIPE_PUBLIC_KEY` = pk_live_51S1Ht0K6kWkUsx...
+- ✅ `VITE_STRIPE_PUBLISHABLE_KEY` = pk_live_51S1Ht0K6kWkUsx...
 - ✅ `VITE_SUPABASE_URL` = https://your-project.supabase.co
 - ✅ `VITE_SUPABASE_ANON_KEY` = eyJhbGc...
 - ✅ `VITE_GOOGLE_MAPS_API_KEY` = AIza...

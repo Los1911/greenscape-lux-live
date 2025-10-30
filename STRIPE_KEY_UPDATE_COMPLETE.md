@@ -2,23 +2,23 @@
 # ✅ Stripe Environment Variable Fix Complete
 
 ## 🎯 Issue Resolved
-Fixed Stripe environment variable configuration to ensure `VITE_STRIPE_PUBLIC_KEY` is correctly set and accessible throughout the application.
+Fixed Stripe environment variable configuration to ensure `VITE_STRIPE_PUBLISHABLE_KEY` is correctly set and accessible throughout the application.
 
 ## 📋 Changes Made
 
 ### 1. Environment Files Updated
 - ✅ Created `.env.local` with correct production keys
-- ✅ Verified `.env.production` has correct `VITE_STRIPE_PUBLIC_KEY`
+- ✅ Verified `.env.production` has correct `VITE_STRIPE_PUBLISHABLE_KEY`
 - ✅ Updated `.env.example` with proper variable naming
 
 ### 2. Verified Configuration
-- ✅ `src/lib/stripe.ts` correctly uses `VITE_STRIPE_PUBLIC_KEY`
+- ✅ `src/lib/stripe.ts` correctly uses `VITE_STRIPE_PUBLISHABLE_KEY`
 - ✅ Fallback key matches production key
 - ✅ Key validation checks format (pk_live_ or pk_test_)
 
 ## 🔑 Correct Variable Name
 ```bash
-VITE_STRIPE_PUBLIC_KEY=pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK
+VITE_STRIPE_PUBLISHABLE_KEY=pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK
 ```
 
 ## 🚀 Deployment Steps
@@ -29,7 +29,7 @@ VITE_STRIPE_PUBLIC_KEY=pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHd
    Go to: Repository → Settings → Secrets and variables → Actions
    
    Update or create:
-   - VITE_STRIPE_PUBLIC_KEY = pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK
+   - VITE_STRIPE_PUBLISHABLE_KEY = pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK
    ```
 
 2. **Trigger Deployment**
@@ -48,7 +48,7 @@ VITE_STRIPE_PUBLIC_KEY=pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHd
 ### For Famous Platform
 1. **Update Environment Variables**
    - Go to: Project Settings → Environment Variables
-   - Update: `VITE_STRIPE_PUBLIC_KEY`
+   - Update: `VITE_STRIPE_PUBLISHABLE_KEY`
    - Value: `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
 
 2. **Save and Redeploy**
@@ -62,7 +62,7 @@ VITE_STRIPE_PUBLIC_KEY=pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHd
 // Should see these in console:
 ✓ Supabase URL loaded: https://mwvcbedvnimabfwubazz.supabase.co
 ✓ Stripe key present: true
-✓ No "undefined" errors for VITE_STRIPE_PUBLIC_KEY
+✓ No "undefined" errors for VITE_STRIPE_PUBLISHABLE_KEY
 ```
 
 ### Stripe.js Loading
@@ -79,7 +79,7 @@ VITE_STRIPE_PUBLIC_KEY=pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHd
 **Problem:** Stripe environment variable was potentially undefined or not accessible at runtime.
 
 **Solution:** 
-1. Ensured consistent naming: `VITE_STRIPE_PUBLIC_KEY`
+1. Ensured consistent naming: `VITE_STRIPE_PUBLISHABLE_KEY`
 2. Added fallback key in `stripe.ts` for reliability
 3. Updated all environment files with correct values
 4. Documented deployment process for both platforms

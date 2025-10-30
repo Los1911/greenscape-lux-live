@@ -25,7 +25,7 @@ export class EnvKeySyncer {
       const supabaseAnon = localStorage.getItem('GSL_SUPABASE_ANON') || localStorage.getItem('supabaseAnonKey');
       
       if (supabaseUrl) keys.VITE_SUPABASE_URL = supabaseUrl;
-      if (supabaseAnon) keys.VITE_SUPABASE_ANON_KEY = supabaseAnon;
+      if (supabaseAnon) keys.VITE_SUPABASE_PUBLISHABLE_KEY = supabaseAnon;
 
       // Check for other API keys that might be stored
       const stripeKey = localStorage.getItem('STRIPE_PUBLISHABLE_KEY') || localStorage.getItem('GSL_STRIPE_KEY');
@@ -61,7 +61,7 @@ export class EnvKeySyncer {
           const decoded = atob(sb);
           const [url, anon] = decoded.split('|');
           if (url) keys.VITE_SUPABASE_URL = url;
-          if (anon) keys.VITE_SUPABASE_ANON_KEY = anon;
+          if (anon) keys.VITE_SUPABASE_PUBLISHABLE_KEY = anon;
         } catch (e) {
           console.warn('Failed to decode sb parameter');
         }
@@ -74,7 +74,7 @@ export class EnvKeySyncer {
       const mapsKey = params.get('maps_key');
       
       if (directUrl) keys.VITE_SUPABASE_URL = directUrl;
-      if (directAnon) keys.VITE_SUPABASE_ANON_KEY = directAnon;
+      if (directAnon) keys.VITE_SUPABASE_PUBLISHABLE_KEY = directAnon;
       if (stripeKey) keys.VITE_STRIPE_PUBLISHABLE_KEY = stripeKey;
       if (mapsKey) keys.VITE_GOOGLE_MAPS_API_KEY = mapsKey;
       
@@ -111,7 +111,7 @@ export class EnvKeySyncer {
     let content = `# Supabase Configuration
 # For Vercel deployment, add these exact values as environment variables:
 VITE_SUPABASE_URL=${mergedKeys.VITE_SUPABASE_URL || 'https://mwvcbedvnimabfwubazz.supabase.co'}
-VITE_SUPABASE_ANON_KEY=${mergedKeys.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2XfXwRvar5UqQSZVK5WTtFfmPZ0HskSY'}
+VITE_SUPABASE_PUBLISHABLE_KEY=${mergedKeys.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2XfXwRvar5UqQSZVK5WTtFfmPZ0HskSY'}
 VITE_SUPABASE_FUNCTIONS_URL=https://mwvcbedvnimabfwubazz.functions.supabase.co
 VITE_SITE_URL=https://greenscapelux.com
 

@@ -14,7 +14,7 @@ interface AppConfig {
 export const getAppConfig = (): AppConfig => {
   // Safe environment variable access with null checks
   const envUrl = globalThis.import?.meta?.env?.VITE_SUPABASE_URL || undefined;
-  const envKey = globalThis.import?.meta?.env?.VITE_SUPABASE_ANON_KEY || undefined;
+  const envKey = globalThis.import?.meta?.env?.VITE_SUPABASE_PUBLISHABLE_KEY || undefined;
   const envAdmin = globalThis.import?.meta?.env?.VITE_ADMIN_EMAIL || undefined;
   
   // Fallback values (production-ready)

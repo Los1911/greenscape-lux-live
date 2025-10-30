@@ -7,7 +7,7 @@ class EnvSyncAutomation {
   constructor() {
     this.requiredVars = [
       'VITE_SUPABASE_URL',
-      'VITE_SUPABASE_ANON_KEY', 
+      'VITE_SUPABASE_PUBLISHABLE_KEY', 
       'VITE_STRIPE_PUBLISHABLE_KEY',
       'VITE_GOOGLE_MAPS_API_KEY'
     ];

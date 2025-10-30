@@ -34,6 +34,6 @@ npm run build
 
 echo "✅ NUCLEAR CACHE PURGE COMPLETE"
 echo "Next steps:"
-echo "1. Verify your .env.local file has correct VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY"
+echo "1. Verify your .env.local file has correct VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY"
 echo "2. Set environment variables in your hosting provider"
 echo "3. Deploy with forced cache invalidation"

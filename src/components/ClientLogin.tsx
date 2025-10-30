@@ -22,9 +22,9 @@ export default function ClientLogin() {
   // ✅ Environment Variable Validation & Debugging
   useEffect(() => {
     console.log("Supabase URL:", import.meta.env.VITE_SUPABASE_URL);
-    console.log("Supabase Key:", import.meta.env.VITE_SUPABASE_ANON_KEY ? "Loaded ✅" : "Missing ❌");
+    console.log("Supabase Key:", import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ? "Loaded ✅" : "Missing ❌");
 
-    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
       setConfigError("Configuration error: Invalid or missing Supabase key.");
     }
   }, []);

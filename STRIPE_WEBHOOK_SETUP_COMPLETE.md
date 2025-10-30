@@ -96,7 +96,7 @@ node scripts/stripe-webhook-test.js
 4. **Check Browser Console**
    - Open DevTools → Console
    - Look for: `✅ Stripe connected successfully`
-   - Verify: `VITE_STRIPE_PUBLIC_KEY: pk_live_51S1Ht0K6kWkUsx...`
+   - Verify: `VITE_STRIPE_PUBLISHABLE_KEY: pk_live_51S1Ht0K6kWkUsx...`
 
 ---
 
@@ -165,7 +165,7 @@ supabase functions deploy stripe-webhook
 - `SUPABASE_SERVICE_ROLE_KEY` = `eyJ...`
 
 ### ✅ Configured in Vercel (Frontend)
-- `VITE_STRIPE_PUBLIC_KEY` = `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
+- `VITE_STRIPE_PUBLISHABLE_KEY` = `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
 
 ---
 

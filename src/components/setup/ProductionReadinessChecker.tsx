@@ -30,7 +30,7 @@ export const ProductionReadinessChecker: React.FC = () => {
     const directConfig = {
       supabase: {
         url: import.meta.env.VITE_SUPABASE_URL || '',
-        anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+        anonKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''
       },
       stripe: {
         publishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || ''
@@ -128,7 +128,7 @@ export const ProductionReadinessChecker: React.FC = () => {
     // Supabase connectivity
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       
       const response = await fetch(`${supabaseUrl}/rest/v1/`, {
         headers: {

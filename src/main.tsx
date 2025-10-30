@@ -25,7 +25,7 @@ console.log('Is Production:', import.meta.env.PROD);
 console.log('Is Development:', import.meta.env.DEV);
 console.log('\n📦 Environment Variables (injected at build time):');
 console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL || '❌ UNDEFINED');
-console.log('VITE_SUPABASE_ANON_KEY:', import.meta.env.VITE_SUPABASE_ANON_KEY ? `✅ SET (${import.meta.env.VITE_SUPABASE_ANON_KEY.substring(0, 20)}...)` : '❌ UNDEFINED');
+console.log('VITE_SUPABASE_PUBLISHABLE_KEY:', import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ? `✅ SET (${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY.substring(0, 20)}...)` : '❌ UNDEFINED');
 console.log('VITE_STRIPE_PUBLISHABLE_KEY:', import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? `✅ SET (${import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY.substring(0, 20)}...)` : '❌ UNDEFINED');
 console.log('VITE_GOOGLE_MAPS_API_KEY:', import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? `✅ SET` : '❌ UNDEFINED');
 console.log('\n💡 If all show ❌ UNDEFINED, environment variables are NOT configured properly in your hosting environment');

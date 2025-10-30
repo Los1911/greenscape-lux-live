@@ -42,7 +42,7 @@ export function getEnvironmentVariable(key: string): string {
       console.warn('⚠️ Using fallback Supabase URL');
       return FALLBACK_CONFIG.supabase.url;
     
-    case 'VITE_SUPABASE_ANON_KEY':
+    case 'VITE_SUPABASE_PUBLISHABLE_KEY':
       console.warn('⚠️ Using fallback Supabase anon key');
       return FALLBACK_CONFIG.supabase.anonKey;
     case 'VITE_STRIPE_PUBLISHABLE_KEY':
@@ -67,7 +67,7 @@ export function validateEnvironmentSetup(): {
 } {
   const requiredKeys = [
     'VITE_SUPABASE_URL',
-    'VITE_SUPABASE_ANON_KEY'
+    'VITE_SUPABASE_PUBLISHABLE_KEY'
   ];
 
   const optionalKeys = [
@@ -114,7 +114,7 @@ export function getSafeConfig() {
   return {
     supabase: {
       url: getEnvironmentVariable('VITE_SUPABASE_URL'),
-      anonKey: getEnvironmentVariable('VITE_SUPABASE_ANON_KEY')
+      anonKey: getEnvironmentVariable('VITE_SUPABASE_PUBLISHABLE_KEY')
     },
     stripe: {
       publishableKey: getEnvironmentVariable('VITE_STRIPE_PUBLISHABLE_KEY')

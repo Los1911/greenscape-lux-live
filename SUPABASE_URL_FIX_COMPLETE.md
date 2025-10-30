@@ -14,7 +14,7 @@ All production environment variables are now correctly set:
 # ✅ CORRECT VALUES
 VITE_SUPABASE_URL=https://mwvcbedvnimabfwubazz.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2XfXwRvar5UqQSZVK5WTtFfmPZ0HskSY
-VITE_STRIPE_PUBLIC_KEY=pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK
+VITE_STRIPE_PUBLISHABLE_KEY=pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK
 VITE_GOOGLE_MAPS_API_KEY=AIzaSyDGAU0VsZYL67arpQfGy-1vWSANqe-mKo4
 ```
 
@@ -39,7 +39,7 @@ Set these secrets in **GitHub Repository Settings → Secrets and variables → 
 | `VITE_SUPABASE_URL` | `https://mwvcbedvnimabfwubazz.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
 | `VITE_SUPABASE_FUNCTIONS_URL` | `https://mwvcbedvnimabfwubazz.functions.supabase.co` |
-| `VITE_STRIPE_PUBLIC_KEY` | `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK` |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK` |
 | `VITE_GOOGLE_MAPS_API_KEY` | `AIzaSyDGAU0VsZYL67arpQfGy-1vWSANqe-mKo4` |
 | `VITE_RESEND_API_KEY` | `re_dTWTSNo5_L2o9dFGw2mwyy8VFvvXxTC6A` |
 
@@ -67,7 +67,7 @@ git push origin main
    🔧 Build Mode: production
    🔧 VITE_SUPABASE_URL: SET
    🔧 VITE_SUPABASE_ANON_KEY: SET
-   🔧 VITE_STRIPE_PUBLIC_KEY: SET
+   🔧 VITE_STRIPE_PUBLISHABLE_KEY: SET
    ```
 
 ### Step 4: Verify Live Site

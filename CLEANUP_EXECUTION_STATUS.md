@@ -71,7 +71,7 @@ npm run preview
 📋 Environment Variables (Injected at Build Time):
   VITE_SUPABASE_URL: ✅ SET
   VITE_SUPABASE_ANON_KEY: ✅ SET (eyJhbGciOiJIUzI1NiI...)
-  VITE_STRIPE_PUBLIC_KEY: ✅ SET (pk_live_51...)
+  VITE_STRIPE_PUBLISHABLE_KEY: ✅ SET (pk_live_51...)
   VITE_GOOGLE_MAPS_API_KEY: ✅ SET
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
@@ -85,7 +85,7 @@ npm run preview
 
 📋 Verification Results:
 
-✅ VITE_STRIPE_PUBLIC_KEY: FOUND in index.abc123.js
+✅ VITE_STRIPE_PUBLISHABLE_KEY: FOUND in index.abc123.js
 ✅ VITE_GOOGLE_MAPS_API_KEY: FOUND in index.abc123.js
 ✅ VITE_SUPABASE_URL: FOUND in index.abc123.js
 ✅ VITE_SUPABASE_ANON_KEY: FOUND in index.abc123.js
@@ -97,7 +97,7 @@ npm run preview
 
 ### Browser Console Output
 ```javascript
-console.log(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+console.log(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 // Should output: "pk_live_51..." (NOT undefined)
 
 console.log(import.meta.env.VITE_GOOGLE_MAPS_API_KEY);
@@ -108,14 +108,14 @@ console.log(import.meta.env.VITE_GOOGLE_MAPS_API_KEY);
 
 1. **Check .env.production file exists and contains:**
    ```
-   VITE_STRIPE_PUBLIC_KEY=pk_live_51...
+   VITE_STRIPE_PUBLISHABLE_KEY=pk_live_51...
    VITE_GOOGLE_MAPS_API_KEY=AIza...
    ```
 
 2. **Verify GitHub Secrets are set** (for GitHub Pages deployment):
    - Go to: Repository → Settings → Secrets and variables → Actions
    - Ensure these secrets exist:
-     - `VITE_STRIPE_PUBLIC_KEY`
+     - `VITE_STRIPE_PUBLISHABLE_KEY`
      - `VITE_GOOGLE_MAPS_API_KEY`
      - `VITE_SUPABASE_URL`
      - `VITE_SUPABASE_ANON_KEY`

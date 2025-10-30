@@ -10,10 +10,10 @@ import { resolve, join } from 'path';
 
 const DIST_DIR = resolve(process.cwd(), 'dist');
 const REQUIRED_VARS = [
-  'VITE_STRIPE_PUBLIC_KEY',
+  'VITE_STRIPE_PUBLISHABLE_KEY',
   'VITE_GOOGLE_MAPS_API_KEY',
   'VITE_SUPABASE_URL',
-  'VITE_SUPABASE_ANON_KEY'
+  'VITE_SUPABASE_PUBLISHABLE_KEY'
 ];
 
 console.log('🔍 Environment Variable Injection Verification');

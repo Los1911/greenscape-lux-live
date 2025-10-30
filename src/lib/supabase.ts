@@ -6,13 +6,13 @@ const supabaseUrl =
   import.meta.env.VITE_SUPABASE_URL || "https://mwvcbedvnimabfwubazz.supabase.co";
 
 const supabaseAnonKey =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2XfXwRvar5UqQSZVK5WTtFfmPZ0HskSY";
 
 // ✅ Support both naming conventions for Stripe publishable key
 const stripePublishableKey =
   import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
-  import.meta.env.VITE_STRIPE_PUBLIC_KEY ||
+  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
   "pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK";
 
 // ✅ Validate required environment variables in production
@@ -21,7 +21,7 @@ if (import.meta.env.MODE === 'production') {
     throw new Error('❌ Invalid or missing VITE_SUPABASE_URL in production');
   }
   if (!supabaseAnonKey || supabaseAnonKey.split('.').length < 3) {
-    throw new Error('❌ Invalid or missing VITE_SUPABASE_ANON_KEY in production');
+    throw new Error('❌ Invalid or missing VITE_SUPABASE_PUBLISHABLE_KEY in production');
   }
   if (!stripePublishableKey || !/^pk_live_[A-Za-z0-9]+$/.test(stripePublishableKey)) {
     throw new Error('❌ Invalid or missing VITE_STRIPE_PUBLISHABLE_KEY in production');

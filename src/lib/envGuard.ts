@@ -10,7 +10,7 @@ const safeGetEnv = (key: string) => {
   }
 };
 
-export const envOk = !!(safeGetEnv('VITE_SUPABASE_URL') && safeGetEnv('VITE_SUPABASE_ANON_KEY'));
+export const envOk = !!(safeGetEnv('VITE_SUPABASE_URL') && safeGetEnv('VITE_SUPABASE_PUBLISHABLE_KEY'));
 
 export const checkSupabaseEnvs = () => {
   const isDev = safeGetEnv('DEV') || safeGetEnv('MODE') === 'development';
@@ -18,13 +18,13 @@ export const checkSupabaseEnvs = () => {
   if (isDev) {
     console.log('🔍 Environment Variables Check:');
     console.log('VITE_SUPABASE_URL:', safeGetEnv('VITE_SUPABASE_URL') ? '✅ Set' : '❌ Missing');
-    console.log('VITE_SUPABASE_ANON_KEY:', safeGetEnv('VITE_SUPABASE_ANON_KEY') ? '✅ Set' : '❌ Missing');
+    console.log('VITE_SUPABASE_PUBLISHABLE_KEY:', safeGetEnv('VITE_SUPABASE_PUBLISHABLE_KEY') ? '✅ Set' : '❌ Missing');
     console.log('VITE_SUPABASE_FUNCTIONS_URL:', safeGetEnv('VITE_SUPABASE_FUNCTIONS_URL') ? '✅ Set' : '❌ Missing');
     console.log('VITE_ADMIN_EMAIL:', safeGetEnv('VITE_ADMIN_EMAIL') ? '✅ Set' : '❌ Missing');
     
     console.log('📋 Raw values:');
     console.log('  URL:', safeGetEnv('VITE_SUPABASE_URL') || 'undefined');
-    console.log('  Key:', safeGetEnv('VITE_SUPABASE_ANON_KEY') ? '[PRESENT]' : 'undefined');
+    console.log('  Key:', safeGetEnv('VITE_SUPABASE_PUBLISHABLE_KEY') ? '[PRESENT]' : 'undefined');
     
     if (!envOk) {
       console.warn('⚠️ Missing environment variables detected!');

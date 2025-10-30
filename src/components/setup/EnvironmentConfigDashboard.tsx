@@ -23,8 +23,8 @@ export function EnvironmentConfigDashboard() {
     },
     {
       name: 'Supabase Anon Key',
-      key: 'VITE_SUPABASE_ANON_KEY',
-      configured: !import.meta.env.VITE_SUPABASE_ANON_KEY?.includes('your-anon-key'),
+      key: 'VITE_SUPABASE_PUBLISHABLE_KEY',
+      configured: !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.includes('your-anon-key'),
     },
     {
       name: 'Stripe Publishable Key',
@@ -121,7 +121,7 @@ export function EnvironmentConfigDashboard() {
                 <li>Add these variables:
                   <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
                     <li><code className="bg-muted px-1 py-0.5 rounded">VITE_SUPABASE_URL</code></li>
-                    <li><code className="bg-muted px-1 py-0.5 rounded">VITE_SUPABASE_ANON_KEY</code></li>
+                    <li><code className="bg-muted px-1 py-0.5 rounded">VITE_SUPABASE_PUBLISHABLE_KEY</code></li>
                     <li><code className="bg-muted px-1 py-0.5 rounded">VITE_STRIPE_PUBLISHABLE_KEY</code></li>
                   </ul>
                 </li>

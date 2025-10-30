@@ -3,7 +3,7 @@ import { secureConfig } from './secureConfig';
 
 // Secure Supabase client without hardcoded credentials
 const supabaseUrl = secureConfig.getRequired('VITE_SUPABASE_URL');
-const supabaseAnonKey = secureConfig.getRequired('VITE_SUPABASE_ANON_KEY');
+const supabaseAnonKey = secureConfig.getRequired('VITE_SUPABASE_PUBLISHABLE_KEY');
 
 // Create Supabase client with enhanced security
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {

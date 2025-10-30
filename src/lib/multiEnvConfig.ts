@@ -27,7 +27,7 @@ const ENVIRONMENT_CONFIGS: Record<Environment, EnvironmentConfig> = {
   development: {
     required: [
       'VITE_SUPABASE_URL',
-      'VITE_SUPABASE_ANON_KEY'
+      'VITE_SUPABASE_PUBLISHABLE_KEY'
     ],
     optional: [
       'VITE_STRIPE_PUBLISHABLE_KEY',
@@ -36,13 +36,13 @@ const ENVIRONMENT_CONFIGS: Record<Environment, EnvironmentConfig> = {
     ],
     validationRules: {
       VITE_SUPABASE_URL: (value) => value.startsWith('https://') && value.includes('supabase'),
-      VITE_SUPABASE_ANON_KEY: (value) => value.length > 100,
+      VITE_SUPABASE_PUBLISHABLE_KEY: (value) => value.length > 100,
       VITE_STRIPE_PUBLISHABLE_KEY: (value) => value.startsWith('pk_test_') || value === '',
       VITE_GOOGLE_MAPS_API_KEY: (value) => value.length > 20 || value === ''
     },
     errorMessages: {
       VITE_SUPABASE_URL: 'Must be a valid Supabase URL starting with https://',
-      VITE_SUPABASE_ANON_KEY: 'Must be a valid Supabase anonymous key (100+ chars)',
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'Must be a valid Supabase anonymous key (100+ chars)',
       VITE_STRIPE_PUBLISHABLE_KEY: 'Must be a test key starting with pk_test_ in development',
       VITE_GOOGLE_MAPS_API_KEY: 'Must be a valid Google Maps API key'
     },
@@ -54,7 +54,7 @@ const ENVIRONMENT_CONFIGS: Record<Environment, EnvironmentConfig> = {
   staging: {
     required: [
       'VITE_SUPABASE_URL',
-      'VITE_SUPABASE_ANON_KEY',
+      'VITE_SUPABASE_PUBLISHABLE_KEY',
       'VITE_STRIPE_PUBLISHABLE_KEY'
     ],
     optional: [
@@ -63,13 +63,13 @@ const ENVIRONMENT_CONFIGS: Record<Environment, EnvironmentConfig> = {
     ],
     validationRules: {
       VITE_SUPABASE_URL: (value) => value.startsWith('https://') && value.includes('supabase'),
-      VITE_SUPABASE_ANON_KEY: (value) => value.length > 100,
+      VITE_SUPABASE_PUBLISHABLE_KEY: (value) => value.length > 100,
       VITE_STRIPE_PUBLISHABLE_KEY: (value) => value.startsWith('pk_test_'),
       VITE_GOOGLE_MAPS_API_KEY: (value) => value.length > 20
     },
     errorMessages: {
       VITE_SUPABASE_URL: 'Must be a valid Supabase URL for staging environment',
-      VITE_SUPABASE_ANON_KEY: 'Must be a valid Supabase anonymous key for staging',
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'Must be a valid Supabase anonymous key for staging',
       VITE_STRIPE_PUBLISHABLE_KEY: 'Must be a Stripe test key for staging (pk_test_)',
       VITE_GOOGLE_MAPS_API_KEY: 'Google Maps API key required for staging'
     },
@@ -81,7 +81,7 @@ const ENVIRONMENT_CONFIGS: Record<Environment, EnvironmentConfig> = {
   production: {
     required: [
       'VITE_SUPABASE_URL',
-      'VITE_SUPABASE_ANON_KEY',
+      'VITE_SUPABASE_PUBLISHABLE_KEY',
       'VITE_STRIPE_PUBLISHABLE_KEY',
       'VITE_GOOGLE_MAPS_API_KEY'
     ],
@@ -90,13 +90,13 @@ const ENVIRONMENT_CONFIGS: Record<Environment, EnvironmentConfig> = {
     ],
     validationRules: {
       VITE_SUPABASE_URL: (value) => value.startsWith('https://') && value.includes('supabase'),
-      VITE_SUPABASE_ANON_KEY: (value) => value.length > 100,
+      VITE_SUPABASE_PUBLISHABLE_KEY: (value) => value.length > 100,
       VITE_STRIPE_PUBLISHABLE_KEY: (value) => value.startsWith('pk_live_'),
       VITE_GOOGLE_MAPS_API_KEY: (value) => value.length > 20
     },
     errorMessages: {
       VITE_SUPABASE_URL: 'Must be a valid production Supabase URL',
-      VITE_SUPABASE_ANON_KEY: 'Must be a valid production Supabase anonymous key',
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'Must be a valid production Supabase anonymous key',
       VITE_STRIPE_PUBLISHABLE_KEY: 'Must be a live Stripe key for production (pk_live_)',
       VITE_GOOGLE_MAPS_API_KEY: 'Google Maps API key is required in production'
     },

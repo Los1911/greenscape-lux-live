@@ -18,8 +18,8 @@ export const EnvironmentDiagnostic: React.FC = () => {
     },
     {
       name: 'Supabase Anon Key',
-      key: 'VITE_SUPABASE_ANON_KEY',
-      value: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      key: 'VITE_SUPABASE_PUBLISHABLE_KEY',
+      value: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       required: true,
       validate: (val: string) => val && val.startsWith('eyJ')
     },

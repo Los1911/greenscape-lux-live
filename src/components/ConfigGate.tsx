@@ -111,7 +111,7 @@ export default function ConfigGate({ children }: { children: React.ReactNode }) 
               2. Select your project → <strong>Settings</strong> → <strong>Environment Variables</strong><br/>
               3. Add these variables:<br/>
               &nbsp;&nbsp;• <code>VITE_SUPABASE_URL</code><br/>
-              &nbsp;&nbsp;• <code>VITE_SUPABASE_ANON_KEY</code><br/>
+              &nbsp;&nbsp;• <code>VITE_SUPABASE_PUBLISHABLE_KEY</code><br/>
               4. Set for <strong>Production, Preview, and Development</strong><br/>
               5. <strong>Redeploy</strong> your application
             </div>

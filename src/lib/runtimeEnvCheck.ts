@@ -5,7 +5,7 @@ export const runtimeEnvCheck = () => {
   
   console.log('import.meta.env available:', !!hasImportMeta);
   console.log('VITE_SUPABASE_URL:', env.VITE_SUPABASE_URL || 'UNDEFINED');
-  console.log('VITE_SUPABASE_ANON_KEY:', env.VITE_SUPABASE_ANON_KEY ? 'SET' : 'UNDEFINED');
+  console.log('VITE_SUPABASE_PUBLISHABLE_KEY:', env.VITE_SUPABASE_PUBLISHABLE_KEY ? 'SET' : 'UNDEFINED');
   console.log('DEV mode:', env.DEV);
   console.log('Environment object keys:', Object.keys(env));
   
@@ -13,7 +13,7 @@ export const runtimeEnvCheck = () => {
     hasImportMeta: !!hasImportMeta,
     env,
     supabaseUrl: env.VITE_SUPABASE_URL,
-    supabaseKey: env.VITE_SUPABASE_ANON_KEY,
+    supabaseKey: env.VITE_SUPABASE_PUBLISHABLE_KEY,
     isDev: env.DEV
   };
 };

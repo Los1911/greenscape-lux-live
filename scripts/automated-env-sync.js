@@ -48,7 +48,7 @@ class AutomatedEnvSync {
   validateEnvironment(env) {
     const requiredVars = [
       'VITE_SUPABASE_URL',
-      'VITE_SUPABASE_ANON_KEY',
+      'VITE_SUPABASE_PUBLISHABLE_KEY',
       'VITE_STRIPE_PUBLISHABLE_KEY',
       'VITE_GOOGLE_MAPS_API_KEY',
       'RESEND_API_KEY'

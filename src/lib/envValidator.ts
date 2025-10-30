@@ -17,12 +17,12 @@ export const validateEnvironment = (): EnvValidationResult => {
   
   // Check for required Vite environment variables
   const supabaseUrl = env.VITE_SUPABASE_URL;
-  const supabaseKey = env.VITE_SUPABASE_ANON_KEY;
+  const supabaseKey = env.VITE_SUPABASE_PUBLISHABLE_KEY;
   // Log all available environment variables for debugging
   console.group('🔍 Environment Variable Debug');
   console.log('All import.meta.env:', env);
   console.log('VITE_SUPABASE_URL:', supabaseUrl);
-  console.log('VITE_SUPABASE_ANON_KEY:', supabaseKey ? '***' + supabaseKey.slice(-8) : 'undefined');
+  console.log('VITE_SUPABASE_PUBLISHABLE_KEY:', supabaseKey ? '***' + supabaseKey.slice(-8) : 'undefined');
   console.log('MODE:', env.MODE);
   console.log('DEV:', env.DEV);
   console.log('PROD:', env.PROD);
@@ -36,9 +36,9 @@ export const validateEnvironment = (): EnvValidationResult => {
   }
   
   if (!supabaseKey) {
-    errors.push('VITE_SUPABASE_ANON_KEY is undefined');
+    errors.push('VITE_SUPABASE_PUBLISHABLE_KEY is undefined');
   } else if (supabaseKey.length < 100) {
-    warnings.push('VITE_SUPABASE_ANON_KEY seems too short');
+    warnings.push('VITE_SUPABASE_PUBLISHABLE_KEY seems too short');
   }
   
   return {
@@ -47,7 +47,7 @@ export const validateEnvironment = (): EnvValidationResult => {
     warnings,
     values: {
       VITE_SUPABASE_URL: supabaseUrl,
-      VITE_SUPABASE_ANON_KEY: supabaseKey,
+      VITE_SUPABASE_PUBLISHABLE_KEY: supabaseKey,
       MODE: env.MODE,
       DEV: String(env.DEV),
       PROD: String(env.PROD)

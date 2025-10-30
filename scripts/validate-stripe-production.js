@@ -29,7 +29,7 @@ function validateStripeKey() {
       
       res.on('end', () => {
         // Check if the HTML contains the Stripe key reference
-        const hasStripeKey = data.includes('VITE_STRIPE_PUBLIC_KEY');
+        const hasStripeKey = data.includes('VITE_STRIPE_PUBLISHABLE_KEY');
         const hasUndefined = data.includes('UNDEFINED');
         
         console.log('✅ Production site is accessible');
@@ -41,12 +41,12 @@ function validateStripeKey() {
           console.log('🔍 Manual verification:');
           console.log(`   1. Open: ${PRODUCTION_URL}`);
           console.log('   2. Open DevTools Console (F12)');
-          console.log('   3. Look for: VITE_STRIPE_PUBLIC_KEY: pk_live_...');
+          console.log('   3. Look for: VITE_STRIPE_PUBLISHABLE_KEY: pk_live_...');
           resolve(true);
         } else {
           console.log('\n❌ Stripe configuration issue detected');
           console.log('📋 Action required:');
-          console.log('   1. Update VITE_STRIPE_PUBLIC_KEY in Vercel');
+          console.log('   1. Update VITE_STRIPE_PUBLISHABLE_KEY in Vercel');
           console.log('   2. Redeploy the application');
           console.log('   3. Run this script again');
           resolve(false);

@@ -36,7 +36,7 @@ const ENVIRONMENT_CONFIGS = {
   development: {
     required: [
       'VITE_SUPABASE_URL',
-      'VITE_SUPABASE_ANON_KEY'
+      'VITE_SUPABASE_PUBLISHABLE_KEY'
     ],
     optional: [
       'VITE_STRIPE_PUBLISHABLE_KEY',
@@ -45,7 +45,7 @@ const ENVIRONMENT_CONFIGS = {
     ],
     validationRules: {
       VITE_SUPABASE_URL: (value) => value.startsWith('https://') && value.includes('supabase'),
-      VITE_SUPABASE_ANON_KEY: (value) => value.length > 100,
+      VITE_SUPABASE_PUBLISHABLE_KEY: (value) => value.length > 100,
       VITE_STRIPE_PUBLISHABLE_KEY: (value) => value.startsWith('pk_test_') || value === '',
       VITE_GOOGLE_MAPS_API_KEY: (value) => value.length > 20 || value === ''
     },
@@ -57,7 +57,7 @@ const ENVIRONMENT_CONFIGS = {
   staging: {
     required: [
       'VITE_SUPABASE_URL',
-      'VITE_SUPABASE_ANON_KEY',
+      'VITE_SUPABASE_PUBLISHABLE_KEY',
       'VITE_STRIPE_PUBLISHABLE_KEY'
     ],
     optional: [
@@ -66,7 +66,7 @@ const ENVIRONMENT_CONFIGS = {
     ],
     validationRules: {
       VITE_SUPABASE_URL: (value) => value.startsWith('https://') && value.includes('supabase'),
-      VITE_SUPABASE_ANON_KEY: (value) => value.length > 100,
+      VITE_SUPABASE_PUBLISHABLE_KEY: (value) => value.length > 100,
       VITE_STRIPE_PUBLISHABLE_KEY: (value) => value.startsWith('pk_test_'),
       VITE_GOOGLE_MAPS_API_KEY: (value) => value.length > 20
     },
@@ -78,7 +78,7 @@ const ENVIRONMENT_CONFIGS = {
   production: {
     required: [
       'VITE_SUPABASE_URL',
-      'VITE_SUPABASE_ANON_KEY',
+      'VITE_SUPABASE_PUBLISHABLE_KEY',
       'VITE_STRIPE_PUBLISHABLE_KEY',
       'VITE_GOOGLE_MAPS_API_KEY'
     ],
@@ -87,7 +87,7 @@ const ENVIRONMENT_CONFIGS = {
     ],
     validationRules: {
       VITE_SUPABASE_URL: (value) => value.startsWith('https://') && value.includes('supabase'),
-      VITE_SUPABASE_ANON_KEY: (value) => value.length > 100,
+      VITE_SUPABASE_PUBLISHABLE_KEY: (value) => value.length > 100,
       VITE_STRIPE_PUBLISHABLE_KEY: (value) => value.startsWith('pk_live_'),
       VITE_GOOGLE_MAPS_API_KEY: (value) => value.length > 20
     },

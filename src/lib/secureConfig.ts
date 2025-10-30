@@ -35,7 +35,7 @@ class SecureConfigManager {
   private loadConfiguration() {
     const requiredKeys = [
       'VITE_SUPABASE_URL',
-      'VITE_SUPABASE_ANON_KEY',
+      'VITE_SUPABASE_PUBLISHABLE_KEY',
       'VITE_STRIPE_PUBLISHABLE_KEY',
       'VITE_GOOGLE_MAPS_API_KEY',
       'VITE_RESEND_API_KEY'
@@ -83,7 +83,7 @@ class SecureConfigManager {
   }
 
   private isCriticalKey(key: string): boolean {
-    return key === 'VITE_SUPABASE_URL' || key === 'VITE_SUPABASE_ANON_KEY';
+    return key === 'VITE_SUPABASE_URL' || key === 'VITE_SUPABASE_PUBLISHABLE_KEY';
   }
 
   private isUsingFallback(key: string): boolean {
@@ -95,7 +95,7 @@ class SecureConfigManager {
     // Only provide fallbacks for critical Supabase keys
     const fallbacks: Record<string, string> = {
       VITE_SUPABASE_URL: 'https://mwvcbedvnimabfwubazz.supabase.co',
-      VITE_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2XfXwRvar5UqQSZVK5WTtFfmPZ0HskSY'
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2XfXwRvar5UqQSZVK5WTtFfmPZ0HskSY'
     };
     return fallbacks[key];
   }

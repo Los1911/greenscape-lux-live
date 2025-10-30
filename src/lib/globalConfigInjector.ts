@@ -3,7 +3,7 @@
 
 const PRODUCTION_CONFIG = {
   VITE_SUPABASE_URL: 'https://mwvcbedvnimabfwubazz.supabase.co',
-  VITE_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2XfXwRvar5UqQSZVK5WTtFfmPZ0HskSY',
+  VITE_SUPABASE_PUBLISHABLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13dmNiZWR2bmltYWJmd3ViYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1NjIyMzksImV4cCI6MjA2NDEzODIzOX0.koz-XZMMXUk2XfXwRvar5UqQSZVK5WTtFfmPZ0HskSY',
   VITE_ADMIN_EMAIL: 'cmatthews@greenscapelux.com'
 };
 
@@ -36,9 +36,9 @@ export const injectGlobalConfig = () => {
       });
     }
 
-    if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
-      Object.defineProperty(import.meta.env, 'VITE_SUPABASE_ANON_KEY', {
-        value: PRODUCTION_CONFIG.VITE_SUPABASE_ANON_KEY,
+    if (!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+      Object.defineProperty(import.meta.env, 'VITE_SUPABASE_PUBLISHABLE_KEY', {
+        value: PRODUCTION_CONFIG.VITE_SUPABASE_PUBLISHABLE_KEY,
         writable: false,
         configurable: false
       });

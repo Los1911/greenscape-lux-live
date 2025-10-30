@@ -150,7 +150,7 @@ export class EnvFileManager {
 
 # Supabase Configuration
 VITE_SUPABASE_URL=${vars.VITE_SUPABASE_URL || 'https://mwvcbedvnimabfwubazz.supabase.co'}
-VITE_SUPABASE_ANON_KEY=${vars.VITE_SUPABASE_ANON_KEY || 'your-supabase-anon-key'}
+VITE_SUPABASE_PUBLISHABLE_KEY=${vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'your-supabase-anon-key'}
 VITE_SUPABASE_FUNCTIONS_URL=https://mwvcbedvnimabfwubazz.functions.supabase.co
 VITE_SITE_URL=https://greenscapelux.com
 

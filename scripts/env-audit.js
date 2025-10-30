@@ -18,7 +18,7 @@ const ENV_VARS = [
     example: 'https://your-project.supabase.co'
   },
   {
-    name: 'VITE_SUPABASE_ANON_KEY',
+    name: 'VITE_SUPABASE_PUBLISHABLE_KEY',
     required: true,
     description: 'Supabase anonymous key (JWT)',
     format: 'eyJ*',
@@ -88,7 +88,7 @@ function validateFormat(varName, value) {
   switch (varName) {
     case 'VITE_SUPABASE_URL':
       return value.includes('.supabase.co');
-    case 'VITE_SUPABASE_ANON_KEY':
+    case 'VITE_SUPABASE_PUBLISHABLE_KEY':
       return value.startsWith('eyJ');
     case 'VITE_STRIPE_PUBLISHABLE_KEY':
       return value.startsWith('pk_');

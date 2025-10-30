@@ -22,7 +22,7 @@ export const FRONTEND_ENV_VARS: EnvVariable[] = [
     placeholder: ['your_supabase_project_url', 'your-project', 'placeholder']
   },
   {
-    key: 'VITE_SUPABASE_ANON_KEY',
+    key: 'VITE_SUPABASE_PUBLISHABLE_KEY',
     description: 'Supabase anonymous key',
     required: true,
     validator: (val) => val.startsWith('eyJ') && val.length > 100,

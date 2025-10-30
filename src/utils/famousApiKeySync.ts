@@ -46,7 +46,7 @@ export class FamousApiKeySync {
       // Check for individual keys in localStorage
       const keys = [
         'VITE_SUPABASE_URL',
-        'VITE_SUPABASE_ANON_KEY',
+        'VITE_SUPABASE_PUBLISHABLE_KEY',
         'VITE_STRIPE_PUBLISHABLE_KEY',
         'VITE_STRIPE_SECRET_KEY',
         'VITE_GOOGLE_MAPS_API_KEY',
@@ -120,7 +120,7 @@ export class FamousApiKeySync {
     const hasSupabaseUrl = typeof import.meta !== 'undefined' && 
       import.meta.env?.VITE_SUPABASE_URL;
     const hasSupabaseKey = typeof import.meta !== 'undefined' && 
-      import.meta.env?.VITE_SUPABASE_ANON_KEY;
+      import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY;
 
     if (hasSupabaseUrl && hasSupabaseKey) {
       return { isValid: true, message: 'Production environment variables detected' };

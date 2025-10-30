@@ -55,7 +55,7 @@ AIzaSyDGAU0VsZYL67arpQfGy-1vWSANqe-mKo4
 ### ⏳ To Be Added Later (When You Have Stripe Keys)
 
 ```
-VITE_STRIPE_PUBLIC_KEY
+VITE_STRIPE_PUBLISHABLE_KEY
 pk_live_[YOUR_STRIPE_PUBLISHABLE_KEY]
 ```
 
