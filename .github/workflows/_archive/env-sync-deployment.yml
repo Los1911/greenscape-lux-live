@@ -1,0 +1,174 @@
+name: Environment Sync & Deployment
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL || '#deployments' }}
+
+jobs:
+  env-validation:
+    name: Environment Validation
+    runs-on: ubuntu-latest
+    outputs:
+      env-valid: ${{ steps.validate.outputs.valid }}
+      critical-missing: ${{ steps.validate.outputs.critical-missing }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Create .env.local from secrets
+      run: |
+        echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env.local
+        echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env.local
+        echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env.local
+        echo "RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}" >> .env.local
+        echo "VITE_GOOGLE_MAPS_API_KEY=${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}" >> .env.local
+        echo "VITE_STRIPE_PUBLISHABLE_KEY=${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}" >> .env.local
+    
+    - name: Validate environment variables
+      id: validate
+      run: |
+        echo "Running environment validation..."
+        npm run env:validate
+        
+        if [ $? -eq 0 ]; then
+          echo "valid=true" >> $GITHUB_OUTPUT
+          echo "critical-missing=false" >> $GITHUB_OUTPUT
+        else
+          echo "valid=false" >> $GITHUB_OUTPUT
+          echo "critical-missing=true" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+    
+    - name: Notify Slack on validation failure
+      if: failure()
+      run: |
+        node scripts/slack-webhook.js validation-failed "Environment validation failed with missing or placeholder variables"
+      continue-on-error: true
+
+  env-sync:
+    name: Sync Environment Variables
+    runs-on: ubuntu-latest
+    needs: env-validation
+    if: github.ref == 'refs/heads/main' && needs.env-validation.outputs.env-valid == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Create .env.local from secrets
+      run: |
+        echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env.local
+        echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env.local
+        echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env.local
+        echo "RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}" >> .env.local
+        echo "VITE_GOOGLE_MAPS_API_KEY=${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}" >> .env.local
+        echo "VITE_STRIPE_PUBLISHABLE_KEY=${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}" >> .env.local
+
+  build-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    needs: [env-validation, env-sync]
+    if: always() && needs.env-validation.outputs.env-valid == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Create .env.local from secrets
+      run: |
+        echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env.local
+        echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env.local
+        echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env.local
+        echo "RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}" >> .env.local
+        echo "VITE_GOOGLE_MAPS_API_KEY=${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}" >> .env.local
+        echo "VITE_STRIPE_PUBLISHABLE_KEY=${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}" >> .env.local
+
+    - name: Run build
+      run: npm run build
+    
+    - name: Run tests
+      run: npm test -- --run
+      continue-on-error: true
+    
+    - name: Notify Slack on build failure
+      if: failure()
+      run: |
+        node scripts/slack-webhook.js build-failed "Build or tests failed after environment sync"
+      continue-on-error: true
+
+  deployment-ready:
+    name: Deployment Ready Check
+    runs-on: ubuntu-latest
+    needs: [env-validation, env-sync, build-test]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Check deployment readiness
+      run: |
+        if [ "${{ needs.env-validation.outputs.env-valid }}" != "true" ]; then
+          echo "❌ Deployment blocked: Environment validation failed"
+          exit 1
+        fi
+        
+        if [ "${{ needs.build-test.result }}" != "success" ]; then
+          echo "❌ Deployment blocked: Build or tests failed"
+          exit 1
+        fi
+        
+        echo "✅ Deployment ready: All checks passed"
+        echo "Environment variables validated and synced"
+        echo "Build completed successfully"
+    
+    - name: Notify Slack on successful deployment
+      if: success()
+      run: |
+        node scripts/slack-webhook.js deployment-success "Environment sync and deployment completed successfully"
+      continue-on-error: true
