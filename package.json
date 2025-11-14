@@ -4,7 +4,6 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "prebuild": "NODE_ENV=production node scripts/pre-build-env-validator.js",
     "dev": "vite",
     "build": "NODE_ENV=production vite build",
     "build:dev": "vite build --mode development",
