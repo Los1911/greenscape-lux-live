@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import ScrollToTop from './components/ScrollToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ConfigProvider } from './lib/ConfigContext';
-import ConfigGate from './components/ConfigGate';
 import { AnalyticsProvider } from './components/Analytics';
 import { VersionChecker } from './components/VersionChecker';
 
@@ -58,14 +57,14 @@ import PaymentMethods from './pages/payments/PaymentMethods';
 import PaymentSubscriptions from './pages/payments/PaymentSubscriptions';
 import PaymentSecurity from './pages/payments/PaymentSecurity';
 
-// Routing helper
+// Routing helpers
 import { IntelligentDashboardRedirect } from './components/routing/IntelligentDashboardRedirect';
 
-// Wrapper components for ConsolidatedAuth with userType
+// Auth wrappers
 const ClientAuth = () => <ConsolidatedAuth userType="client" />;
 const LandscaperAuth = () => <ConsolidatedAuth userType="landscaper" />;
 
-// Global error handling
+// Global error logs
 if (typeof window !== "undefined" && !window.__GSL_ONERROR) {
   window.__GSL_ONERROR = true;
   window.addEventListener("error", e => {
@@ -80,127 +79,74 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <ConfigProvider>
-        <ConfigGate>
-          <Router>
-            <AnalyticsProvider>
-              <VersionChecker />
-              <ScrollToTop />
+        <Router>
+          <AnalyticsProvider>
+            <VersionChecker />
+            <ScrollToTop />
 
-              <Routes>
-                {/* Marketing site pages */}
-                <Route path="/" element={<GreenScapeLuxLanding />} />
-                <Route path="/about" element={<AboutUs />} />
-                <Route path="/professionals" element={<Professionals />} />
-                <Route path="/terms" element={<TermsOfService />} />
-                <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Routes>
+              <Route path="/" element={<GreenScapeLuxLanding />} />
+              <Route path="/about" element={<AboutUs />} />
+              <Route path="/professionals" element={<Professionals />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
 
-                {/* Get Started */}
-                <Route path="/get-started" element={<GetStarted />} />
+              <Route path="/get-started" element={<GetStarted />} />
+              <Route path="/get-quote" element={<GetQuoteEnhanced />} />
+              <Route path="/thank-you" element={<ThankYou />} />
 
-                {/* Quote System */}
-                <Route path="/get-quote" element={<GetQuoteEnhanced />} />
-                <Route path="/thank-you" element={<ThankYou />} />
+              <Route path="/search" element={<SearchPage />} />
 
-                {/* Search */}
-                <Route path="/search" element={<SearchPage />} />
+              {/* Authentication */}
+              <Route path="/client-login" element={<ClientAuth />} />
+              <Route path="/client-signup" element={<ClientAuth />} />
+              <Route path="/pro-login" element={<LandscaperAuth />} />
+              <Route path="/pro-signup" element={<LandscaperAuth />} />
+              <Route path="/login" element={<ClientAuth />} />
+              <Route path="/signup" element={<ClientAuth />} />
+              <Route path="/admin-login" element={<AdminLogin />} />
 
-                {/* AUTH ROUTES */}
-                <Route path="/client-login" element={<ClientAuth />} />
-                <Route path="/client-signup" element={<ClientAuth />} />
-                <Route path="/pro-login" element={<LandscaperAuth />} />
-                <Route path="/pro-signup" element={<LandscaperAuth />} />
+              {/* Password Reset */}
+              <Route path="/reset-password" element={<ResetPassword />} />
 
-                <Route path="/login" element={<ClientAuth />} />
-                <Route path="/signup" element={<ClientAuth />} />
-                <Route path="/admin-login" element={<AdminLogin />} />
-                <Route path="/auth" element={<ConsolidatedAuth />} />
+              {/* Dashboards */}
+              <Route path="/client-dashboard/*" element={
+                <SimpleProtectedRoute requiredRole="client">
+                  <ClientDashboardV2 />
+                </SimpleProtectedRoute>
+              } />
 
-                {/* Password Reset */}
-                <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/landscaper-dashboard/*" element={
+                <SimpleProtectedRoute requiredRole="landscaper">
+                  <LandscaperDashboardV2 />
+                </SimpleProtectedRoute>
+              } />
 
-                {/* PROTECTED ROUTES */}
-                <Route path="/client-dashboard/*" element={
-                  <SimpleProtectedRoute requiredRole="client">
-                    <ClientDashboardV2 />
-                  </SimpleProtectedRoute>
-                } />
+              {/* Admin */}
+              <Route path="/admin-dashboard" element={
+                <SimpleProtectedRoute requiredRole="admin">
+                  <AdminDashboard />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/admin" element={
+                <SimpleProtectedRoute requiredRole="admin">
+                  <AdminPanel />
+                </SimpleProtectedRoute>
+              } />
 
-                <Route path="/dashboard/*" element={<IntelligentDashboardRedirect />} />
+              {/* Payments */}
+              <Route path="/payments/overview" element={
+                <SimpleProtectedRoute requiredRole="client">
+                  <PaymentOverview />
+                </SimpleProtectedRoute>
+              } />
 
-                <Route path="/landscaper-dashboard/*" element={
-                  <SimpleProtectedRoute requiredRole="landscaper">
-                    <LandscaperDashboardV2 />
-                  </SimpleProtectedRoute>
-                } />
+              {/* 404 */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
 
-                <Route path="/client-quote" element={
-                  <SimpleProtectedRoute requiredRole="client">
-                    <ClientQuoteForm />
-                  </SimpleProtectedRoute>
-                } />
-
-                {/* Admin routes */}
-                <Route path="/admin-dashboard" element={
-                  <SimpleProtectedRoute requiredRole="admin">
-                    <AdminDashboard />
-                  </SimpleProtectedRoute>
-                } />
-
-                <Route path="/admin" element={
-                  <SimpleProtectedRoute requiredRole="admin">
-                    <AdminPanel />
-                  </SimpleProtectedRoute>
-                } />
-
-                <Route path="/business-automation" element={
-                  <SimpleProtectedRoute requiredRole="admin">
-                    <BusinessAutomation />
-                  </SimpleProtectedRoute>
-                } />
-
-                <Route path="/notifications" element={
-                  <SimpleProtectedRoute requiredRole="admin">
-                    <NotificationDashboard />
-                  </SimpleProtectedRoute>
-                } />
-
-                <Route path="/ai-quotes" element={
-                  <SimpleProtectedRoute requiredRole="admin">
-                    <AIQuoteDashboard />
-                  </SimpleProtectedRoute>
-                } />
-
-                {/* Payments */}
-                <Route path="/payments/overview" element={
-                  <SimpleProtectedRoute requiredRole="client">
-                    <PaymentOverview />
-                  </SimpleProtectedRoute>
-                } />
-
-                <Route path="/payments/methods" element={
-                  <SimpleProtectedRoute requiredRole="client">
-                    <PaymentMethods />
-                  </SimpleProtectedRoute>
-                } />
-
-                <Route path="/payments/subscriptions" element={
-                  <SimpleProtectedRoute requiredRole="client">
-                    <PaymentSubscriptions />
-                  </SimpleProtectedRoute>
-                } />
-
-                <Route path="/payments/security" element={
-                  <SimpleProtectedRoute requiredRole="client">
-                    <PaymentSecurity />
-                  </SimpleProtectedRoute>
-                } />
-
-                {/* 404 */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </AnalyticsProvider>
-          </Router>
-        </ConfigGate>
+          </AnalyticsProvider>
+        </Router>
       </ConfigProvider>
     </ErrorBoundary>
   );
