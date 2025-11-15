@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { getRuntimeConfig } from '@/lib/runtimeConfig';
 import AppLayout from '@/components/AppLayout';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import JobCompletionForm from '@/components/JobCompletionForm';
@@ -60,8 +59,7 @@ export default function LandscaperProfile() {
 
   const handleSubmitDocuments = async () => {
     const {
-      data: { user },
-      error: userError
+      data: { user }
     } = await supabase.auth.getUser();
 
     if (!user) {
@@ -119,44 +117,26 @@ export default function LandscaperProfile() {
   useEffect(() => {
     const fetchProfile = async () => {
       const {
-        data: { user },
-        error: userError
+        data: { user }
       } = await supabase.auth.getUser();
 
-      if (userError) {
-        console.error('Error getting user:', userError.message);
-        return;
-      }
+      if (!user) return;
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('landscapers')
         .select('*')
         .eq('email', user.email)
         .maybeSingle();
 
-      if (!data) {
-        console.warn("No landscaper profile found for this user yet.");
-        setLandscaperData(null);
-        return;
-      }
+      setLandscaperData(data || null);
 
-      if (error) {
-        console.error('Error fetching landscaper:', error.message);
-      } else {
-        setLandscaperData(data);
-      }
-
-      const { data: jobData, error: jobError } = await supabase
+      const { data: jobData } = await supabase
         .from('jobs')
         .select('*')
         .eq('assigned_email', user.email)
         .order('date', { ascending: true });
 
-      if (jobError) {
-        console.error('Error fetching jobs:', jobError.message);
-      } else {
-        setJobs(jobData);
-      }
+      setJobs(jobData || []);
     };
 
     fetchProfile();
@@ -168,6 +148,7 @@ export default function LandscaperProfile() {
       <div className="flex flex-col items-center justify-start min-h-screen px-4 pt-24">
         <div className="w-full max-w-3xl bg-black/80 border border-green-500 rounded-lg p-8 shadow-lg">
           <h1 className="text-3xl font-bold text-green-400 mb-6 text-center">Landscaper Profile</h1>
+
           {landscaperData ? (
             <div className="text-white space-y-4">
               <p><span className="text-green-400">Full Name:</span> {landscaperData.full_name}</p>
@@ -201,7 +182,7 @@ export default function LandscaperProfile() {
                 <span className="text-green-400">Insurance:</span>{' '}
                 {landscaperData.insurance_file ? (
                   <a
-                    href={`${getRuntimeConfig().url}/storage/v1/object/public/landscaper-uploads/${landscaperData.insurance_file}`}
+                    href={`${supabase.storageUrl}/storage/v1/object/public/landscaper-uploads/${landscaperData.insurance_file}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-400 underline"
@@ -217,7 +198,7 @@ export default function LandscaperProfile() {
                 <span className="text-green-400">License:</span>{' '}
                 {landscaperData.license_file ? (
                   <a
-                    href={`${getRuntimeConfig().url}/storage/v1/object/public/landscaper-uploads/${landscaperData.license_file}`}
+                    href={`${supabase.storageUrl}/storage/v1/object/public/landscaper-uploads/${landscaperData.license_file}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-400 underline"
@@ -265,7 +246,6 @@ export default function LandscaperProfile() {
           </div>
         )}
 
-        {/* Reviews Section */}
         {landscaperData && (
           <div className="mt-8 w-full max-w-3xl bg-black/80 border border-green-500 rounded-lg p-6 shadow-lg">
             <ReviewsSection 
