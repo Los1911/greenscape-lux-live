@@ -11,7 +11,6 @@ import SystemHealthMonitor from '@/components/admin/SystemHealthMonitor';
 import UserManagementCard from '@/components/admin/UserManagementCard';
 import LandscaperApprovalPanel from '@/components/admin/LandscaperApprovalPanel';
 import SystemLogs from '@/components/admin/SystemLogs';
-import { EnvironmentVariablesDashboard } from '@/components/admin/EnvironmentVariablesDashboard';
 import { VercelIntegrationDashboard } from '@/components/admin/VercelIntegrationDashboard';
 import { DisputeQueuePanel } from '@/components/admin/DisputeQueuePanel';
 import { DisputeAnalyticsDashboard } from '@/components/admin/DisputeAnalyticsDashboard';
@@ -26,8 +25,6 @@ import {
   AlertTriangle,
   LogOut
 } from 'lucide-react';
-
-
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -52,7 +49,8 @@ export default function AdminDashboard() {
         supabase.from('landscapers').select('id, approved', { count: 'exact' }).eq('approved', false)
       ]);
 
-      const totalRevenue = paymentsResult.data?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
+      const totalRevenue =
+        paymentsResult.data?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
 
       setStats({
         totalUsers: usersResult.count || 0,
@@ -68,33 +66,31 @@ export default function AdminDashboard() {
   const initializeMonitoring = async () => {
     if (!stripeKeyMonitor.isMonitoring()) {
       await stripeKeyMonitor.startMonitoring();
+      setMonitoringStatus(true);
+    } else {
+      setMonitoringStatus(true);
     }
-    setMonitoringStatus(true);
   };
 
   const handleLogout = async () => {
     try {
-      console.log('Admin logout initiated');
       await signOutAndRedirect(supabase, '/admin-login');
     } catch (error) {
-      console.error('Admin logout error:', error);
       window.location.href = '/admin-login';
     }
   };
-  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-[#020b06] to-black text-white">
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
-
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 flex-wrap">
+        
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-4xl font-bold text-emerald-300">Admin Dashboard</h1>
             <p className="text-emerald-300/70">Manage your platform and monitor security</p>
           </div>
 
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Shield className={`h-5 w-5 ${monitoringStatus ? 'text-green-500' : 'text-red-500'}`} />
               <span className="text-gray-300">
@@ -106,7 +102,7 @@ export default function AdminDashboard() {
               onClick={handleLogout}
               variant="outline"
               size="sm"
-              className="bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
+              className="bg-red-500/10 border-red-500/30 text-red-400"
             >
               <LogOut className="w-4 h-4 mr-2" />
               Logout
@@ -114,54 +110,53 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="bg-black/60 border border-emerald-500/25 rounded-2xl backdrop-blur">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-6">
-              <CardTitle className="text-sm text-white">Total Users</CardTitle>
+          <Card className="bg-black/60 border border-emerald-500/25">
+            <CardHeader className="flex justify-between p-6">
+              <CardTitle>Total Users</CardTitle>
               <Users className="h-4 w-4 text-emerald-400" />
             </CardHeader>
-            <CardContent className="p-6 pt-0">
-              <div className="text-2xl font-bold text-emerald-300">{stats.totalUsers}</div>
+            <CardContent className="p-6 pt-0 text-2xl font-bold text-emerald-300">
+              {stats.totalUsers}
             </CardContent>
           </Card>
 
-          <Card className="bg-black/60 border border-emerald-500/25 rounded-2xl backdrop-blur">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-6">
-              <CardTitle className="text-sm text-white">Total Revenue</CardTitle>
+          <Card className="bg-black/60 border border-emerald-500/25">
+            <CardHeader className="flex justify-between p-6">
+              <CardTitle>Total Revenue</CardTitle>
               <DollarSign className="h-4 w-4 text-emerald-400" />
             </CardHeader>
-            <CardContent className="p-6 pt-0">
-              <div className="text-2xl font-bold text-emerald-300">${stats.totalRevenue}</div>
+            <CardContent className="p-6 pt-0 text-2xl font-bold text-emerald-300">
+              ${stats.totalRevenue}
             </CardContent>
           </Card>
 
-          <Card className="bg-black/60 border border-emerald-500/25 rounded-2xl backdrop-blur">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-6">
-              <CardTitle className="text-sm text-white">Active Jobs</CardTitle>
+          <Card className="bg-black/60 border border-emerald-500/25">
+            <CardHeader className="flex justify-between p-6">
+              <CardTitle>Active Jobs</CardTitle>
               <Activity className="h-4 w-4 text-emerald-400" />
             </CardHeader>
-            <CardContent className="p-6 pt-0">
-              <div className="text-2xl font-bold text-emerald-300">{stats.activeJobs}</div>
+            <CardContent className="p-6 pt-0 text-2xl font-bold text-emerald-300">
+              {stats.activeJobs}
             </CardContent>
           </Card>
 
-          <Card className="bg-black/60 border border-emerald-500/25 rounded-2xl backdrop-blur">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-6">
-              <CardTitle className="text-sm text-white">Pending Approvals</CardTitle>
+          <Card className="bg-black/60 border border-emerald-500/25">
+            <CardHeader className="flex justify-between p-6">
+              <CardTitle>Pending Approvals</CardTitle>
               <AlertTriangle className="h-4 w-4 text-yellow-400" />
             </CardHeader>
-            <CardContent className="p-6 pt-0">
-              <div className="text-2xl font-bold text-yellow-300">{stats.pendingApprovals}</div>
+            <CardContent className="p-6 pt-0 text-2xl font-bold text-yellow-300">
+              {stats.pendingApprovals}
             </CardContent>
           </Card>
         </div>
 
-
         {/* Tabs */}
-        <Tabs defaultValue="overview" className="space-y-10">
-          <TabsList className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-10 bg-black/60 border border-emerald-500/25 p-1 rounded-lg">
+        <Tabs defaultValue="overview" className="space-y-8">
+
+          <TabsList className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-10 bg-black/60 border border-emerald-500/25 p-1 gap-1">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="stripe-connect">Connect Test</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
@@ -170,11 +165,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="disputes">Disputes</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="stripe-prod">Stripe</TabsTrigger>
-            <TabsTrigger value="env-vars">Environment</TabsTrigger>
+            <TabsTrigger value="system">System</TabsTrigger>
             <TabsTrigger value="vercel">Vercel</TabsTrigger>
             <TabsTrigger value="logs">Logs</TabsTrigger>
           </TabsList>
-
 
           <TabsContent value="overview">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -213,8 +207,8 @@ export default function AdminDashboard() {
             <StripeProductionDashboard />
           </TabsContent>
 
-          <TabsContent value="env-vars">
-            <EnvironmentVariablesDashboard />
+          <TabsContent value="system">
+            <SystemHealthMonitor />
           </TabsContent>
 
           <TabsContent value="vercel">
@@ -225,8 +219,6 @@ export default function AdminDashboard() {
             <SystemLogs />
           </TabsContent>
         </Tabs>
-
-
       </div>
     </div>
   );
