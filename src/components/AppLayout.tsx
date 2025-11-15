@@ -1,6 +1,5 @@
 import React from 'react';
 import { MultiEnvironmentValidator } from '@/components/setup/MultiEnvironmentValidator';
-import { EnvironmentConfigDashboard } from '@/components/setup/EnvironmentConfigDashboard';
 import { useMultiEnvironmentValidation } from '@/hooks/useMultiEnvironmentValidation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,9 +28,7 @@ const AppLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Environment Config Dashboard - Shows when fallbacks are detected */}
-      <EnvironmentConfigDashboard />
-      
+
       <div className="container mx-auto px-4 py-8">
 
         {/* Header */}
@@ -107,7 +104,7 @@ const AppLayout: React.FC = () => {
           </Card>
         </div>
 
-        {/* Environment-Specific Information */}
+        {/* Environment-Specific Info */}
         <Card className="border-0 shadow-lg bg-white/70 backdrop-blur-sm mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
@@ -141,10 +138,10 @@ const AppLayout: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Main Validation Component */}
+        {/* Main Validator */}
         <MultiEnvironmentValidator />
 
-        {/* Footer Information */}
+        {/* Footer */}
         <div className="mt-12 text-center">
           <div className="inline-flex items-center gap-2 px-6 py-3 bg-white/70 backdrop-blur-sm rounded-full border shadow-lg">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
