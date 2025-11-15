@@ -8,6 +8,7 @@
   },
 
   "type": "module",
+
   "scripts": {
     "dev": "vite",
     "build": "NODE_ENV=production vite build",

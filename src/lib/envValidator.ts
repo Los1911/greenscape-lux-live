@@ -14,7 +14,7 @@ export const validateEnvironment = (): EnvValidationResult => {
 
   // Safe access to Vite env vars
   const env =
-    (typeof import !== "undefined" && import.meta?.env) || {};
+    (typeof import.meta !== "undefined" && import.meta.env) || {};
 
   const supabaseUrl = env.VITE_SUPABASE_URL;
   const supabaseKey = env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -32,7 +32,6 @@ export const validateEnvironment = (): EnvValidationResult => {
   console.groupEnd();
 
   // ---- SAFE VALIDATION ONLY ----
-  // No hard failures. No strict length rules.
 
   // URL check
   if (!supabaseUrl) {
@@ -41,8 +40,8 @@ export const validateEnvironment = (): EnvValidationResult => {
     warnings.push("VITE_SUPABASE_URL should start with https://");
   }
 
-  // Key format checks (allow both formats)
-  const isLegacyKey = supabaseKey?.startsWith("eyJ");
+  // Key format checks (allow legacy + new)
+  const isLegacyKey = supabaseKey?.startsWith("eyJ"); // old anon JWT
   const isNewKey =
     supabaseKey?.startsWith("sbp_") ||
     supabaseKey?.startsWith("sb_publishable_");
@@ -50,9 +49,7 @@ export const validateEnvironment = (): EnvValidationResult => {
   if (!supabaseKey) {
     errors.push("VITE_SUPABASE_PUBLISHABLE_KEY is undefined");
   } else if (!isLegacyKey && !isNewKey) {
-    warnings.push(
-      "Supabase key format is non standard but may still be valid"
-    );
+    warnings.push("Supabase key format is non standard but may still be valid");
   }
 
   return {
@@ -71,7 +68,7 @@ export const validateEnvironment = (): EnvValidationResult => {
 
 // Auto validate only in development
 const env =
-  (typeof import !== "undefined" && import.meta?.env) || {};
+  (typeof import.meta !== "undefined" && import.meta.env) || {};
 
 if (env.DEV) {
   const validation = validateEnvironment();
