@@ -14,11 +14,20 @@ export default function BackButton({ className = '', fallbackPath }: BackButtonP
   const location = useLocation();
 
   const handleBack = () => {
+    // If a fallbackPath was explicitly provided, always use it
     if (fallbackPath) {
       navigate(fallbackPath);
-    } else {
-      navigateBack(navigate, location.pathname);
+      return;
     }
+
+    // If there *is* browser history, go back
+    if (window.history.length > 2) {
+      navigate(-1);
+      return;
+    }
+
+    // FINAL HARD FALLBACK when there is no page to go back to
+    navigate('/');
   };
 
   return (
