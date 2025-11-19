@@ -1,28 +1,28 @@
 // Navigation helper utilities for consistent UX
 import { NavigateFunction } from 'react-router-dom';
-import { getUserRoles } from '@/hooks/useRole';
+import { useRole } from '@/hooks/useRole';
 
 // Route mapping for proper back navigation
 export const BACK_ROUTE_MAP: Record<string, string> = {
-  // Quote flow
   '/get-quote': '/',
   '/get-a-quote': '/',
   '/instant-quote': '/',
   '/thank-you': '/get-quote',
-  
-  // Auth flows - improved back navigation logic
+
+  // Auth flows
   '/login': '/',
   '/signup': '/',
-  '/client-login': '/', // Go to home instead of role selection for better UX
-  '/client-signup': '/', // Go to home instead of role selection  
+  '/client-login': '/',
+  '/client-signup': '/',
   '/landscaper-login': '/',
   '/landscaper-signup': '/',
   '/pro-login': '/',
   '/pro-signup': '/',
-  '/get-started': '/', // Role selection goes back to home
-  '/forgot-password': '/client-login', // More intuitive than generic login
+  '/get-started': '/',
+  '/forgot-password': '/client-login',
   '/reset-password': '/client-login',
-  // Dashboard flows
+
+  // Dashboards
   '/client/dashboard': '/',
   '/client/profile': '/client/dashboard',
   '/landscaper/dashboard': '/',
@@ -31,13 +31,13 @@ export const BACK_ROUTE_MAP: Record<string, string> = {
   '/landscaper-profile': '/landscaper-dashboard',
   '/landscaper/jobs': '/landscaper/dashboard',
   '/landscaper-jobs': '/landscaper-dashboard',
-  
-  // Admin flows
+
+  // Admin
   '/admin': '/',
   '/admin/profile': '/admin',
   '/admin/notifications': '/admin',
-  
-  // Other pages
+
+  // Misc
   '/about': '/',
   '/professionals': '/',
   '/privacy': '/',
@@ -45,72 +45,69 @@ export const BACK_ROUTE_MAP: Record<string, string> = {
   '/search': '/',
 };
 
-// Safe navigation function that uses explicit routes instead of navigate(-1)
+// Simple back navigation
 export const navigateBack = (navigate: NavigateFunction, currentPath: string) => {
   const backPath = BACK_ROUTE_MAP[currentPath] || '/';
   navigate(backPath);
 };
 
-// Context-aware back navigation based on user role and current location
-export const navigateBackContextAware = async (
-  navigate: NavigateFunction, 
+// Context aware back navigation (updated to use useRole instead of getUserRoles)
+export const navigateBackContextAware = (
+  navigate: NavigateFunction,
   currentPath: string
-): Promise<void> => {
-  const { role, loading } = await getUserRoles();
-  
-  // If still loading, use standard back logic
+): void => {
+  const { role, loading } = useRole();
+
   if (loading) {
     const backPath = BACK_ROUTE_MAP[currentPath] || '/';
     navigate(backPath);
     return;
   }
-  
-  // Determine appropriate back path based on current location and role
+
   const dashboardRoute = getDashboardRoute(role || undefined);
-  
-  // If on a dashboard sub-page, go back to dashboard
-  if (currentPath.includes('/profile') || 
-      currentPath.includes('/jobs') || 
-      currentPath.includes('/earnings') ||
-      currentPath.includes('/chat') ||
-      currentPath.includes('/notifications')) {
+
+  if (
+    currentPath.includes('/profile') ||
+    currentPath.includes('/jobs') ||
+    currentPath.includes('/earnings') ||
+    currentPath.includes('/chat') ||
+    currentPath.includes('/notifications')
+  ) {
     navigate(dashboardRoute);
     return;
   }
-  
-  // If on dashboard itself, go to home
+
   if (currentPath === dashboardRoute) {
     navigate('/');
     return;
   }
-  
-  // Use standard back route map or dashboard as fallback
+
   const backPath = BACK_ROUTE_MAP[currentPath] || dashboardRoute;
   navigate(backPath);
 };
 
-// Enhanced navigation helper with location awareness
+// Helper wrapper
 export const createNavigationHelper = (navigate: NavigateFunction, location: any) => ({
   goBack: (fallbackPath?: string) => {
     const currentPath = location.pathname;
     const backPath = fallbackPath || BACK_ROUTE_MAP[currentPath] || '/';
     navigate(backPath);
   },
-  
+
   goToDashboard: (userRole?: string) => {
     navigate(getDashboardRoute(userRole));
   },
-  
+
   goToProfile: (userRole?: string) => {
     navigate(getProfileRoute(userRole));
   },
-  
+
   goHome: () => navigate('/'),
   goToQuote: () => navigate('/get-quote'),
   goToAuth: (type: 'login' | 'signup' = 'login') => navigate(`/${type}`),
 });
 
-// Get proper dashboard route based on user role
+// Role-based routing
 export const getDashboardRoute = (userRole?: string): string => {
   switch (userRole) {
     case 'admin':
@@ -124,7 +121,6 @@ export const getDashboardRoute = (userRole?: string): string => {
   }
 };
 
-// Get proper profile route based on user role
 export const getProfileRoute = (userRole?: string): string => {
   switch (userRole) {
     case 'admin':

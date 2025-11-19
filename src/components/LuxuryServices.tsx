@@ -40,7 +40,6 @@ const LuxuryServices: React.FC = () => {
           Luxury Services
         </h2>
 
-        
         {/* Service Overview Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-8 md:mb-10">
           {services.map((service, index) => (
@@ -65,7 +64,8 @@ const LuxuryServices: React.FC = () => {
 
         {/* Detailed Services */}
         <div className="space-y-3 md:space-y-4 mb-8 md:mb-10">
-          {/* Core Year-Round Services */}
+
+          {/* Core Services */}
           <Card className="bg-gray-900/60 border border-green-500/30 rounded-2xl">
             <CardContent className="p-0">
               <button
@@ -80,7 +80,7 @@ const LuxuryServices: React.FC = () => {
                   <span className="text-green-400 text-xl md:text-2xl flex-shrink-0 font-bold">{openSection === 'core' ? '−' : '+'}</span>
                 </div>
               </button>
-              
+
               {openSection === 'core' && (
                 <div className="px-4 md:px-6 pb-4 md:pb-6">
                   <ul className="space-y-2 md:space-y-2.5 text-gray-300 text-sm md:text-base">
@@ -93,14 +93,14 @@ const LuxuryServices: React.FC = () => {
                     <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Flower bed maintenance</li>
                     <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Basic to premium landscape design</li>
                     <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Gravel & rock placement</li>
-                    <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Pressure washing (driveways, walkways)</li>
+                    <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Pressure washing</li>
                   </ul>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Seasonal & Winter Services */}
+          {/* Seasonal */}
           <Card className="bg-gray-900/60 border border-green-500/30 rounded-2xl">
             <CardContent className="p-0">
               <button
@@ -115,27 +115,28 @@ const LuxuryServices: React.FC = () => {
                   <span className="text-green-400 text-xl md:text-2xl flex-shrink-0 font-bold">{openSection === 'seasonal' ? '−' : '+'}</span>
                 </div>
               </button>
-              
+
               {openSection === 'seasonal' && (
                 <div className="px-4 md:px-6 pb-4 md:pb-6">
                   <ul className="space-y-2 md:space-y-2.5 text-gray-300 text-sm md:text-base">
                     <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Leaf removal</li>
                     <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Gutter cleaning</li>
-                    <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Winter pruning (shrubs, small trees)</li>
-                    <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Holiday lighting installation/removal</li>
-                    <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Snow removal (driveways, walkways)</li>
-                    <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Ice salting and de-icing</li>
-                    <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Seasonal plant protection and dormancy prep</li>
+                    <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Winter pruning</li>
+                    <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Holiday lighting install/removal</li>
+                    <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Snow removal</li>
+                    <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Ice salting</li>
+                    <li className="flex items-start"><span className="text-green-400 mr-2">•</span>Seasonal plant protection</li>
                   </ul>
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
-        {/* Call to Action */}
+
+        {/* CTA */}
         <div className="text-center">
-          <button 
-            onClick={() => navigate('/get-quote-enhanced')}
+          <button
+            onClick={() => navigate('/get-quote')}
             className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold px-8 py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-emerald-500/25 text-lg"
           >
             Get Your Quote Today

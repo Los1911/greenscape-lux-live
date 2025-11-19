@@ -4,21 +4,20 @@ import {
   CheckCircle2, 
   Clock, 
   DollarSign, 
-  TrendingUp,
   AlertCircle 
 } from 'lucide-react';
 import { UnifiedStatsCard } from '@/components/shared/UnifiedDashboardComponents';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useAuth } from '@/contexts/AuthContext';
 
-export function LiveDashboardStats() {
+export default function LiveDashboardStats() {
   const { user } = useAuth();
   const { stats, loading, error } = useDashboardData('client');
 
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }, (_, i) => (
+        {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="bg-black/60 backdrop-blur rounded-2xl p-6 animate-pulse">
             <div className="h-4 bg-gray-700 rounded mb-2"></div>
             <div className="h-8 bg-gray-700 rounded mb-1"></div>
@@ -56,10 +55,7 @@ export function LiveDashboardStats() {
         subtitle="In progress or pending"
         icon={<Clock className="w-5 h-5" />}
         variant="yellow"
-        trend={{
-          value: stats.activeJobs > 0 ? 15 : 0,
-          isPositive: true
-        }}
+        trend={{ value: stats.activeJobs > 0 ? 15 : 0, isPositive: true }}
       />
       
       <UnifiedStatsCard
@@ -68,10 +64,7 @@ export function LiveDashboardStats() {
         subtitle="Successfully finished"
         icon={<CheckCircle2 className="w-5 h-5" />}
         variant="green"
-        trend={{
-          value: stats.completedJobs > 0 ? 8 : 0,
-          isPositive: true
-        }}
+        trend={{ value: stats.completedJobs > 0 ? 8 : 0, isPositive: true }}
       />
       
       <UnifiedStatsCard

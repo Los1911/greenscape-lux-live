@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { NotificationService } from '@/services/NotificationService';
 import { toast } from 'sonner';
+import { notificationSound } from '@/utils/notificationSound';
 
 interface Notification {
   id: string;
@@ -153,33 +154,37 @@ export function NotificationBell() {
       console.error('Error marking all as read:', error);
     }
   };
-
   const showToastNotification = (notification: Notification) => {
     const { type, title, message } = notification;
     
-    // Determine toast type based on notification type
+    // Play sound alert
     if (type.includes('success') || type.includes('completed') || type.includes('accepted')) {
+      notificationSound.playNotificationSound('success');
       toast.success(title, {
         description: message,
         duration: 5000,
       });
     } else if (type.includes('failed') || type.includes('error')) {
+      notificationSound.playNotificationSound('error');
       toast.error(title, {
         description: message,
         duration: 6000,
       });
     } else if (type.includes('warning') || type.includes('required')) {
+      notificationSound.playNotificationSound('warning');
       toast.warning(title, {
         description: message,
         duration: 5000,
       });
     } else {
+      notificationSound.playNotificationSound('info');
       toast.info(title, {
         description: message,
         duration: 4000,
       });
     }
   };
+
 
 
   const handleNotificationAction = async (notification: Notification) => {
