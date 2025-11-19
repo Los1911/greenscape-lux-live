@@ -18,7 +18,10 @@ import AboutUs from "@/pages/AboutUs";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
 import Professionals from "@/pages/Professionals";
+
+// Your landing page
 import Contact from "@/pages/GreenScapeLuxLanding";
+
 import NotFound from "@/pages/NotFound";
 
 export default function App() {
@@ -27,12 +30,13 @@ export default function App() {
       <Routes>
 
         {/* Landing Page */}
-        <Route path="/" element={<GetStarted />} />
+        <Route path="/" element={<Contact />} />
 
-        {/* The route you were missing */}
-        <Route path="/portal-login" element={<UnifiedLogin />} />
+        {/* Get Started page */}
+        <Route path="/get-started" element={<GetStarted />} />
 
         {/* Auth */}
+        <Route path="/portal-login" element={<UnifiedLogin />} />
         <Route path="/login" element={<UnifiedLogin />} />
         <Route path="/register" element={<UnifiedPortalAuth />} />
         <Route path="/reset-password" element={<ResetPassword />} />
