@@ -10,7 +10,7 @@ import { UnifiedStatsCard } from '@/components/shared/UnifiedDashboardComponents
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useAuth } from '@/contexts/AuthContext';
 
-export default function LiveDashboardStats() {
+export function LiveDashboardStats() {
   const { user } = useAuth();
   const { stats, loading, error } = useDashboardData('client');
 
@@ -48,7 +48,7 @@ export default function LiveDashboardStats() {
         icon={<Calendar className="w-5 h-5" />}
         variant="blue"
       />
-      
+
       <UnifiedStatsCard
         title="Active Jobs"
         value={stats.activeJobs}
@@ -57,7 +57,7 @@ export default function LiveDashboardStats() {
         variant="yellow"
         trend={{ value: stats.activeJobs > 0 ? 15 : 0, isPositive: true }}
       />
-      
+
       <UnifiedStatsCard
         title="Completed"
         value={stats.completedJobs}
@@ -66,7 +66,7 @@ export default function LiveDashboardStats() {
         variant="green"
         trend={{ value: stats.completedJobs > 0 ? 8 : 0, isPositive: true }}
       />
-      
+
       <UnifiedStatsCard
         title="Total Spent"
         value={`$${stats.totalEarnings.toFixed(2)}`}
