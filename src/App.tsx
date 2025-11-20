@@ -1,64 +1,275 @@
-import React from "react";
-import { HashRouter as Router, Routes, Route } from "react-router-dom";
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import ScrollToTop from './components/ScrollToTop';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ConfigProvider } from './lib/ConfigContext';
+import { ConfigGate } from './components/ConfigGate';
 
-import GetStarted from "@/pages/GetStarted";
-import UnifiedLogin from "@/pages/UnifiedLogin";
-import UnifiedPortalAuth from "@/pages/UnifiedPortalAuth";
+import { AnalyticsProvider } from './components/Analytics';
+import { VersionChecker } from './components/VersionChecker';
 
-import GetQuoteEnhanced from "@/pages/GetQuoteEnhanced";  
-import QuotePage from "@/pages/ClientQuoteForm";
+// Marketing pages
+import AboutUs from './pages/AboutUs';
+import GreenScapeLuxLanding from './pages/GreenScapeLuxLanding';
+import Professionals from './pages/Professionals';
+import TermsOfService from './pages/TermsOfService';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
-import ClientDashboardV2 from "@/pages/ClientDashboardV2";
-import LandscaperDashboardV2 from "@/pages/LandscaperDashboardV2";
-import AdminDashboard from "@/pages/AdminDashboard";
+// Quote system
+import GetQuoteEnhanced from './pages/GetQuoteEnhanced';
+import ThankYou from './pages/ThankYou';
+import ClientQuoteForm from './pages/ClientQuoteForm';
 
-import ResetPassword from "@/pages/ResetPassword";
+// Auth
+import PortalLogin from './pages/portal-login';
+import ResetPassword from './pages/ResetPassword';
+import AdminLogin from './pages/AdminLogin';
 
-import AboutUs from "@/pages/AboutUs";
-import PrivacyPolicy from "@/pages/PrivacyPolicy";
-import TermsOfService from "@/pages/TermsOfService";
-import Professionals from "@/pages/Professionals";
+// Dashboards
+import ClientDashboardV2 from './pages/ClientDashboardV2';
+import LandscaperDashboardV2 from './pages/LandscaperDashboardV2';
+import AdminDashboard from './pages/AdminDashboard';
 
-// Your landing page
-import Contact from "@/pages/GreenScapeLuxLanding";
+// Job management
+import LandscaperJobs from './pages/LandscaperJobs';
+import NewRequests from './pages/NewRequests';
+import JobComplete from './pages/JobComplete';
+import LandscaperOnboarding from './pages/LandscaperOnboarding';
+import LandscaperProfile from './pages/LandscaperProfile';
 
-import NotFound from "@/pages/NotFound";
+// Admin pages
+import AdminPanel from './pages/AdminPanel';
+import BusinessAutomation from './pages/BusinessAutomation';
+import NotificationDashboard from './pages/NotificationDashboard';
+import AIQuoteDashboard from './pages/AIQuoteDashboard';
+import PriceAnalyticsDashboard from './pages/analytics/PriceAnalyticsDashboard';
 
-export default function App() {
-  return (
-    <Router>
-      <Routes>
+// Client pages
+import ClientHistory from './pages/ClientHistory';
+import ClientProfile from './pages/ClientProfile';
+import BillingHistory from './pages/BillingHistory';
+import SubscriptionDashboard from './pages/SubscriptionDashboard';
+import Chat from './pages/Chat';
 
-        {/* Landing Page */}
-        <Route path="/" element={<Contact />} />
+// Payments
+import PaymentOverview from './pages/payments/PaymentOverview';
+import PaymentMethods from './pages/payments/PaymentMethods';
+import PaymentSubscriptions from './pages/payments/PaymentSubscriptions';
+import PaymentSecurity from './pages/payments/PaymentSecurity';
 
-        {/* Get Started page */}
-        <Route path="/get-started" element={<GetStarted />} />
+// Search / misc
+import SearchPage from './pages/SearchPage';
+import NotFound from './pages/NotFound';
+import EnvironmentStatus from './pages/EnvironmentStatus';
 
-        {/* Auth */}
-        <Route path="/portal-login" element={<UnifiedLogin />} />
-        <Route path="/login" element={<UnifiedLogin />} />
-        <Route path="/register" element={<UnifiedPortalAuth />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+// Protected route
+import SimpleProtectedRoute from './components/auth/SimpleProtectedRoute';
 
-        {/* Quotes */}
-        <Route path="/instant-quote" element={<GetQuoteEnhanced />} />
-        <Route path="/quote" element={<QuotePage />} />
+// Dashboard auto-router
+import { IntelligentDashboardRedirect } from './components/routing/IntelligentDashboardRedirect';
 
-        {/* Dashboards */}
-        <Route path="/client-dashboard/*" element={<ClientDashboardV2 />} />
-        <Route path="/landscaper-dashboard/*" element={<LandscaperDashboardV2 />} />
-        <Route path="/admin/*" element={<AdminDashboard />} />
+// NEW: Fix login stalls + refresh loop
+import RoleRouter from './router/RoleRouter';
 
-        {/* Misc */}
-        <Route path="/about" element={<AboutUs />} />
-        <Route path="/privacy" element={<PrivacyPolicy />} />
-        <Route path="/terms" element={<TermsOfService />} />
-        <Route path="/pros" element={<Professionals />} />
-        <Route path="/contact" element={<Contact />} />
+// Setup
+import { SetupWizard } from './components/setup/SetupWizard';
+import { ProductionStatus } from './components/setup/ProductionStatus';
 
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </Router>
-  );
+// Global error + auth listeners
+if (typeof window !== "undefined" && !window.__GSL_ONERROR) {
+  window.__GSL_ONERROR = true;
+  window.addEventListener("error", (e) => {
+    console.error("Global error", e?.error || e);
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    console.error("Unhandled promise rejection", e?.reason);
+  });
 }
+
+if (typeof window !== "undefined" && !window.__GSL_AUTH_LISTENER) {
+  window.__GSL_AUTH_LISTENER = true;
+  import('@/lib/supabase').then(({ supabase }) => {
+    supabase.auth.onAuthStateChange((event) => {
+      console.log('[AUTH GLOBAL]', event);
+    });
+  });
+}
+
+const App: React.FC = () => {
+  return (
+    <ErrorBoundary>
+      <ConfigProvider>
+        <ConfigGate>
+          <Router>
+            <AnalyticsProvider>
+              <VersionChecker />
+              <ScrollToTop />
+
+              <Routes>
+
+                {/* MARKETING */}
+                <Route path="/" element={<GreenScapeLuxLanding />} />
+                <Route path="/about" element={<AboutUs />} />
+                <Route path="/professionals" element={<Professionals />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<TermsOfService />} />
+
+                {/* NEW FIX: Role-based auto-redirect */}
+                <Route path="/get-started" element={<RoleRouter />} />
+
+                {/* UNIVERSAL LOGIN */}
+                <Route path="/portal-login" element={<PortalLogin />} />
+                <Route path="/login" element={<Navigate to="/portal-login" replace />} />
+                <Route path="/signup" element={<Navigate to="/portal-login" replace />} />
+                <Route path="/client-login" element={<Navigate to="/portal-login" replace />} />
+                <Route path="/pro-login" element={<Navigate to="/portal-login" replace />} />
+                <Route path="/landscaper-login" element={<Navigate to="/portal-login" replace />} />
+
+                {/* QUOTING */}
+                <Route path="/get-quote" element={<GetQuoteEnhanced />} />
+                <Route path="/instant-quote" element={<Navigate to="/get-quote" replace />} />
+                <Route path="/thank-you" element={<ThankYou />} />
+                <Route path="/client-quote" element={
+                  <SimpleProtectedRoute requiredRole="client">
+                    <ClientQuoteForm />
+                  </SimpleProtectedRoute>
+                } />
+
+                {/* PASSWORD RESET */}
+                <Route path="/reset-password" element={<ResetPassword />} />
+
+                {/* DASHBOARDS */}
+                <Route path="/client-dashboard/*" element={
+                  <SimpleProtectedRoute requiredRole="client">
+                    <ClientDashboardV2 />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/landscaper-dashboard/*" element={
+                  <SimpleProtectedRoute requiredRole="landscaper">
+                    <LandscaperDashboardV2 />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/admin" element={
+                  <SimpleProtectedRoute requiredRole="admin">
+                    <AdminPanel />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/admin-dashboard" element={
+                  <SimpleProtectedRoute requiredRole="admin">
+                    <AdminDashboard />
+                  </SimpleProtectedRoute>
+                } />
+
+                {/* JOB MANAGEMENT */}
+                <Route path="/landscaper-jobs" element={
+                  <SimpleProtectedRoute requiredRole="landscaper">
+                    <LandscaperJobs />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/new-requests" element={
+                  <SimpleProtectedRoute requiredRole="landscaper">
+                    <NewRequests />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/job-complete/:jobId" element={
+                  <SimpleProtectedRoute requiredRole="landscaper">
+                    <JobComplete />
+                  </SimpleProtectedRoute>
+                } />
+
+                {/* ADMIN TOOLS */}
+                <Route path="/business-automation" element={
+                  <SimpleProtectedRoute requiredRole="admin">
+                    <BusinessAutomation />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/notifications" element={
+                  <SimpleProtectedRoute requiredRole="admin">
+                    <NotificationDashboard />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/ai-quotes" element={
+                  <SimpleProtectedRoute requiredRole="admin">
+                    <AIQuoteDashboard />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/analytics/pricing" element={
+                  <SimpleProtectedRoute requiredRole="admin">
+                    <PriceAnalyticsDashboard />
+                  </SimpleProtectedRoute>
+                } />
+
+                {/* CLIENT FEATURES */}
+                <Route path="/profile" element={
+                  <SimpleProtectedRoute requiredRole="client">
+                    <ClientProfile />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/client-history" element={
+                  <SimpleProtectedRoute requiredRole="client">
+                    <ClientHistory />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/billing/history" element={
+                  <SimpleProtectedRoute requiredRole="client">
+                    <BillingHistory />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/subscriptions" element={
+                  <SimpleProtectedRoute requiredRole="client">
+                    <SubscriptionDashboard />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/chat" element={
+                  <SimpleProtectedRoute requiredRole="client">
+                    <Chat />
+                  </SimpleProtectedRoute>
+                } />
+
+                {/* PAYMENTS */}
+                <Route path="/payments/overview" element={
+                  <SimpleProtectedRoute requiredRole="client">
+                    <PaymentOverview />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/payments/methods" element={
+                  <SimpleProtectedRoute requiredRole="client">
+                    <PaymentMethods />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/payments/subscriptions" element={
+                  <SimpleProtectedRoute requiredRole="client">
+                    <PaymentSubscriptions />
+                  </SimpleProtectedRoute>
+                } />
+                <Route path="/payments/security" element={
+                  <SimpleProtectedRoute requiredRole="client">
+                    <PaymentSecurity />
+                  </SimpleProtectedRoute>
+                } />
+
+                {/* SETUP + DEBUG */}
+                <Route path="/setup" element={<SetupWizard onComplete={() => window.location.href = '/'} />} />
+                <Route path="/status" element={<ProductionStatus />} />
+                <Route path="/admin/environment-status" element={
+                  <SimpleProtectedRoute requiredRole="admin">
+                    <EnvironmentStatus />
+                  </SimpleProtectedRoute>
+                } />
+
+                {/* SEARCH */}
+                <Route path="/search" element={<SearchPage />} />
+
+                {/* CATCH ALL */}
+                <Route path="*" element={<NotFound />} />
+
+              </Routes>
+            </AnalyticsProvider>
+          </Router>
+        </ConfigGate>
+      </ConfigProvider>
+    </ErrorBoundary>
+  );
+};
+
+export default App;
