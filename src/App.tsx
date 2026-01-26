@@ -62,9 +62,6 @@ import SimpleProtectedRoute from './components/auth/SimpleProtectedRoute';
 // Dashboard auto-router
 import RoleRouter from './router/RoleRouter';
 
-// Setup / status
-import { ProductionStatus } from './components/setup/ProductionStatus';
-
 // Global error + auth listeners
 if (typeof window !== 'undefined' && !window.__GSL_ONERROR) {
   window.__GSL_ONERROR = true;
@@ -289,9 +286,6 @@ const App: React.FC = () => {
                   </SimpleProtectedRoute>
                 }
               />
-
-              {/* STATUS */}
-              <Route path="/status" element={<ProductionStatus />} />
 
               {/* SEARCH */}
               <Route path="/search" element={<SearchPage />} />
