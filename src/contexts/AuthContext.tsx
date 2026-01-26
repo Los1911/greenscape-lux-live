@@ -22,7 +22,22 @@ const AuthContext = createContext<AuthContextType>({
   refreshUserRole: async () => {},
 });
 
+/**
+ * Primary hook (new standard)
+ */
 export const useAuth = () => useContext(AuthContext);
+
+/**
+ * Legacy compatibility hook
+ * Required for existing payment pages and older imports
+ */
+export const useAuthContext = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuthContext must be used within AuthProvider");
+  }
+  return ctx;
+};
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -46,7 +61,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signOutAndRedirect();
   };
 
-  // Load session ONCE
+  // Load session once
   useEffect(() => {
     const init = async () => {
       const { data } = await supabase.auth.getSession();
