@@ -62,8 +62,7 @@ import SimpleProtectedRoute from './components/auth/SimpleProtectedRoute';
 // Dashboard auto-router
 import RoleRouter from './router/RoleRouter';
 
-// Setup
-import { SetupWizard } from './components/setup/SetupWizard';
+// Setup / status
 import { ProductionStatus } from './components/setup/ProductionStatus';
 
 // Global error + auth listeners
@@ -291,8 +290,7 @@ const App: React.FC = () => {
                 }
               />
 
-              {/* SETUP */}
-              <Route path="/setup" element={<SetupWizard onComplete={() => (window.location.href = '/')} />} />
+              {/* STATUS */}
               <Route path="/status" element={<ProductionStatus />} />
 
               {/* SEARCH */}
