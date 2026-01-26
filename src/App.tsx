@@ -55,7 +55,6 @@ import PaymentSecurity from './pages/payments/PaymentSecurity';
 // Search / misc
 import SearchPage from './pages/SearchPage';
 import NotFound from './pages/NotFound';
-import EnvironmentStatus from './pages/EnvironmentStatus';
 
 // Protected route
 import SimpleProtectedRoute from './components/auth/SimpleProtectedRoute';
@@ -292,17 +291,9 @@ const App: React.FC = () => {
                 }
               />
 
-              {/* SETUP / DEBUG */}
+              {/* SETUP */}
               <Route path="/setup" element={<SetupWizard onComplete={() => (window.location.href = '/')} />} />
               <Route path="/status" element={<ProductionStatus />} />
-              <Route
-                path="/admin/environment-status"
-                element={
-                  <SimpleProtectedRoute requiredRole="admin">
-                    <EnvironmentStatus />
-                  </SimpleProtectedRoute>
-                }
-              />
 
               {/* SEARCH */}
               <Route path="/search" element={<SearchPage />} />
