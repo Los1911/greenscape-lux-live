@@ -1,91 +1,75 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import PaymentLayout from '@/components/layouts/PaymentLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useAuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Crown, Calendar, CreditCard, Check, Star } from 'lucide-react';
+import {
+  Crown,
+  Calendar,
+  CreditCard,
+  Check,
+  Star,
+  Loader2
+} from 'lucide-react';
 
 interface Subscription {
   id: string;
   plan_name: string;
   status: 'active' | 'canceled' | 'past_due';
   current_period_end: string;
-  amount: number;
+  price: number;
   interval: 'month' | 'year';
 }
 
-const PLANS = [
-  {
-    id: 'basic_monthly',
-    name: 'Basic',
-    amount: 999,
-    interval: 'month',
-    features: ['Up to 3 requests/month', 'Email support', 'Mobile access']
-  },
-  {
-    id: 'premium_monthly', 
-    name: 'Premium',
-    amount: 2999,
-    interval: 'month',
-    popular: true,
-    features: ['Unlimited requests', 'Priority support', 'Advanced scheduling']
-  }
-];
-
 export default function PaymentSubscriptions() {
-  const { user } = useAuthContext();
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  
-  const userId = user?.id || 'demo-user-123';
+  const [userId, setUserId] = useState<string | null>(null);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchSubscription();
-  }, [userId]);
+    initUser();
+  }, []);
 
-  const fetchSubscription = async () => {
+  const initUser = async () => {
+    const { data } = await supabase.auth.getUser();
+    if (!data?.user) return;
+
+    setUserId(data.user.id);
+    fetchSubscriptions(data.user.id);
+  };
+
+  const fetchSubscriptions = async (uid: string) => {
     try {
+      setLoading(true);
+
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      setSubscription(data);
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubscribe = async (planId: string) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('create-subscription', {
-        body: { userId, planId }
-      });
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-      if (data.checkoutUrl) window.location.href = data.checkoutUrl;
-    } catch (error) {
+      setSubscriptions(data || []);
+    } catch (err) {
+      console.error(err);
       toast({
-        title: "Error",
-        description: "Failed to create subscription",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to load subscriptions',
+        variant: 'destructive'
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   if (loading) {
     return (
       <PaymentLayout activeTab="subscriptions">
-        <div className="animate-pulse">
-          <div className="h-32 bg-slate-700 rounded-lg"></div>
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-white" />
         </div>
       </PaymentLayout>
     );
@@ -94,87 +78,62 @@ export default function PaymentSubscriptions() {
   return (
     <PaymentLayout activeTab="subscriptions">
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-white">Subscriptions</h2>
+        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+          <Crown className="h-6 w-6 text-yellow-400" />
+          Subscriptions
+        </h2>
 
-        {subscription ? (
+        {subscriptions.length === 0 ? (
           <Card className="bg-slate-800 border-slate-700">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-white">
-                <Crown className="h-5 w-5 text-yellow-400" />
-                Current Subscription
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-semibold text-lg text-white">{subscription.plan_name}</h3>
-                  <p className="text-gray-300">
-                    ${(subscription.amount / 100).toFixed(2)}/{subscription.interval}
-                  </p>
-                </div>
-                <Badge className="bg-green-100 text-green-800">
-                  {subscription.status}
-                </Badge>
-              </div>
-              
-              <div className="flex items-center gap-2 text-gray-300">
-                <Calendar className="h-4 w-4" />
-                Next billing: {new Date(subscription.current_period_end).toLocaleDateString()}
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <Button variant="outline" className="border-slate-600 text-white">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Manage Billing
-                </Button>
-                <Button variant="destructive">Cancel Subscription</Button>
-              </div>
+            <CardContent className="py-10 text-center text-gray-400">
+              No active subscriptions
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-white mb-2">Choose Your Plan</h2>
-              <p className="text-gray-400">Select the perfect plan for your needs</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {PLANS.map((plan) => (
-                <Card key={plan.id} className={`bg-slate-800 border-slate-700 ${plan.popular ? 'ring-2 ring-blue-500' : ''}`}>
-                  {plan.popular && (
-                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      <Badge className="bg-blue-500 text-white">
-                        <Star className="h-3 w-3 mr-1" />
-                        Popular
-                      </Badge>
-                    </div>
-                  )}
-                  <CardHeader>
-                    <CardTitle className="text-white">{plan.name}</CardTitle>
-                    <div className="text-3xl font-bold text-white">
-                      ${(plan.amount / 100).toFixed(2)}
-                      <span className="text-lg font-normal text-gray-400">/{plan.interval}</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <ul className="space-y-2">
-                      {plan.features.map((feature, index) => (
-                        <li key={index} className="flex items-center gap-2 text-gray-300">
-                          <Check className="h-4 w-4 text-green-400" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-                    <Button 
-                      className="w-full bg-green-600 hover:bg-green-700"
-                      onClick={() => handleSubscribe(plan.id)}
+          <div className="space-y-4">
+            {subscriptions.map(sub => (
+              <Card key={sub.id} className="bg-slate-800 border-slate-700">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between text-white">
+                    <span className="flex items-center gap-2">
+                      <Star className="h-5 w-5 text-yellow-400" />
+                      {sub.plan_name}
+                    </span>
+                    <Badge
+                      className={
+                        sub.status === 'active'
+                          ? 'bg-green-100 text-green-800'
+                          : sub.status === 'past_due'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }
                     >
-                      Choose Plan
+                      {sub.status}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+
+                <CardContent className="space-y-3">
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <CreditCard className="h-4 w-4" />
+                    ${(sub.price / 100).toFixed(2)} / {sub.interval}
+                  </div>
+
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <Calendar className="h-4 w-4" />
+                    Renews on{' '}
+                    {new Date(sub.current_period_end).toLocaleDateString()}
+                  </div>
+
+                  {sub.status === 'active' && (
+                    <Button variant="outline" className="mt-4">
+                      <Check className="h-4 w-4 mr-2" />
+                      Manage Subscription
                     </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
       </div>
