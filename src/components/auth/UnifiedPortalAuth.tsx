@@ -9,9 +9,6 @@ import { supabase } from '@/lib/supabase';
 import { ensureClientProfile } from '@/lib/clients';
 import { useAuth } from '@/contexts/AuthContext';
 import AnimatedBackground from '@/components/AnimatedBackground';
-import HomeButton from '@/components/HomeButton';
-import { handleUnifiedPasswordReset, getPasswordResetUrl } from '@/utils/unifiedPasswordResetHandler';
-import { clearPasswordResetFlag, clearRecoveryIntent } from '@/utils/passwordResetGuard';
 import {
   handleSignupError,
   handleLoginError,
@@ -19,15 +16,17 @@ import {
   isEmailInCooldown,
   generateTestEmailAlias
 } from '@/lib/authErrorHandler';
+import {
+  handleUnifiedPasswordReset,
+  getPasswordResetUrl
+} from '@/utils/unifiedPasswordResetHandler';
+import {
+  clearPasswordResetFlag,
+  clearRecoveryIntent
+} from '@/utils/passwordResetGuard';
 import { useOAuthLayoutFix } from '@/hooks/useOAuthLayoutFix';
 
 const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
-
-const log = (area: string, msg: string, data?: any) => {
-  if (!isDev) return;
-  const ts = new Date().toISOString().split('T')[1];
-  console.log(`[${ts}][PORTAL:${area}] ${msg}`, data ?? '');
-};
 
 const UnifiedPortalAuth: React.FC = () => {
   const navigate = useNavigate();
@@ -39,6 +38,7 @@ const UnifiedPortalAuth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [socialAuthError, setSocialAuthError] = useState('');
 
   const [formData, setFormData] = useState({
     email: '',
@@ -58,7 +58,15 @@ const UnifiedPortalAuth: React.FC = () => {
   const [forgotError, setForgotError] = useState('');
   const [forgotErrorCode, setForgotErrorCode] = useState<string | null>(null);
 
-  useOAuthLayoutFix();
+  const { layoutReady } = useOAuthLayoutFix();
+
+  useEffect(() => {
+    const state = location.state as { error?: string } | null;
+    if (state?.error) {
+      setSocialAuthError(state.error);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     clearPasswordResetFlag();
@@ -66,21 +74,24 @@ const UnifiedPortalAuth: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!user || redirectAttemptedRef.current) return;
-    redirectAttemptedRef.current = true;
-
-    const path =
-      userRole === 'admin'
-        ? '/admin'
-        : userRole === 'landscaper'
-        ? '/landscaper-dashboard'
-        : '/client-dashboard';
-
-    navigate(path, { replace: true });
-  }, [user, userRole, navigate]);
+    if (userRole && !authLoading && !redirectAttemptedRef.current) {
+      redirectAttemptedRef.current = true;
+      const path =
+        userRole === 'admin'
+          ? '/admin-dashboard'
+          : userRole === 'landscaper'
+          ? '/landscaper-dashboard'
+          : '/client-dashboard';
+      navigate(path, { replace: true });
+    }
+  }, [userRole, authLoading, user, navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    if (message) {
+      setMessage('');
+      setErrorCode(null);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -88,24 +99,28 @@ const UnifiedPortalAuth: React.FC = () => {
     setLoading(true);
     setMessage('');
     setErrorCode(null);
+    setSocialAuthError('');
+    redirectAttemptedRef.current = false;
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password
       });
 
       if (error) {
-        const { message: msg, parsed } = handleLoginError(error);
-        setMessage(msg);
+        const { message, parsed } = handleLoginError(error);
+        setMessage(message);
         setErrorCode(parsed.code);
         return;
       }
 
-      setMessage('Login successful. Redirecting...');
+      if (data.user) {
+        setMessage('Login successful. Redirecting...');
+      }
     } catch (err: any) {
-      const { message: msg, parsed } = handleLoginError(err);
-      setMessage(msg);
+      const { message, parsed } = handleLoginError(err);
+      setMessage(message);
       setErrorCode(parsed.code);
     } finally {
       setLoading(false);
@@ -119,13 +134,17 @@ const UnifiedPortalAuth: React.FC = () => {
     setErrorCode(null);
 
     if (formData.password !== formData.confirmPassword) {
-      setMessage('Passwords do not match.');
+      setMessage('Passwords do not match');
+      setErrorCode('validation_failed');
       setLoading(false);
       return;
     }
 
-    if (isEmailInCooldown(formData.email)) {
-      setMessage('This email was used recently. Please wait.');
+    const cooldownCheck = isEmailInCooldown(formData.email);
+    if (cooldownCheck.inCooldown) {
+      const alias = generateTestEmailAlias(formData.email);
+      setMessage(`Wait ${cooldownCheck.remainingMinutes} min or use ${alias}`);
+      setErrorCode('email_cooldown');
       setLoading(false);
       return;
     }
@@ -134,21 +153,18 @@ const UnifiedPortalAuth: React.FC = () => {
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
-        options: {
-          data: { role: roleIntent }
-        }
+        options: { data: { role: roleIntent } }
       });
 
       if (error) {
-        const { message: msg, parsed } = handleSignupError(formData.email, error);
-        setMessage(msg);
+        const { message, parsed } = handleSignupError(formData.email, error);
+        setMessage(message);
         setErrorCode(parsed.code);
         return;
       }
 
-      if (roleIntent === 'client') {
+      if (data.user && roleIntent === 'client') {
         await ensureClientProfile({
-          auth_user_id: data.user!.id,
           first_name: formData.firstName,
           last_name: formData.lastName,
           email: formData.email,
@@ -156,10 +172,10 @@ const UnifiedPortalAuth: React.FC = () => {
         });
       }
 
-      setMessage('Check your email to verify your account.');
+      setMessage('Please check your email to verify your account');
     } catch (err: any) {
-      const { message: msg, parsed } = handleSignupError(formData.email, err);
-      setMessage(msg);
+      const { message, parsed } = handleSignupError(formData.email, err);
+      setMessage(message);
       setErrorCode(parsed.code);
     } finally {
       setLoading(false);
@@ -168,12 +184,9 @@ const UnifiedPortalAuth: React.FC = () => {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail) return;
-
     setForgotLoading(true);
-    setForgotMessage('');
     setForgotError('');
-    setForgotErrorCode(null);
+    setForgotMessage('');
 
     try {
       const result = await handleUnifiedPasswordReset(
@@ -182,213 +195,129 @@ const UnifiedPortalAuth: React.FC = () => {
       );
 
       if (!result.success) {
-        const { message: msg, parsed } = handlePasswordResetError(result.error);
-        setForgotError(msg);
+        const { message, parsed } = handlePasswordResetError(result.error || '');
+        setForgotError(message);
         setForgotErrorCode(parsed.code);
         return;
       }
 
-      setForgotMessage('Password reset email sent. Check your inbox.');
-      setTimeout(() => {
-        setShowForgotPassword(false);
-        setForgotEmail('');
-      }, 2000);
+      setForgotMessage('Reset email sent. Check your inbox.');
+      setTimeout(() => setShowForgotPassword(false), 4000);
     } catch (err: any) {
-      const { message: msg, parsed } = handlePasswordResetError(err);
-      setForgotError(msg);
+      const { message, parsed } = handlePasswordResetError(err);
+      setForgotError(message);
       setForgotErrorCode(parsed.code);
     } finally {
       setForgotLoading(false);
     }
   };
 
-  const isSuccess = message.toLowerCase().includes('success');
+  const isSuccess = message.includes('check') || message.includes('successful');
   const isError = !isSuccess && message.length > 0;
 
   return (
-    <div className="bg-black relative flex flex-col min-h-screen">
+    <div
+      className="bg-black min-h-screen flex items-center justify-center px-4"
+      style={{ opacity: layoutReady ? 1 : 0.99 }}
+    >
       <AnimatedBackground />
 
       {showForgotPassword && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-gray-900 border border-emerald-500/30 rounded-2xl p-6 w-full max-w-md relative">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-gray-900 p-6 rounded-xl w-full max-w-md relative">
             <button
-              className="absolute top-4 right-4 text-gray-400 hover:text-white"
               onClick={() => setShowForgotPassword(false)}
+              className="absolute top-4 right-4 text-gray-400"
             >
-              <X className="w-5 h-5" />
+              <X />
             </button>
-
-            <h2 className="text-xl font-bold text-emerald-400 mb-2">
-              Reset Password
-            </h2>
-
+            <h2 className="text-emerald-400 font-bold mb-4">Reset Password</h2>
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <Input
                 type="email"
-                placeholder="Enter your email"
+                placeholder="Email"
                 value={forgotEmail}
                 onChange={e => setForgotEmail(e.target.value)}
                 required
-                className="bg-gray-800/50 border-emerald-500/30 text-white"
               />
-
-              <Button
-                type="submit"
-                disabled={forgotLoading}
-                className="w-full bg-gradient-to-r from-emerald-500 to-emerald-400 text-black font-semibold"
-              >
+              <Button type="submit" disabled={forgotLoading} className="w-full">
                 {forgotLoading ? 'Sending...' : 'Send Reset Link'}
               </Button>
+              {forgotMessage && <p className="text-emerald-400">{forgotMessage}</p>}
+              {forgotError && <p className="text-red-400">{forgotError}</p>}
             </form>
-
-            {forgotMessage && (
-              <div className="mt-3 text-emerald-400 text-sm">{forgotMessage}</div>
-            )}
-            {forgotError && (
-              <div className="mt-3 text-red-400 text-sm">{forgotError}</div>
-            )}
           </div>
         </div>
       )}
 
-      <div className="relative z-10 flex flex-col items-center justify-center px-4 py-8">
-        <div className="w-full max-w-xl">
-          <HomeButton />
-
-          <div className="text-center mb-6">
-            <Shield className="w-8 h-8 mx-auto text-emerald-400" />
-            <h1 className="text-3xl font-bold text-emerald-400">
-              GreenScape Lux Portal
-            </h1>
-            <p className="text-gray-300">Secure access for all users</p>
+      <Card className="bg-gray-900/80 border-emerald-500/30 w-full max-w-xl z-10">
+        <CardHeader>
+          <div className="flex justify-center mb-4">
+            <Shield className="text-emerald-400 w-8 h-8" />
           </div>
+          <Tabs value={activeTab} onValueChange={v => setActiveTab(v)}>
+            <TabsList className="grid grid-cols-2">
+              <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            </TabsList>
 
-          <Card className="bg-gray-900/80 border border-emerald-500/30">
-            <CardHeader className="pb-2">
-              <Tabs value={activeTab} onValueChange={v => setActiveTab(v)}>
-                <TabsList className="grid grid-cols-2 bg-gray-800/50">
-                  <TabsTrigger value="login">Login</TabsTrigger>
-                  <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                </TabsList>
+            <TabsContent value="login">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <Input
+                  name="email"
+                  placeholder="Email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  required
+                />
+                <Input
+                  name="password"
+                  type="password"
+                  placeholder="Password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  required
+                />
+                <Button type="submit" disabled={loading} className="w-full">
+                  {loading ? 'Signing In...' : 'Sign In'}
+                </Button>
+              </form>
+              <button
+                onClick={() => setShowForgotPassword(true)}
+                className="mt-4 text-sm text-emerald-400"
+              >
+                Forgot password?
+              </button>
+            </TabsContent>
 
-                <TabsContent value="login" className="mt-6">
-                  <form onSubmit={handleLogin} className="space-y-4">
-                    <Input
-                      type="email"
-                      name="email"
-                      placeholder="Email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      required
-                      className="bg-gray-800/50 border-emerald-500/30 text-white"
-                    />
-                    <Input
-                      type="password"
-                      name="password"
-                      placeholder="Password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      required
-                      className="bg-gray-800/50 border-emerald-500/30 text-white"
-                    />
-                    <Button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full bg-gradient-to-r from-emerald-500 to-emerald-400 text-black font-semibold"
-                    >
-                      {loading ? 'Signing In...' : 'Sign In'}
-                    </Button>
-                  </form>
+            <TabsContent value="signup">
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <Input name="firstName" placeholder="First Name" onChange={handleInputChange} required />
+                <Input name="lastName" placeholder="Last Name" onChange={handleInputChange} required />
+                <Input name="email" placeholder="Email" onChange={handleInputChange} required />
+                <Input name="phone" placeholder="Phone" onChange={handleInputChange} />
+                <Input name="password" type="password" placeholder="Password" onChange={handleInputChange} required />
+                <Input name="confirmPassword" type="password" placeholder="Confirm Password" onChange={handleInputChange} required />
+                <Button type="submit" disabled={loading} className="w-full">
+                  {loading ? 'Creating...' : 'Create Account'}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </CardHeader>
 
-                  <div className="mt-4 text-center">
-                    <button
-                      type="button"
-                      onClick={() => setShowForgotPassword(true)}
-                      className="text-emerald-400 hover:text-emerald-300 text-sm"
-                    >
-                      Forgot password?
-                    </button>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="signup" className="mt-6">
-                  <form onSubmit={handleSignUp} className="space-y-4">
-                    <Input
-                      name="firstName"
-                      placeholder="First Name"
-                      value={formData.firstName}
-                      onChange={handleInputChange}
-                      required
-                      className="bg-gray-800/50 border-emerald-500/30 text-white"
-                    />
-                    <Input
-                      name="lastName"
-                      placeholder="Last Name"
-                      value={formData.lastName}
-                      onChange={handleInputChange}
-                      required
-                      className="bg-gray-800/50 border-emerald-500/30 text-white"
-                    />
-                    <Input
-                      name="email"
-                      placeholder="Email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      required
-                      className="bg-gray-800/50 border-emerald-500/30 text-white"
-                    />
-                    <Input
-                      name="password"
-                      type="password"
-                      placeholder="Password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      required
-                      className="bg-gray-800/50 border-emerald-500/30 text-white"
-                    />
-                    <Input
-                      name="confirmPassword"
-                      type="password"
-                      placeholder="Confirm Password"
-                      value={formData.confirmPassword}
-                      onChange={handleInputChange}
-                      required
-                      className="bg-gray-800/50 border-emerald-500/30 text-white"
-                    />
-                    <Button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full bg-gradient-to-r from-emerald-500 to-emerald-400 text-black font-semibold"
-                    >
-                      {loading ? 'Creating...' : 'Create Account'}
-                    </Button>
-                  </form>
-                </TabsContent>
-              </Tabs>
-            </CardHeader>
-
-            {(message || errorCode) && (
-              <CardContent>
-                <div
-                  className={`text-sm p-3 rounded-lg ${
-                    isSuccess
-                      ? 'text-emerald-400 bg-emerald-900/20'
-                      : 'text-red-400 bg-red-900/20'
-                  }`}
-                >
-                  {message}
-                  {isDev && errorCode && (
-                    <div className="mt-1 text-xs font-mono text-gray-500">
-                      Error Code: {errorCode}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            )}
-          </Card>
-        </div>
-      </div>
+        {(message || socialAuthError) && (
+          <CardContent>
+            <div
+              className={`p-3 rounded ${
+                isError ? 'bg-red-900/20 text-red-400' : 'bg-emerald-900/20 text-emerald-400'
+              }`}
+            >
+              {message || socialAuthError}
+            </div>
+          </CardContent>
+        )}
+      </Card>
     </div>
   );
 };
