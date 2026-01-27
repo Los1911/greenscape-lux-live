@@ -12,7 +12,6 @@ import AnimatedBackground from '@/components/AnimatedBackground';
 import HomeButton from '@/components/HomeButton';
 import { handleUnifiedPasswordReset, getPasswordResetUrl } from '@/utils/unifiedPasswordResetHandler';
 import { clearPasswordResetFlag, clearRecoveryIntent } from '@/utils/passwordResetGuard';
-import SocialAuthButtons, { LuxAuthDivider } from './SocialAuthButtons';
 import { 
   handleSignupError, 
   handleLoginError, 
@@ -441,13 +440,6 @@ const UnifiedPortalAuth: React.FC = () => {
 
                   <LuxAuthDivider />
                   
-                  <SocialAuthButtons 
-                    variant="lux"
-                    roleIntent="client"
-                    onError={handleSocialAuthError}
-                    onLoading={handleSocialAuthLoading}
-                    disabled={loading}
-                  />
                 </TabsContent>
                 
                 <TabsContent value="signup" className="mt-6">
@@ -541,12 +533,6 @@ const UnifiedPortalAuth: React.FC = () => {
                   
                   <LuxAuthDivider />
                   
-                  <SocialAuthButtons 
-                    variant="lux"
-                    roleIntent={roleIntent}
-                    onError={handleSocialAuthError}
-                    onLoading={handleSocialAuthLoading}
-                    disabled={loading}
                   />
                 </TabsContent>
               </Tabs>
