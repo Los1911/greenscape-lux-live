@@ -1,237 +1,115 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, X, AlertCircle, Info } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
-import { ensureClientProfile } from '@/lib/clients';
-import { useAuth } from '@/contexts/AuthContext';
-import AnimatedBackground from '@/components/AnimatedBackground';
-import {
-  handleSignupError,
-  handleLoginError,
-  handlePasswordResetError,
-  isEmailInCooldown,
-  generateTestEmailAlias
-} from '@/lib/authErrorHandler';
-import {
-  handleUnifiedPasswordReset,
-  getPasswordResetUrl
-} from '@/utils/unifiedPasswordResetHandler';
-import {
-  clearPasswordResetFlag,
-  clearRecoveryIntent
-} from '@/utils/passwordResetGuard';
-import { useOAuthLayoutFix } from '@/hooks/useOAuthLayoutFix';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
-const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
-
-const UnifiedPortalAuth: React.FC = () => {
+const UnifiedPortalAuth = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { role: userRole, loading: authLoading, user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
-  const [roleIntent, setRoleIntent] = useState<'client' | 'landscaper'>('client');
+  const [tab, setTab] = useState<"login" | "signup">("login");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [errorCode, setErrorCode] = useState<string | null>(null);
-  const [socialAuthError, setSocialAuthError] = useState('');
+  const [message, setMessage] = useState("");
 
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    firstName: '',
-    lastName: '',
-    phone: ''
+    email: "",
+    password: "",
+    confirmPassword: "",
+    firstName: "",
+    lastName: "",
   });
 
-  const redirectAttemptedRef = useRef(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
 
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotMessage, setForgotMessage] = useState('');
-  const [forgotError, setForgotError] = useState('');
-  const [forgotErrorCode, setForgotErrorCode] = useState<string | null>(null);
-
-  const { layoutReady } = useOAuthLayoutFix();
-
-  useEffect(() => {
-    const state = location.state as { error?: string } | null;
-    if (state?.error) {
-      setSocialAuthError(state.error);
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state]);
-
-  useEffect(() => {
-    clearPasswordResetFlag();
-    clearRecoveryIntent();
-  }, []);
-
-  useEffect(() => {
-    if (userRole && !authLoading && !redirectAttemptedRef.current) {
-      redirectAttemptedRef.current = true;
-      const path =
-        userRole === 'admin'
-          ? '/admin-dashboard'
-          : userRole === 'landscaper'
-          ? '/landscaper-dashboard'
-          : '/client-dashboard';
-      navigate(path, { replace: true });
-    }
-  }, [userRole, authLoading, user, navigate]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    if (message) {
-      setMessage('');
-      setErrorCode(null);
-    }
+    setMessage("");
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setMessage('');
-    setErrorCode(null);
-    setSocialAuthError('');
-    redirectAttemptedRef.current = false;
+    setMessage("");
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password
-      });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: formData.email,
+      password: formData.password,
+    });
 
-      if (error) {
-        const { message, parsed } = handleLoginError(error);
-        setMessage(message);
-        setErrorCode(parsed.code);
-        return;
-      }
+    setLoading(false);
 
-      if (data.user) {
-        setMessage('Login successful. Redirecting...');
-      }
-    } catch (err: any) {
-      const { message, parsed } = handleLoginError(err);
-      setMessage(message);
-      setErrorCode(parsed.code);
-    } finally {
-      setLoading(false);
+    if (error) {
+      setMessage(error.message);
+      return;
     }
+
+    navigate("/dashboard");
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setMessage('');
-    setErrorCode(null);
+    setMessage("");
 
     if (formData.password !== formData.confirmPassword) {
-      setMessage('Passwords do not match');
-      setErrorCode('validation_failed');
-      setLoading(false);
+      setMessage("Passwords do not match");
       return;
     }
 
-    const cooldownCheck = isEmailInCooldown(formData.email);
-    if (cooldownCheck.inCooldown) {
-      const alias = generateTestEmailAlias(formData.email);
-      setMessage(`Wait ${cooldownCheck.remainingMinutes} min or use ${alias}`);
-      setErrorCode('email_cooldown');
-      setLoading(false);
-      return;
-    }
+    setLoading(true);
 
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: { data: { role: roleIntent } }
-      });
-
-      if (error) {
-        const { message, parsed } = handleSignupError(formData.email, error);
-        setMessage(message);
-        setErrorCode(parsed.code);
-        return;
-      }
-
-      if (data.user && roleIntent === 'client') {
-        await ensureClientProfile({
+    const { error } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+      options: {
+        data: {
           first_name: formData.firstName,
           last_name: formData.lastName,
-          email: formData.email,
-          phone: formData.phone
-        });
-      }
+        },
+      },
+    });
 
-      setMessage('Please check your email to verify your account');
-    } catch (err: any) {
-      const { message, parsed } = handleSignupError(formData.email, err);
-      setMessage(message);
-      setErrorCode(parsed.code);
-    } finally {
-      setLoading(false);
+    setLoading(false);
+
+    if (error) {
+      setMessage(error.message);
+      return;
     }
+
+    setMessage("Check your email to verify your account");
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setForgotLoading(true);
-    setForgotError('');
-    setForgotMessage('');
+    setLoading(true);
+    setMessage("");
 
-    try {
-      const result = await handleUnifiedPasswordReset(
-        forgotEmail,
-        getPasswordResetUrl()
-      );
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
 
-      if (!result.success) {
-        const { message, parsed } = handlePasswordResetError(result.error || '');
-        setForgotError(message);
-        setForgotErrorCode(parsed.code);
-        return;
-      }
+    setLoading(false);
 
-      setForgotMessage('Reset email sent. Check your inbox.');
-      setTimeout(() => setShowForgotPassword(false), 4000);
-    } catch (err: any) {
-      const { message, parsed } = handlePasswordResetError(err);
-      setForgotError(message);
-      setForgotErrorCode(parsed.code);
-    } finally {
-      setForgotLoading(false);
+    if (error) {
+      setMessage(error.message);
+      return;
     }
+
+    setMessage("Password reset email sent");
+    setForgotMode(false);
   };
 
-  const isSuccess = message.includes('check') || message.includes('successful');
-  const isError = !isSuccess && message.length > 0;
-
   return (
-    <div
-      className="bg-black min-h-screen flex items-center justify-center px-4"
-      style={{ opacity: layoutReady ? 1 : 0.99 }}
-    >
-      <AnimatedBackground />
+    <div className="min-h-screen flex items-center justify-center bg-black px-4">
+      <Card className="w-full max-w-md border border-emerald-500/30 bg-black/80">
+        <CardHeader className="text-center text-emerald-400 text-xl font-bold">
+          GreenScape Lux Portal
+        </CardHeader>
 
-      {showForgotPassword && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-gray-900 p-6 rounded-xl w-full max-w-md relative">
-            <button
-              onClick={() => setShowForgotPassword(false)}
-              className="absolute top-4 right-4 text-gray-400"
-            >
-              <X />
-            </button>
-            <h2 className="text-emerald-400 font-bold mb-4">Reset Password</h2>
+        <CardContent>
+          {forgotMode ? (
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <Input
                 type="email"
@@ -240,83 +118,115 @@ const UnifiedPortalAuth: React.FC = () => {
                 onChange={e => setForgotEmail(e.target.value)}
                 required
               />
-              <Button type="submit" disabled={forgotLoading} className="w-full">
-                {forgotLoading ? 'Sending...' : 'Send Reset Link'}
+
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? "Sending..." : "Send Reset Link"}
               </Button>
-              {forgotMessage && <p className="text-emerald-400">{forgotMessage}</p>}
-              {forgotError && <p className="text-red-400">{forgotError}</p>}
-            </form>
-          </div>
-        </div>
-      )}
 
-      <Card className="bg-gray-900/80 border-emerald-500/30 w-full max-w-xl z-10">
-        <CardHeader>
-          <div className="flex justify-center mb-4">
-            <Shield className="text-emerald-400 w-8 h-8" />
-          </div>
-          <Tabs value={activeTab} onValueChange={v => setActiveTab(v)}>
-            <TabsList className="grid grid-cols-2">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <Input
-                  name="email"
-                  placeholder="Email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  required
-                />
-                <Input
-                  name="password"
-                  type="password"
-                  placeholder="Password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  required
-                />
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? 'Signing In...' : 'Sign In'}
-                </Button>
-              </form>
-              <button
-                onClick={() => setShowForgotPassword(true)}
-                className="mt-4 text-sm text-emerald-400"
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => setForgotMode(false)}
               >
-                Forgot password?
-              </button>
-            </TabsContent>
+                Back to login
+              </Button>
+            </form>
+          ) : (
+            <Tabs value={tab} onValueChange={v => setTab(v as any)}>
+              <TabsList className="grid grid-cols-2 mb-4">
+                <TabsTrigger value="login">Login</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
-                <Input name="firstName" placeholder="First Name" onChange={handleInputChange} required />
-                <Input name="lastName" placeholder="Last Name" onChange={handleInputChange} required />
-                <Input name="email" placeholder="Email" onChange={handleInputChange} required />
-                <Input name="phone" placeholder="Phone" onChange={handleInputChange} />
-                <Input name="password" type="password" placeholder="Password" onChange={handleInputChange} required />
-                <Input name="confirmPassword" type="password" placeholder="Confirm Password" onChange={handleInputChange} required />
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? 'Creating...' : 'Create Account'}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
-        </CardHeader>
+              <TabsContent value="login">
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <Input
+                    name="email"
+                    type="email"
+                    placeholder="Email"
+                    value={formData.email}
+                    onChange={onChange}
+                    required
+                  />
+                  <Input
+                    name="password"
+                    type="password"
+                    placeholder="Password"
+                    value={formData.password}
+                    onChange={onChange}
+                    required
+                  />
 
-        {(message || socialAuthError) && (
-          <CardContent>
-            <div
-              className={`p-3 rounded ${
-                isError ? 'bg-red-900/20 text-red-400' : 'bg-emerald-900/20 text-emerald-400'
-              }`}
-            >
-              {message || socialAuthError}
-            </div>
-          </CardContent>
-        )}
+                  <Button type="submit" disabled={loading} className="w-full">
+                    {loading ? "Signing in..." : "Sign In"}
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={() => setForgotMode(true)}
+                    className="text-sm text-emerald-400 w-full"
+                  >
+                    Forgot password?
+                  </button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="signup">
+                <form onSubmit={handleSignup} className="space-y-4">
+                  <Input
+                    name="firstName"
+                    placeholder="First Name"
+                    value={formData.firstName}
+                    onChange={onChange}
+                    required
+                  />
+                  <Input
+                    name="lastName"
+                    placeholder="Last Name"
+                    value={formData.lastName}
+                    onChange={onChange}
+                    required
+                  />
+                  <Input
+                    name="email"
+                    type="email"
+                    placeholder="Email"
+                    value={formData.email}
+                    onChange={onChange}
+                    required
+                  />
+                  <Input
+                    name="password"
+                    type="password"
+                    placeholder="Password"
+                    value={formData.password}
+                    onChange={onChange}
+                    required
+                  />
+                  <Input
+                    name="confirmPassword"
+                    type="password"
+                    placeholder="Confirm Password"
+                    value={formData.confirmPassword}
+                    onChange={onChange}
+                    required
+                  />
+
+                  <Button type="submit" disabled={loading} className="w-full">
+                    {loading ? "Creating..." : "Create Account"}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
+          )}
+
+          {message && (
+            <p className="mt-4 text-center text-sm text-emerald-400">
+              {message}
+            </p>
+          )}
+        </CardContent>
       </Card>
     </div>
   );
