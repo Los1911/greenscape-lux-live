@@ -7,23 +7,69 @@ import { Shield, Eye, EyeOff, Lock, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import AnimatedBackground from '@/components/AnimatedBackground';
+import { clearPasswordResetFlag, clearRecoveryIntent } from '@/utils/passwordResetGuard';
+
+const log = (area: string, msg: string, data?: any) => {
+  const ts = new Date().toISOString().split('T')[1];
+  console.log(`[${ts}][ADMIN_LOGIN:${area}] ${msg}`, data !== undefined ? data : '');
+};
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const { user, role } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({ email: '', password: '' });
 
+  // PART 3: Clear password reset flags AND recovery intent on admin login page load
   useEffect(() => {
+    log('INIT', 'Admin login page loaded - clearing password reset flags and recovery intent');
+    clearPasswordResetFlag();
+    clearRecoveryIntent();
+  }, []);
+
+  // Auth loading guard - show loading UI while auth is initializing
+  if (authLoading) {
+    return (
+      <div 
+        className="bg-black flex flex-col items-center justify-center min-h-screen"
+        style={{
+          minHeight: '100dvh',
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          paddingLeft: 'env(safe-area-inset-left)',
+          paddingRight: 'env(safe-area-inset-right)'
+        }}
+      >
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Watch AuthContext for role - redirect when admin role is confirmed
+  useEffect(() => {
+    log('AUTH_WATCH', 'Context changed', { hasUser: !!user, role, authLoading });
+    
     if (user && role === 'admin') {
+      log('AUTH_WATCH', '✅ Admin role confirmed - redirecting to dashboard');
       navigate('/admin-dashboard', { replace: true });
     }
-  }, [user, role, navigate]);
+    if (user && role && role !== 'admin') {
+      log('AUTH_WATCH', `⚠️ Non-admin role detected (${role}) - redirecting`);
+      const path = role === 'landscaper' ? '/landscaper-dashboard' : '/client-dashboard';
+      navigate(path, { replace: true });
+    }
+  }, [user, role, navigate, authLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    log('LOGIN', '=== ADMIN LOGIN ATTEMPT ===');
+    log('LOGIN', 'Email:', formData.email);
+    
     setLoading(true);
     setError('');
 
@@ -33,34 +79,54 @@ export default function AdminLogin() {
         password: formData.password
       });
 
-      if (signInError) throw signInError;
-
-      const userRole = data.user?.user_metadata?.role;
-      if (userRole !== 'admin') {
-        await supabase.auth.signOut();
-        throw new Error('Access denied. Admin credentials required.');
+      if (signInError) {
+        log('LOGIN', '❌ Sign in error:', signInError.message);
+        throw signInError;
       }
 
-      await supabase.from('admin_login_logs').insert({
-        admin_id: data.user.id,
-        email: data.user.email,
-        ip_address: 'browser',
-        user_agent: navigator.userAgent
-      });
+      log('LOGIN', '✅ Sign in successful, user:', data.user?.email);
+      
+      try {
+        await supabase.from('admin_login_logs').insert({
+          admin_id: data.user?.id,
+          email: data.user?.email,
+          ip_address: 'browser',
+          user_agent: navigator.userAgent
+        });
+        log('LOGIN', 'Admin login logged');
+      } catch (logError) {
+        log('LOGIN', 'Admin login log failed (non-critical):', logError);
+      }
 
-      navigate('/admin-dashboard', { replace: true });
+      log('LOGIN', 'Waiting for AuthContext to resolve role...');
+      
     } catch (err: any) {
+      log('LOGIN', '❌ ERROR:', err.message);
       setError(err.message || 'Login failed');
-    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
+    <div 
+      className="bg-black relative overflow-hidden flex flex-col min-h-screen"
+      style={{
+        minHeight: '100dvh',
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)'
+      }}
+    >
       <AnimatedBackground />
       
-      <div className="relative z-10 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
+      <div 
+        className="relative z-10 flex-1 flex items-center justify-center px-4 py-6"
+        style={{
+          paddingTop: 'max(1.5rem, env(safe-area-inset-top))',
+          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))'
+        }}
+      >
         <div className="w-full max-w-md">
           {/* Header Section */}
           <div className="text-center mb-8 animate-fade-in">
@@ -82,14 +148,10 @@ export default function AdminLogin() {
           </div>
 
           {/* Login Card */}
-          <Card className="relative bg-black/80 border-2 border-red-500/30 backdrop-blur-xl shadow-[0_0_40px_rgba(239,68,68,0.3)] hover:shadow-[0_0_50px_rgba(239,68,68,0.4)] hover:border-red-500/50 transition-all duration-500">
+          <Card className="relative bg-black/80 border-2 border-red-500/30 backdrop-blur-xl shadow-[0_0_40px_rgba(239,68,68,0.3)]">
             <CardHeader className="space-y-6">
               {/* Security Warning */}
-              <div 
-                className="bg-gradient-to-br from-red-500/10 to-red-600/10 border-2 border-red-500/40 rounded-xl p-4 shadow-[0_0_20px_rgba(239,68,68,0.2)]"
-                role="alert"
-                aria-live="polite"
-              >
+              <div className="bg-gradient-to-br from-red-500/10 to-red-600/10 border-2 border-red-500/40 rounded-xl p-4" role="alert">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
                   <p className="text-sm text-red-200 leading-relaxed">
@@ -102,9 +164,6 @@ export default function AdminLogin() {
               {/* Login Form */}
               <form onSubmit={handleSubmit} className="space-y-5" noValidate>
                 <div className="space-y-2">
-                  <label htmlFor="admin-email" className="sr-only">
-                    Admin Email Address
-                  </label>
                   <Input
                     id="admin-email"
                     type="email"
@@ -114,16 +173,11 @@ export default function AdminLogin() {
                     onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                     required
                     autoComplete="email"
-                    aria-required="true"
-                    aria-invalid={error ? 'true' : 'false'}
-                    className="bg-black/60 border-2 border-red-500/30 text-white placeholder:text-gray-500 focus:border-red-500/60 focus:ring-4 focus:ring-red-500/20 transition-all duration-300 h-12"
+                    className="bg-black/60 border-2 border-red-500/30 text-white placeholder:text-gray-500 focus:border-red-500/60 h-12"
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <label htmlFor="admin-password" className="sr-only">
-                    Admin Password
-                  </label>
                   <div className="relative">
                     <Input
                       id="admin-password"
@@ -134,22 +188,15 @@ export default function AdminLogin() {
                       onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                       required
                       autoComplete="current-password"
-                      aria-required="true"
-                      aria-invalid={error ? 'true' : 'false'}
-                      className="bg-black/60 border-2 border-red-500/30 text-white placeholder:text-gray-500 focus:border-red-500/60 focus:ring-4 focus:ring-red-500/20 transition-all duration-300 h-12 pr-12"
+                      className="bg-black/60 border-2 border-red-500/30 text-white placeholder:text-gray-500 focus:border-red-500/60 h-12 pr-12"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      aria-pressed={showPassword}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-500/50 rounded-md p-1 transition-colors duration-200"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-300 p-1"
                     >
-                      {showPassword ? (
-                        <EyeOff className="w-5 h-5" aria-hidden="true" />
-                      ) : (
-                        <Eye className="w-5 h-5" aria-hidden="true" />
-                      )}
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
                 </div>
@@ -157,12 +204,11 @@ export default function AdminLogin() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-12 bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold text-base hover:from-red-700 hover:via-red-600 hover:to-red-700 hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 focus:ring-4 focus:ring-red-500/50"
-                  aria-busy={loading}
+                  className="w-full h-12 bg-gradient-to-r from-red-600 via-red-500 to-red-600 text-white font-bold"
                 >
                   {loading ? (
                     <span className="flex items-center justify-center gap-2">
-                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true"></span>
+                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                       Authenticating...
                     </span>
                   ) : (
@@ -174,11 +220,7 @@ export default function AdminLogin() {
             
             {error && (
               <CardContent>
-                <div 
-                  className="bg-red-500/10 border-2 border-red-500/40 rounded-lg p-4 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
-                  role="alert"
-                  aria-live="assertive"
-                >
+                <div className="bg-red-500/10 border-2 border-red-500/40 rounded-lg p-4" role="alert">
                   <p className="text-sm text-red-300 font-medium">{error}</p>
                 </div>
               </CardContent>
