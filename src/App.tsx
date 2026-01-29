@@ -56,7 +56,6 @@ import PaymentSecurity from './pages/payments/PaymentSecurity';
 /* MISC */
 import SearchPage from './pages/SearchPage';
 import NotFound from './pages/NotFound';
-import EnvironmentStatus from './pages/EnvironmentStatus';
 
 /* ROUTING */
 import SimpleProtectedRoute from './components/auth/SimpleProtectedRoute';
@@ -254,11 +253,6 @@ const App: React.FC = () => {
             {/* SETUP / STATUS */}
             <Route path="/setup" element={<SetupWizard onComplete={() => window.location.href = '/'} />} />
             <Route path="/status" element={<ProductionStatus />} />
-            <Route path="/admin/environment-status" element={
-              <SimpleProtectedRoute requiredRole="admin">
-                <EnvironmentStatus />
-              </SimpleProtectedRoute>
-            } />
 
             {/* SEARCH */}
             <Route path="/search" element={<SearchPage />} />
