@@ -63,7 +63,6 @@ import { IntelligentDashboardRedirect } from './components/routing/IntelligentDa
 import RoleRouter from './router/RoleRouter';
 
 /* SETUP */
-import { ProductionStatus } from './components/setup/ProductionStatus';
 import { ClientOnboardingRedirect } from './components/onboarding/ClientOnboardingRedirect';
 
 /* ADMIN FAIL-SOFT */
@@ -239,7 +238,6 @@ const App: React.FC = () => {
             } />
 
             {/* SETUP / STATUS */}
-            <Route path="/status" element={<ProductionStatus />} />
 
             {/* SEARCH */}
             <Route path="/search" element={<SearchPage />} />
