@@ -6,72 +6,84 @@ import { AnalyticsProvider } from './components/Analytics';
 import { VersionChecker } from './components/VersionChecker';
 import { supabase } from './lib/supabase';
 
-/* MARKETING */
+// =============================================================================
+// MARKETING PAGES
+// =============================================================================
 import AboutUs from './pages/AboutUs';
 import GreenScapeLuxLanding from './pages/GreenScapeLuxLanding';
 import Professionals from './pages/Professionals';
 import TermsOfService from './pages/TermsOfService';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 
-/* QUOTES */
+// =============================================================================
+// QUOTES
+// =============================================================================
 import GetQuoteEnhanced from './pages/GetQuoteEnhanced';
 import ThankYou from './pages/ThankYou';
 import ClientQuoteForm from './pages/ClientQuoteForm';
 
-/* AUTH */
+// =============================================================================
+// AUTH
+// =============================================================================
 import PortalLogin from './pages/portal-login';
 import ResetPassword from './pages/ResetPassword';
 import AdminLogin from './pages/AdminLogin';
 
-/* DASHBOARDS */
+// =============================================================================
+// DASHBOARDS
+// =============================================================================
 import ClientDashboardV2 from './pages/ClientDashboardV2';
 import LandscaperDashboardV2 from './pages/LandscaperDashboardV2';
 import AdminDashboard from './pages/AdminDashboard';
 
-/* JOBS */
+// =============================================================================
+// JOBS
+// =============================================================================
 import LandscaperJobs from './pages/LandscaperJobs';
 import NewRequests from './pages/NewRequests';
 import JobComplete from './pages/JobComplete';
-import LandscaperProfile from './pages/LandscaperProfile';
 
-/* ADMIN TOOLS */
+// =============================================================================
+// ADMIN TOOLS
+// =============================================================================
 import AdminPanel from './pages/AdminPanel';
 import BusinessAutomation from './pages/BusinessAutomation';
 import NotificationDashboard from './pages/NotificationDashboard';
 import AIQuoteDashboard from './pages/AIQuoteDashboard';
 
-/* CLIENT */
+// =============================================================================
+// CLIENT
+// =============================================================================
 import ClientHistory from './pages/ClientHistory';
 import ClientProfile from './pages/ClientProfile';
 import BillingHistory from './pages/BillingHistory';
 import SubscriptionDashboard from './pages/SubscriptionDashboard';
 import Chat from './pages/Chat';
 
-/* PAYMENTS */
+// =============================================================================
+// PAYMENTS
+// =============================================================================
 import PaymentOverview from './pages/payments/PaymentOverview';
-import PaymentMethods from './pages/payments/PaymentMethods';
-import PaymentSubscriptions from './pages/payments/PaymentSubscriptions';
-import PaymentSecurity from './pages/payments/PaymentSecurity';
 
-/* MISC */
+// =============================================================================
+// MISC
+// =============================================================================
 import SearchPage from './pages/SearchPage';
 import NotFound from './pages/NotFound';
 
-/* ROUTING */
+// =============================================================================
+// ROUTING HELPERS
+// =============================================================================
 import SimpleProtectedRoute from './components/auth/SimpleProtectedRoute';
-import { IntelligentDashboardRedirect } from './components/routing/IntelligentDashboardRedirect';
 import RoleRouter from './router/RoleRouter';
 
-/* SETUP */
-import { ClientOnboardingRedirect } from './components/onboarding/ClientOnboardingRedirect';
-
-/* ADMIN FAIL-SOFT */
-import AdminFailSoft from './components/admin/AdminFailSoft';
-
+// =============================================================================
+// APP
+// =============================================================================
 const App: React.FC = () => {
   React.useEffect(() => {
-    console.log('🚀 App initialized');
-    console.log('Supabase loaded:', !!supabase);
+    console.log('🚀 [App] Application initialized');
+    console.log('🚀 [App] Supabase ready:', !!supabase);
   }, []);
 
   return (
@@ -82,7 +94,6 @@ const App: React.FC = () => {
           <ScrollToTop />
 
           <Routes>
-
             {/* MARKETING */}
             <Route path="/" element={<GreenScapeLuxLanding />} />
             <Route path="/about" element={<AboutUs />} />
@@ -90,161 +101,175 @@ const App: React.FC = () => {
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
 
-            {/* AUTO ROUTE */}
+            {/* ROLE REDIRECT */}
             <Route path="/get-started" element={<RoleRouter />} />
 
-            {/* AUTH */}
+            {/* LOGIN */}
             <Route path="/portal-login" element={<PortalLogin />} />
             <Route path="/login" element={<Navigate to="/portal-login" replace />} />
             <Route path="/signup" element={<Navigate to="/portal-login" replace />} />
             <Route path="/admin-login" element={<AdminLogin />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* QUOTES */}
             <Route path="/get-quote" element={<GetQuoteEnhanced />} />
             <Route path="/thank-you" element={<ThankYou />} />
-            <Route path="/client-quote" element={
-              <SimpleProtectedRoute requiredRole="client">
-                <ClientOnboardingRedirect>
+            <Route
+              path="/client-quote"
+              element={
+                <SimpleProtectedRoute requiredRole="client">
                   <ClientQuoteForm />
-                </ClientOnboardingRedirect>
-              </SimpleProtectedRoute>
-            } />
+                </SimpleProtectedRoute>
+              }
+            />
 
-            {/* CLIENT DASHBOARD */}
-            <Route path="/client-dashboard/*" element={
-              <SimpleProtectedRoute requiredRole="client">
-                <ClientDashboardV2 />
-              </SimpleProtectedRoute>
-            } />
+            {/* PASSWORD RESET */}
+            <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* LANDSCAPER DASHBOARD */}
-            <Route path="/landscaper-dashboard/*" element={
-              <SimpleProtectedRoute requiredRole="landscaper">
-                <LandscaperDashboardV2 />
-              </SimpleProtectedRoute>
-            } />
-
-            {/* ADMIN DASHBOARD — FAIL SOFT */}
-            <Route path="/admin-dashboard" element={
-              <SimpleProtectedRoute requiredRole="admin">
-                <AdminFailSoft>
+            {/* DASHBOARDS */}
+            <Route
+              path="/client-dashboard/*"
+              element={
+                <SimpleProtectedRoute requiredRole="client">
+                  <ClientDashboardV2 />
+                </SimpleProtectedRoute>
+              }
+            />
+            <Route
+              path="/landscaper-dashboard/*"
+              element={
+                <SimpleProtectedRoute requiredRole="landscaper">
+                  <LandscaperDashboardV2 />
+                </SimpleProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin-dashboard"
+              element={
+                <SimpleProtectedRoute requiredRole="admin">
                   <AdminDashboard />
-                </AdminFailSoft>
-              </SimpleProtectedRoute>
-            } />
+                </SimpleProtectedRoute>
+              }
+            />
 
-            {/* LEGACY ADMIN */}
+            {/* ADMIN */}
+            <Route
+              path="/admin"
+              element={
+                <SimpleProtectedRoute requiredRole="admin">
+                  <AdminPanel />
+                </SimpleProtectedRoute>
+              }
+            />
 
             {/* JOBS */}
-            <Route path="/landscaper-jobs" element={
-              <SimpleProtectedRoute requiredRole="landscaper">
-                <LandscaperJobs />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/new-requests" element={
-              <SimpleProtectedRoute requiredRole="landscaper">
-                <NewRequests />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/job-complete/:jobId" element={
-              <SimpleProtectedRoute requiredRole="landscaper">
-                <JobComplete />
-              </SimpleProtectedRoute>
-            } />
+            <Route
+              path="/landscaper-jobs"
+              element={
+                <SimpleProtectedRoute requiredRole="landscaper">
+                  <LandscaperJobs />
+                </SimpleProtectedRoute>
+              }
+            />
+            <Route
+              path="/new-requests"
+              element={
+                <SimpleProtectedRoute requiredRole="landscaper">
+                  <NewRequests />
+                </SimpleProtectedRoute>
+              }
+            />
+            <Route
+              path="/job-complete/:jobId"
+              element={
+                <SimpleProtectedRoute requiredRole="landscaper">
+                  <JobComplete />
+                </SimpleProtectedRoute>
+              }
+            />
 
             {/* ADMIN TOOLS */}
-            <Route path="/business-automation" element={
-              <SimpleProtectedRoute requiredRole="admin">
-                <BusinessAutomation />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/notifications" element={
-              <SimpleProtectedRoute requiredRole="admin">
-                <NotificationDashboard />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/ai-quotes" element={
-              <SimpleProtectedRoute requiredRole="admin">
-                <AIQuoteDashboard />
-              </SimpleProtectedRoute>
-            } />
+            <Route
+              path="/business-automation"
+              element={
+                <SimpleProtectedRoute requiredRole="admin">
+                  <BusinessAutomation />
+                </SimpleProtectedRoute>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <SimpleProtectedRoute requiredRole="admin">
+                  <NotificationDashboard />
+                </SimpleProtectedRoute>
+              }
+            />
+            <Route
+              path="/ai-quotes"
+              element={
+                <SimpleProtectedRoute requiredRole="admin">
+                  <AIQuoteDashboard />
+                </SimpleProtectedRoute>
+              }
+            />
 
             {/* CLIENT */}
-            <Route path="/profile" element={
-              <SimpleProtectedRoute requiredRole="client">
-                <ClientOnboardingRedirect>
+            <Route
+              path="/profile"
+              element={
+                <SimpleProtectedRoute requiredRole="client">
                   <ClientProfile />
-                </ClientOnboardingRedirect>
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/client-history" element={
-              <SimpleProtectedRoute requiredRole="client">
-                <ClientOnboardingRedirect>
+                </SimpleProtectedRoute>
+              }
+            />
+            <Route
+              path="/client-history"
+              element={
+                <SimpleProtectedRoute requiredRole="client">
                   <ClientHistory />
-                </ClientOnboardingRedirect>
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/billing/history" element={
-              <SimpleProtectedRoute requiredRole="client">
-                <ClientOnboardingRedirect>
+                </SimpleProtectedRoute>
+              }
+            />
+            <Route
+              path="/billing/history"
+              element={
+                <SimpleProtectedRoute requiredRole="client">
                   <BillingHistory />
-                </ClientOnboardingRedirect>
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/subscriptions" element={
-              <SimpleProtectedRoute requiredRole="client">
-                <ClientOnboardingRedirect>
+                </SimpleProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions"
+              element={
+                <SimpleProtectedRoute requiredRole="client">
                   <SubscriptionDashboard />
-                </ClientOnboardingRedirect>
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/chat" element={
-              <SimpleProtectedRoute requiredRole="client">
-                <ClientOnboardingRedirect>
+                </SimpleProtectedRoute>
+              }
+            />
+            <Route
+              path="/chat"
+              element={
+                <SimpleProtectedRoute requiredRole="client">
                   <Chat />
-                </ClientOnboardingRedirect>
-              </SimpleProtectedRoute>
-            } />
+                </SimpleProtectedRoute>
+              }
+            />
 
             {/* PAYMENTS */}
-            <Route path="/payments/overview" element={
-              <SimpleProtectedRoute requiredRole="client">
-                <ClientOnboardingRedirect>
+            <Route
+              path="/payments/overview"
+              element={
+                <SimpleProtectedRoute requiredRole="client">
                   <PaymentOverview />
-                </ClientOnboardingRedirect>
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/payments/methods" element={
-              <SimpleProtectedRoute requiredRole="client">
-                <ClientOnboardingRedirect>
-                  <PaymentMethods />
-                </ClientOnboardingRedirect>
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/payments/subscriptions" element={
-              <SimpleProtectedRoute requiredRole="client">
-                <ClientOnboardingRedirect>
-                  <PaymentSubscriptions />
-                </ClientOnboardingRedirect>
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/payments/security" element={
-              <SimpleProtectedRoute requiredRole="client">
-                <ClientOnboardingRedirect>
-                  <PaymentSecurity />
-                </ClientOnboardingRedirect>
-              </SimpleProtectedRoute>
-            } />
-
-            {/* SETUP / STATUS */}
+                </SimpleProtectedRoute>
+              }
+            />
 
             {/* SEARCH */}
             <Route path="/search" element={<SearchPage />} />
 
             {/* FALLBACK */}
             <Route path="*" element={<NotFound />} />
-
           </Routes>
         </AnalyticsProvider>
       </Router>
