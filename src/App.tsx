@@ -59,7 +59,6 @@ import NotFound from './pages/NotFound';
 
 /* ROUTING */
 import SimpleProtectedRoute from './components/auth/SimpleProtectedRoute';
-import { FeatureGatedRoute } from './components/routing/FeatureGatedRoute';
 import { IntelligentDashboardRedirect } from './components/routing/IntelligentDashboardRedirect';
 import RoleRouter from './router/RoleRouter';
 
@@ -138,16 +137,6 @@ const App: React.FC = () => {
             } />
 
             {/* LEGACY ADMIN */}
-            <Route path="/admin" element={
-              <SimpleProtectedRoute requiredRole="admin">
-                <FeatureGatedRoute
-                  featureFlag="FEATURE_ADMIN_CONTACT_PANEL"
-                  fallbackPath="/admin-dashboard"
-                >
-                  <AdminPanel />
-                </FeatureGatedRoute>
-              </SimpleProtectedRoute>
-            } />
 
             {/* JOBS */}
             <Route path="/landscaper-jobs" element={
