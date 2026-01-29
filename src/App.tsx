@@ -63,7 +63,6 @@ import { IntelligentDashboardRedirect } from './components/routing/IntelligentDa
 import RoleRouter from './router/RoleRouter';
 
 /* SETUP */
-import { SetupWizard } from './components/setup/SetupWizard';
 import { ProductionStatus } from './components/setup/ProductionStatus';
 import { ClientOnboardingRedirect } from './components/onboarding/ClientOnboardingRedirect';
 
@@ -240,7 +239,6 @@ const App: React.FC = () => {
             } />
 
             {/* SETUP / STATUS */}
-            <Route path="/setup" element={<SetupWizard onComplete={() => window.location.href = '/'} />} />
             <Route path="/status" element={<ProductionStatus />} />
 
             {/* SEARCH */}
