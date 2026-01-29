@@ -22,7 +22,6 @@ import ClientQuoteForm from './pages/ClientQuoteForm';
 import PortalLogin from './pages/portal-login';
 import ResetPassword from './pages/ResetPassword';
 import AdminLogin from './pages/AdminLogin';
-import AuthCallback from './pages/AuthCallback';
 
 /* DASHBOARDS */
 import ClientDashboardV2 from './pages/ClientDashboardV2';
@@ -40,7 +39,6 @@ import AdminPanel from './pages/AdminPanel';
 import BusinessAutomation from './pages/BusinessAutomation';
 import NotificationDashboard from './pages/NotificationDashboard';
 import AIQuoteDashboard from './pages/AIQuoteDashboard';
-import PriceAnalyticsDashboard from './pages/analytics/PriceAnalyticsDashboard';
 
 /* CLIENT */
 import ClientHistory from './pages/ClientHistory';
@@ -105,7 +103,6 @@ const App: React.FC = () => {
             <Route path="/signup" element={<Navigate to="/portal-login" replace />} />
             <Route path="/admin-login" element={<AdminLogin />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
 
             {/* QUOTES */}
             <Route path="/get-quote" element={<GetQuoteEnhanced />} />
@@ -184,11 +181,6 @@ const App: React.FC = () => {
             <Route path="/ai-quotes" element={
               <SimpleProtectedRoute requiredRole="admin">
                 <AIQuoteDashboard />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/analytics/pricing" element={
-              <SimpleProtectedRoute requiredRole="admin">
-                <PriceAnalyticsDashboard />
               </SimpleProtectedRoute>
             } />
 
