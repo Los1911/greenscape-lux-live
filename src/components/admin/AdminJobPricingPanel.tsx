@@ -4,40 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/hooks/use-toast'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  DollarSign,
-  RefreshCw,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  User,
-  Calendar,
-  FileText,
-  ChevronRight,
-  Save,
-  Eye,
-  Mail,
-  Layers,
-  Tag,
-  Flag,
-  Activity,
-  CalendarCheck,
-  HelpCircle,
-  List
-} from 'lucide-react'
+import { RefreshCw, AlertCircle } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 
-/* =========================================================
+/* =======================
    TYPES
-========================================================= */
+======================= */
 
 interface Job {
   id: string
@@ -64,9 +37,9 @@ type LifecycleStage =
   | 'completed'
   | 'unclassified'
 
-/* =========================================================
+/* =======================
    LIFECYCLE LOGIC
-========================================================= */
+======================= */
 
 function deriveLifecycleStage(job?: Job | null): LifecycleStage {
   if (!job) return 'unclassified'
@@ -77,21 +50,13 @@ function deriveLifecycleStage(job?: Job | null): LifecycleStage {
   return 'unclassified'
 }
 
-function isJobFlagged(job?: Job | null) {
-  return !!job?.flagged_at
-}
-
-function isJobEditable(job?: Job | null) {
-  return deriveLifecycleStage(job) === 'pricing'
-}
-
 function getJobDisplayName(job?: Job | null) {
   return job?.service_name || job?.service_type || 'Unnamed Service'
 }
 
-/* =========================================================
-   MAIN COMPONENT
-========================================================= */
+/* =======================
+   COMPONENT
+======================= */
 
 export function AdminJobPricingPanel() {
   const { toast } = useToast()
@@ -100,23 +65,19 @@ export function AdminJobPricingPanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null)
   const [activeTab, setActiveTab] = useState<LifecycleStage>('pricing')
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null)
 
-  /* -----------------------------
-     INPUT STATE (FIXED)
-  ----------------------------- */
   const [priceInput, setPriceInput] = useState('')
   const [notesInput, setNotesInput] = useState('')
   const [saving, setSaving] = useState(false)
 
   const lastJobIdRef = useRef<string | null>(null)
-  const isEditingRef = useRef(false)
 
-  /* -----------------------------
+  /* =======================
      LOAD JOBS
-  ----------------------------- */
+  ======================= */
+
   const loadJobs = useCallback(async () => {
     try {
       setLoading(true)
@@ -144,10 +105,7 @@ export function AdminJobPricingPanel() {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-
-      if (!isEditingRef.current) {
-        setJobs(data || [])
-      }
+      setJobs(data || [])
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -160,7 +118,11 @@ export function AdminJobPricingPanel() {
 
     const channel = supabase
       .channel('admin-jobs')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, loadJobs)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'jobs' },
+        loadJobs
+      )
       .subscribe()
 
     return () => {
@@ -168,26 +130,38 @@ export function AdminJobPricingPanel() {
     }
   }, [loadJobs])
 
-  /* -----------------------------
+  /* =======================
      INITIALIZE INPUTS ON JOB CHANGE
-  ----------------------------- */
-  useEffect(() => {
-    const id = selectedJob?.id || null
-    if (id !== lastJobIdRef.current) {
-      lastJobIdRef.current = id
-      setPriceInput(selectedJob?.price?.toString() || '')
-      setNotesInput(selectedJob?.admin_notes || '')
-    }
-  }, [selectedJob?.id])
+  ======================= */
 
-  /* -----------------------------
+  useEffect(() => {
+    if (!selectedJob) return
+
+    if (lastJobIdRef.current !== selectedJob.id) {
+      lastJobIdRef.current = selectedJob.id
+      setPriceInput(
+        selectedJob.price != null ? String(selectedJob.price) : ''
+      )
+      setNotesInput(selectedJob.admin_notes || '')
+    }
+  }, [selectedJob])
+
+  /* =======================
      SAVE PRICE
-  ----------------------------- */
+  ======================= */
+
   const handleSavePrice = async () => {
     if (!selectedJob) return
 
     const price = Number(priceInput)
-    if (isNaN(price) || price <= 0) return
+    if (isNaN(price) || price <= 0) {
+      toast({
+        title: 'Invalid price',
+        description: 'Enter a valid price greater than zero',
+        variant: 'destructive',
+      })
+      return
+    }
 
     setSaving(true)
     try {
@@ -200,26 +174,46 @@ export function AdminJobPricingPanel() {
           priced_at: new Date().toISOString(),
           priced_by: data.user?.id ?? null,
           admin_notes: notesInput || null,
-          status: 'priced'
+          status: 'priced',
         })
         .eq('id', selectedJob.id)
 
       if (error) throw error
 
-      toast({ title: 'Price saved', description: `$${price.toFixed(2)} applied` })
+      toast({
+        title: 'Price saved',
+        description: `$${price.toFixed(2)} applied`,
+      })
+
       setSelectedJob(null)
-      setMobileOpen(false)
+      lastJobIdRef.current = null
       loadJobs()
     } catch (err: any) {
-      toast({ title: 'Save failed', description: err.message, variant: 'destructive' })
+      toast({
+        title: 'Save failed',
+        description: err.message,
+        variant: 'destructive',
+      })
     } finally {
       setSaving(false)
     }
   }
 
-  /* =========================================================
-     RENDER
-  ========================================================= */
+  /* =======================
+     DERIVED DATA
+  ======================= */
+
+  const jobsByLifecycle: Record<LifecycleStage, Job[]> = {
+    pricing: jobs.filter(j => deriveLifecycleStage(j) === 'pricing'),
+    scheduled: jobs.filter(j => deriveLifecycleStage(j) === 'scheduled'),
+    active: jobs.filter(j => deriveLifecycleStage(j) === 'active'),
+    completed: jobs.filter(j => deriveLifecycleStage(j) === 'completed'),
+    unclassified: jobs.filter(j => deriveLifecycleStage(j) === 'unclassified'),
+  }
+
+  /* =======================
+     UI STATES
+  ======================= */
 
   if (loading) {
     return (
@@ -234,96 +228,109 @@ export function AdminJobPricingPanel() {
       <div className="text-center py-12 text-red-400">
         <AlertCircle className="w-10 h-10 mx-auto mb-3" />
         {error}
-        <Button onClick={loadJobs} className="mt-4">Retry</Button>
+        <Button onClick={loadJobs} className="mt-4">
+          Retry
+        </Button>
       </div>
     )
   }
 
-  const pricingJobs = jobs.filter(j => deriveLifecycleStage(j) === 'pricing')
+  /* =======================
+     RENDER
+  ======================= */
 
   return (
-    <>
-      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as LifecycleStage)}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="pricing">Needs Pricing ({pricingJobs.length})</TabsTrigger>
-        </TabsList>
+    <Tabs value={activeTab} onValueChange={v => setActiveTab(v as LifecycleStage)}>
+      <TabsList className="mb-4">
+        <TabsTrigger value="pricing">
+          Needs Pricing ({jobsByLifecycle.pricing.length})
+        </TabsTrigger>
+        <TabsTrigger value="scheduled">
+          Scheduled ({jobsByLifecycle.scheduled.length})
+        </TabsTrigger>
+        <TabsTrigger value="active">
+          Active ({jobsByLifecycle.active.length})
+        </TabsTrigger>
+        <TabsTrigger value="completed">
+          Completed ({jobsByLifecycle.completed.length})
+        </TabsTrigger>
+      </TabsList>
 
-        <TabsContent value="pricing">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* JOB LIST */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Jobs</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 max-h-[600px] overflow-y-auto">
-                {pricingJobs.map(job => (
-                  <button
-                    key={job.id}
-                    onClick={() => setSelectedJob(job)}
-                    className={`w-full text-left p-3 rounded border ${
-                      selectedJob?.id === job.id
-                        ? 'border-emerald-500 bg-emerald-500/10'
-                        : 'border-gray-700 hover:bg-gray-800'
-                    }`}
-                  >
-                    <div className="font-medium">{getJobDisplayName(job)}</div>
-                    <div className="text-xs text-gray-500">{job.client_email}</div>
-                  </button>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* PRICING PANEL */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Job Pricing</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {!selectedJob ? (
-                  <div className="text-center text-gray-500 py-10">
-                    Select a job to price
+      <TabsContent value={activeTab}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Jobs</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 max-h-[600px] overflow-y-auto">
+              {jobsByLifecycle[activeTab].map(job => (
+                <button
+                  key={job.id}
+                  onClick={() => setSelectedJob(job)}
+                  className={`w-full text-left p-3 rounded border ${
+                    selectedJob?.id === job.id
+                      ? 'border-emerald-500 bg-emerald-500/10'
+                      : 'border-gray-700 hover:bg-gray-800'
+                  }`}
+                >
+                  <div className="font-medium">
+                    {getJobDisplayName(job)}
                   </div>
-                ) : (
-                  <>
-                    <div className="mb-4 text-sm text-gray-400">
-                      {getJobDisplayName(selectedJob)}
-                    </div>
+                  <div className="text-xs text-gray-500">
+                    {job.client_email}
+                  </div>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
 
-                    <label className="text-sm text-gray-400">Price ($)</label>
-                    <Input
-                      value={priceInput}
-                      onFocus={() => { isEditingRef.current = true }}
-                      onBlur={() => { isEditingRef.current = false }}
-                      onChange={e => {
-                        const val = e.target.value
-                        if (/^\d*\.?\d*$/.test(val)) setPriceInput(val)
-                      }}
-                      placeholder="0.00"
-                      className="mb-3"
-                    />
+          <Card>
+            <CardHeader>
+              <CardTitle>Job Pricing</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!selectedJob ? (
+                <div className="text-center text-gray-500 py-10">
+                  Select a job to price
+                </div>
+              ) : (
+                <>
+                  <div className="mb-3 text-sm text-gray-400">
+                    {getJobDisplayName(selectedJob)}
+                  </div>
 
-                    <Textarea
-                      value={notesInput}
-                      onChange={e => setNotesInput(e.target.value)}
-                      placeholder="Admin notes"
-                      className="mb-4"
-                    />
+                  <label className="text-sm text-gray-400">Price ($)</label>
+                  <Input
+                    value={priceInput}
+                    onChange={e => {
+                      const val = e.target.value
+                      if (/^\d*\.?\d*$/.test(val)) setPriceInput(val)
+                    }}
+                    placeholder="0.00"
+                    className="mb-3"
+                  />
 
-                    <Button
-                      onClick={handleSavePrice}
-                      disabled={saving || !priceInput}
-                      className="w-full"
-                    >
-                      {saving ? 'Saving…' : 'Save Price'}
-                    </Button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </>
+                  <Textarea
+                    value={notesInput}
+                    onChange={e => setNotesInput(e.target.value)}
+                    placeholder="Admin notes"
+                    className="mb-4"
+                  />
+
+                  <Button
+                    onClick={handleSavePrice}
+                    disabled={saving || !priceInput}
+                    className="w-full"
+                  >
+                    {saving ? 'Saving…' : 'Save Price'}
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+    </Tabs>
   )
 }
 
