@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 
-import { AdminStatCard } from '@/components/admin/layout/AdminStatCard'
 import { AdminSectionGroup } from '@/components/admin/layout/AdminSectionGroup'
 
 import { AdminJobsPanel } from '@/components/admin/AdminJobsPanel'
@@ -174,12 +173,13 @@ export default function AdminDashboard() {
         </Button>
       </div>
 
+      {/* INLINE STAT CARDS */}
       <section className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <AdminStatCard title="Users" value={stats.totalUsers} icon={Users} />
-        <AdminStatCard title="Revenue" value={`$${stats.totalRevenue}`} icon={DollarSign} />
-        <AdminStatCard title="Active Jobs" value={stats.activeJobs} icon={Activity} />
-        <AdminStatCard title="Pending" value={stats.pendingApprovals} icon={AlertTriangle} />
-        <AdminStatCard title="Flagged" value={stats.flaggedJobs} icon={Shield} />
+        <Stat title="Users" value={stats.totalUsers} icon={<Users />} />
+        <Stat title="Revenue" value={`$${stats.totalRevenue}`} icon={<DollarSign />} />
+        <Stat title="Active Jobs" value={stats.activeJobs} icon={<Activity />} />
+        <Stat title="Pending" value={stats.pendingApprovals} icon={<AlertTriangle />} />
+        <Stat title="Flagged" value={stats.flaggedJobs} icon={<Shield />} />
       </section>
 
       <AdminSectionGroup title="Operations" icon={Layers}>
@@ -203,6 +203,30 @@ export default function AdminDashboard() {
           <RemediationQueuePanel />
         </SafeAdminSection>
       </AdminSectionGroup>
+    </div>
+  )
+}
+
+/* =========================================================
+   INLINE STAT CARD
+========================================================= */
+
+function Stat({
+  title,
+  value,
+  icon
+}: {
+  title: string
+  value: string | number
+  icon: ReactNode
+}) {
+  return (
+    <div className="border border-emerald-500/20 rounded-lg p-4 bg-black/40">
+      <div className="flex items-center gap-2 text-emerald-400 mb-1">
+        {icon}
+        <span className="text-sm">{title}</span>
+      </div>
+      <div className="text-xl font-semibold">{value}</div>
     </div>
   )
 }
