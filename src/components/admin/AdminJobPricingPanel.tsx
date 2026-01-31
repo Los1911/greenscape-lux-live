@@ -4,13 +4,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { RefreshCw, AlertCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import {
+  DollarSign,
+  RefreshCw,
+  AlertCircle,
+  Save,
+} from 'lucide-react'
 
-/* =======================
+/* =========================================================
    TYPES
-======================= */
+========================================================= */
 
 interface Job {
   id: string
@@ -37,36 +43,43 @@ type LifecycleStage =
   | 'completed'
   | 'unclassified'
 
-/* =======================
-   LIFECYCLE LOGIC
-======================= */
+/* =========================================================
+   LIFECYCLE DERIVATION (FIXED)
+========================================================= */
 
 function deriveLifecycleStage(job?: Job | null): LifecycleStage {
   if (!job) return 'unclassified'
+
   if (job.completed_at) return 'completed'
-  if ((job.assigned_to || job.landscaper_id) && !job.completed_at) return 'active'
-  if (job.priced_at && !job.assigned_to) return 'scheduled'
-  if (job.price == null || job.priced_at == null) return 'pricing'
-  return 'unclassified'
+
+  if (job.assigned_to || job.landscaper_id) {
+    return 'active'
+  }
+
+  if (job.priced_at) {
+    return 'scheduled'
+  }
+
+  return 'pricing'
 }
 
 function getJobDisplayName(job?: Job | null) {
   return job?.service_name || job?.service_type || 'Unnamed Service'
 }
 
-/* =======================
+/* =========================================================
    COMPONENT
-======================= */
+========================================================= */
 
-export function AdminJobPricingPanel() {
+export default function AdminJobPricingPanel() {
   const { toast } = useToast()
 
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [activeTab, setActiveTab] = useState<LifecycleStage>('pricing')
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
+  const [activeTab, setActiveTab] = useState<LifecycleStage>('pricing')
 
   const [priceInput, setPriceInput] = useState('')
   const [notesInput, setNotesInput] = useState('')
@@ -74,9 +87,9 @@ export function AdminJobPricingPanel() {
 
   const lastJobIdRef = useRef<string | null>(null)
 
-  /* =======================
+  /* =========================================================
      LOAD JOBS
-  ======================= */
+  ========================================================= */
 
   const loadJobs = useCallback(async () => {
     try {
@@ -118,11 +131,7 @@ export function AdminJobPricingPanel() {
 
     const channel = supabase
       .channel('admin-jobs')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'jobs' },
-        loadJobs
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, loadJobs)
       .subscribe()
 
     return () => {
@@ -130,38 +139,27 @@ export function AdminJobPricingPanel() {
     }
   }, [loadJobs])
 
-  /* =======================
-     INITIALIZE INPUTS ON JOB CHANGE
-  ======================= */
+  /* =========================================================
+     INIT INPUTS WHEN JOB CHANGES
+  ========================================================= */
 
   useEffect(() => {
-    if (!selectedJob) return
-
-    if (lastJobIdRef.current !== selectedJob.id) {
-      lastJobIdRef.current = selectedJob.id
-      setPriceInput(
-        selectedJob.price != null ? String(selectedJob.price) : ''
-      )
-      setNotesInput(selectedJob.admin_notes || '')
+    if (selectedJob?.id !== lastJobIdRef.current) {
+      lastJobIdRef.current = selectedJob?.id || null
+      setPriceInput(selectedJob?.price?.toString() || '')
+      setNotesInput(selectedJob?.admin_notes || '')
     }
-  }, [selectedJob])
+  }, [selectedJob?.id])
 
-  /* =======================
+  /* =========================================================
      SAVE PRICE
-  ======================= */
+  ========================================================= */
 
   const handleSavePrice = async () => {
     if (!selectedJob) return
 
     const price = Number(priceInput)
-    if (isNaN(price) || price <= 0) {
-      toast({
-        title: 'Invalid price',
-        description: 'Enter a valid price greater than zero',
-        variant: 'destructive',
-      })
-      return
-    }
+    if (isNaN(price) || price <= 0) return
 
     setSaving(true)
     try {
@@ -174,7 +172,7 @@ export function AdminJobPricingPanel() {
           priced_at: new Date().toISOString(),
           priced_by: data.user?.id ?? null,
           admin_notes: notesInput || null,
-          status: 'priced',
+          status: 'priced'
         })
         .eq('id', selectedJob.id)
 
@@ -182,38 +180,31 @@ export function AdminJobPricingPanel() {
 
       toast({
         title: 'Price saved',
-        description: `$${price.toFixed(2)} applied`,
+        description: `$${price.toFixed(2)} applied`
       })
 
       setSelectedJob(null)
-      lastJobIdRef.current = null
       loadJobs()
     } catch (err: any) {
       toast({
         title: 'Save failed',
         description: err.message,
-        variant: 'destructive',
+        variant: 'destructive'
       })
     } finally {
       setSaving(false)
     }
   }
 
-  /* =======================
-     DERIVED DATA
-  ======================= */
+  /* =========================================================
+     FILTERS
+  ========================================================= */
 
-  const jobsByLifecycle: Record<LifecycleStage, Job[]> = {
-    pricing: jobs.filter(j => deriveLifecycleStage(j) === 'pricing'),
-    scheduled: jobs.filter(j => deriveLifecycleStage(j) === 'scheduled'),
-    active: jobs.filter(j => deriveLifecycleStage(j) === 'active'),
-    completed: jobs.filter(j => deriveLifecycleStage(j) === 'completed'),
-    unclassified: jobs.filter(j => deriveLifecycleStage(j) === 'unclassified'),
-  }
+  const pricingJobs = jobs.filter(j => deriveLifecycleStage(j) === 'pricing')
 
-  /* =======================
-     UI STATES
-  ======================= */
+  /* =========================================================
+     RENDER
+  ========================================================= */
 
   if (loading) {
     return (
@@ -228,42 +219,30 @@ export function AdminJobPricingPanel() {
       <div className="text-center py-12 text-red-400">
         <AlertCircle className="w-10 h-10 mx-auto mb-3" />
         {error}
-        <Button onClick={loadJobs} className="mt-4">
-          Retry
-        </Button>
+        <Button onClick={loadJobs} className="mt-4">Retry</Button>
       </div>
     )
   }
-
-  /* =======================
-     RENDER
-  ======================= */
 
   return (
     <Tabs value={activeTab} onValueChange={v => setActiveTab(v as LifecycleStage)}>
       <TabsList className="mb-4">
         <TabsTrigger value="pricing">
-          Needs Pricing ({jobsByLifecycle.pricing.length})
-        </TabsTrigger>
-        <TabsTrigger value="scheduled">
-          Scheduled ({jobsByLifecycle.scheduled.length})
-        </TabsTrigger>
-        <TabsTrigger value="active">
-          Active ({jobsByLifecycle.active.length})
-        </TabsTrigger>
-        <TabsTrigger value="completed">
-          Completed ({jobsByLifecycle.completed.length})
+          Needs Pricing
+          <Badge className="ml-2">{pricingJobs.length}</Badge>
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value={activeTab}>
+      <TabsContent value="pricing">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          {/* JOB LIST */}
           <Card>
             <CardHeader>
-              <CardTitle>Jobs</CardTitle>
+              <CardTitle>Needs Pricing</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 max-h-[600px] overflow-y-auto">
-              {jobsByLifecycle[activeTab].map(job => (
+              {pricingJobs.map(job => (
                 <button
                   key={job.id}
                   onClick={() => setSelectedJob(job)}
@@ -273,17 +252,14 @@ export function AdminJobPricingPanel() {
                       : 'border-gray-700 hover:bg-gray-800'
                   }`}
                 >
-                  <div className="font-medium">
-                    {getJobDisplayName(job)}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {job.client_email}
-                  </div>
+                  <div className="font-medium">{getJobDisplayName(job)}</div>
+                  <div className="text-xs text-gray-500">{job.client_email}</div>
                 </button>
               ))}
             </CardContent>
           </Card>
 
+          {/* PRICING PANEL */}
           <Card>
             <CardHeader>
               <CardTitle>Job Pricing</CardTitle>
@@ -295,16 +271,13 @@ export function AdminJobPricingPanel() {
                 </div>
               ) : (
                 <>
-                  <div className="mb-3 text-sm text-gray-400">
-                    {getJobDisplayName(selectedJob)}
-                  </div>
-
-                  <label className="text-sm text-gray-400">Price ($)</label>
+                  <label className="text-sm text-gray-400">Price</label>
                   <Input
                     value={priceInput}
                     onChange={e => {
-                      const val = e.target.value
-                      if (/^\d*\.?\d*$/.test(val)) setPriceInput(val)
+                      if (/^\d*\.?\d*$/.test(e.target.value)) {
+                        setPriceInput(e.target.value)
+                      }
                     }}
                     placeholder="0.00"
                     className="mb-3"
@@ -328,10 +301,9 @@ export function AdminJobPricingPanel() {
               )}
             </CardContent>
           </Card>
+
         </div>
       </TabsContent>
     </Tabs>
   )
 }
-
-export default AdminJobPricingPanel
