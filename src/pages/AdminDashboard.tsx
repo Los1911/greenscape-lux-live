@@ -4,8 +4,6 @@ import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 
-import { AdminSectionGroup } from '@/components/admin/layout/AdminSectionGroup'
-
 import { AdminJobsPanel } from '@/components/admin/AdminJobsPanel'
 import { AdminJobPricingPanel } from '@/components/admin/AdminJobPricingPanel'
 import AdminJobPhotoReview from '@/components/admin/AdminJobPhotoReview'
@@ -18,28 +16,33 @@ import {
   Activity,
   AlertTriangle,
   Shield,
-  Layers,
   LogOut
 } from 'lucide-react'
 
 /* =========================================================
-   SAFE SECTION WRAPPER
+   SAFE SECTION
 ========================================================= */
-
 function SafeAdminSection({
-  name,
+  title,
   children
 }: {
-  name: string
+  title: string
   children: ReactNode
 }) {
   try {
-    return <>{children}</>
-  } catch (err) {
-    console.error('[ADMIN_SECTION_FAILED]', name, err)
     return (
-      <div className="border border-red-500/30 bg-red-500/10 rounded-lg p-4 text-sm text-red-300">
-        ⚠️ {name} failed to load. Check console for details.
+      <section className="mb-10">
+        <h2 className="text-lg font-semibold text-emerald-300 mb-4">
+          {title}
+        </h2>
+        {children}
+      </section>
+    )
+  } catch (err) {
+    console.error('[ADMIN_SECTION_FAILED]', title, err)
+    return (
+      <div className="border border-red-500/30 bg-red-500/10 rounded-lg p-4 text-sm text-red-300 mb-8">
+        ⚠️ {title} failed to load. Check console.
       </div>
     )
   }
@@ -48,7 +51,6 @@ function SafeAdminSection({
 /* =========================================================
    TYPES
 ========================================================= */
-
 interface DashboardStats {
   totalUsers: number
   totalRevenue: number
@@ -60,13 +62,13 @@ interface DashboardStats {
 /* =========================================================
    COMPONENT
 ========================================================= */
-
 export default function AdminDashboard() {
   const { user, role, loading: authLoading } = useAuth()
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     totalRevenue: 0,
@@ -76,25 +78,14 @@ export default function AdminDashboard() {
   })
 
   /* -----------------------------
-     AUTH GATE
+     AUTH GUARD
   ----------------------------- */
   useEffect(() => {
     if (authLoading) return
 
-    if (!user) {
-      navigate('/admin-login', { replace: true })
-      return
-    }
-
-    if (role === 'client') {
-      navigate('/client-dashboard', { replace: true })
-      return
-    }
-
-    if (role === 'landscaper') {
-      navigate('/landscaper-dashboard', { replace: true })
-      return
-    }
+    if (!user) navigate('/admin-login', { replace: true })
+    if (role === 'client') navigate('/client-dashboard', { replace: true })
+    if (role === 'landscaper') navigate('/landscaper-dashboard', { replace: true })
   }, [authLoading, user, role, navigate])
 
   /* -----------------------------
@@ -125,9 +116,9 @@ export default function AdminDashboard() {
         pendingApprovals: approvals.count || 0,
         flaggedJobs: flagged.count || 0
       })
-    } catch (err) {
-      console.error('[ADMIN_STATS_FAILED]', err)
-      setLoadError('Dashboard stats failed to load')
+    } catch (e) {
+      console.error(e)
+      setError('Failed to load admin stats')
     } finally {
       setLoading(false)
     }
@@ -144,10 +135,10 @@ export default function AdminDashboard() {
     )
   }
 
-  if (loadError) {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-red-300">
-        {loadError}
+        {error}
       </div>
     )
   }
@@ -157,7 +148,7 @@ export default function AdminDashboard() {
   ----------------------------- */
   return (
     <div className="min-h-screen bg-black text-white px-4 py-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-emerald-300">
           Admin Dashboard
         </h1>
@@ -173,44 +164,42 @@ export default function AdminDashboard() {
         </Button>
       </div>
 
-      {/* INLINE STAT CARDS */}
-      <section className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+      {/* STATS */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
         <Stat title="Users" value={stats.totalUsers} icon={<Users />} />
         <Stat title="Revenue" value={`$${stats.totalRevenue}`} icon={<DollarSign />} />
         <Stat title="Active Jobs" value={stats.activeJobs} icon={<Activity />} />
         <Stat title="Pending" value={stats.pendingApprovals} icon={<AlertTriangle />} />
         <Stat title="Flagged" value={stats.flaggedJobs} icon={<Shield />} />
-      </section>
+      </div>
 
-      <AdminSectionGroup title="Operations" icon={Layers}>
-        <SafeAdminSection name="Admin Job Pricing">
-          <AdminJobPricingPanel />
-        </SafeAdminSection>
+      {/* OPERATIONS */}
+      <SafeAdminSection title="Job Pricing">
+        <AdminJobPricingPanel />
+      </SafeAdminSection>
 
-        <SafeAdminSection name="Admin Jobs Panel">
-          <AdminJobsPanel />
-        </SafeAdminSection>
+      <SafeAdminSection title="Jobs">
+        <AdminJobsPanel />
+      </SafeAdminSection>
 
-        <SafeAdminSection name="Photo Review">
-          <AdminJobPhotoReview />
-        </SafeAdminSection>
+      <SafeAdminSection title="Photo Review">
+        <AdminJobPhotoReview />
+      </SafeAdminSection>
 
-        <SafeAdminSection name="Payout Queue">
-          <AdminPayoutQueue />
-        </SafeAdminSection>
+      <SafeAdminSection title="Payout Queue">
+        <AdminPayoutQueue />
+      </SafeAdminSection>
 
-        <SafeAdminSection name="Remediation Queue">
-          <RemediationQueuePanel />
-        </SafeAdminSection>
-      </AdminSectionGroup>
+      <SafeAdminSection title="Remediation Queue">
+        <RemediationQueuePanel />
+      </SafeAdminSection>
     </div>
   )
 }
 
 /* =========================================================
-   INLINE STAT CARD
+   STAT CARD
 ========================================================= */
-
 function Stat({
   title,
   value,
