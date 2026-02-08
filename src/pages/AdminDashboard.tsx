@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { AdminJobPricingPanel } from '@/components/admin/AdminJobPricingPanel'
 import { LogOut } from 'lucide-react'
-
+import AdminJobPricingPanel from '@/components/admin/AdminJobPricingPanel'
 export default function AdminDashboard() {
   const { user, role, loading: authLoading } = useAuth()
   const navigate = useNavigate()
