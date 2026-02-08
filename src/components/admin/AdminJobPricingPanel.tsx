@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
-import { RefreshCw, AlertCircle } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 
-/* ================= TYPES ================= */
+/* ===================== TYPES ===================== */
 
 interface Job {
   id: string
@@ -22,20 +22,20 @@ interface Job {
   created_at: string
 }
 
-/* ================= COMPONENT ================= */
+/* ===================== COMPONENT ===================== */
 
-export default function AdminJobPricingPanel() {
+export function AdminJobPricingPanel() {
   const { toast } = useToast()
 
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null)
 
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null)
   const [priceInput, setPriceInput] = useState('')
   const [notesInput, setNotesInput] = useState('')
   const [saving, setSaving] = useState(false)
 
-  /* ================= LOAD JOBS ================= */
+  /* ===================== LOAD JOBS ===================== */
 
   const loadJobs = useCallback(async () => {
     setLoading(true)
@@ -56,7 +56,11 @@ export default function AdminJobPricingPanel() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      toast({ title: 'Failed to load jobs', description: error.message, variant: 'destructive' })
+      toast({
+        title: 'Failed to load jobs',
+        description: error.message,
+        variant: 'destructive'
+      })
     } else {
       setJobs(data || [])
     }
@@ -69,7 +73,11 @@ export default function AdminJobPricingPanel() {
 
     const channel = supabase
       .channel('admin-jobs')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, loadJobs)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'jobs' },
+        loadJobs
+      )
       .subscribe()
 
     return () => {
@@ -77,14 +85,17 @@ export default function AdminJobPricingPanel() {
     }
   }, [loadJobs])
 
-  /* ================= SAVE PRICE ================= */
+  /* ===================== SAVE PRICE ===================== */
 
   const handleSavePrice = async () => {
     if (!selectedJob) return
 
     const price = Number(priceInput)
     if (!price || price <= 0) {
-      toast({ title: 'Invalid price', variant: 'destructive' })
+      toast({
+        title: 'Invalid price',
+        variant: 'destructive'
+      })
       return
     }
 
@@ -100,30 +111,38 @@ export default function AdminJobPricingPanel() {
           priced_at: new Date().toISOString(),
           priced_by: auth.user?.id ?? null,
           admin_notes: notesInput || null,
-          status: 'scheduled' // 🔥 THIS WAS MISSING
+          status: 'scheduled' // 🔑 THIS IS THE KEY
         })
         .eq('id', selectedJob.id)
 
       if (error) throw error
 
-      toast({ title: 'Price saved', description: `$${price.toFixed(2)} applied` })
+      toast({
+        title: 'Price saved',
+        description: `$${price.toFixed(2)} applied`
+      })
 
       setSelectedJob(null)
       setPriceInput('')
       setNotesInput('')
       loadJobs()
     } catch (err: any) {
-      toast({ title: 'Save failed', description: err.message, variant: 'destructive' })
+      toast({
+        title: 'Save failed',
+        description: err.message,
+        variant: 'destructive'
+      })
     } finally {
       setSaving(false)
     }
   }
 
-  /* ================= FILTERS ================= */
+  /* ===================== FILTERS ===================== */
 
-  const pricingJobs = jobs.filter(j => j.price === null || j.priced_at === null)
+  // ✅ SINGLE SOURCE OF TRUTH
+  const pricingJobs = jobs.filter(j => j.status === 'pending')
 
-  /* ================= RENDER ================= */
+  /* ===================== RENDER ===================== */
 
   if (loading) {
     return (
@@ -136,11 +155,14 @@ export default function AdminJobPricingPanel() {
   return (
     <Tabs defaultValue="pricing">
       <TabsList>
-        <TabsTrigger value="pricing">Needs Pricing ({pricingJobs.length})</TabsTrigger>
+        <TabsTrigger value="pricing">
+          Needs Pricing ({pricingJobs.length})
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="pricing">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* LEFT */}
           <Card>
             <CardHeader>
               <CardTitle>Needs Pricing</CardTitle>
@@ -156,13 +178,18 @@ export default function AdminJobPricingPanel() {
                   }}
                   className="w-full text-left p-3 rounded border border-gray-700 hover:bg-gray-800"
                 >
-                  <div className="font-medium">{job.service_name || 'Unnamed Service'}</div>
-                  <div className="text-xs text-gray-500">{job.client_email}</div>
+                  <div className="font-medium">
+                    {job.service_name || 'Unnamed Service'}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {job.client_email}
+                  </div>
                 </button>
               ))}
             </CardContent>
           </Card>
 
+          {/* RIGHT */}
           <Card>
             <CardHeader>
               <CardTitle>Job Pricing</CardTitle>
@@ -204,3 +231,5 @@ export default function AdminJobPricingPanel() {
     </Tabs>
   )
 }
+
+export default AdminJobPricingPanel
