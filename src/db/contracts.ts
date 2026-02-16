@@ -1,7 +1,6 @@
 import { isUUID } from '../lib/isUUID';
 import type { Job } from '@/types/job';
 
-// Legacy type for backward compatibility
 export type { Job } from '@/types/job';
 
 export type Doc = {
@@ -23,28 +22,24 @@ export const Jobs = {
       .order('preferred_date', { ascending: true });
   },
 
-  // START JOB → move to in_progress
   start(supabase: any, id: string) {
     if (!isUUID(id)) {
       throw new Error('Invalid job id');
     }
 
-    return supabase
-      .from('jobs')
-      .update({ status: 'in_progress' })
-      .eq('id', id);
+    return supabase.functions.invoke('job-execution', {
+      body: { action: 'start', jobId: id }
+    });
   },
 
-  // COMPLETE JOB → move to completed_pending_review
   complete(supabase: any, id: string) {
     if (!isUUID(id)) {
       throw new Error('Invalid job id');
     }
 
-    return supabase
-      .from('jobs')
-      .update({ status: 'completed_pending_review' })
-      .eq('id', id);
+    return supabase.functions.invoke('job-execution', {
+      body: { action: 'complete', jobId: id }
+    });
   }
 };
 
