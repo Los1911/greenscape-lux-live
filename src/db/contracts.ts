@@ -28,10 +28,15 @@ export const Jobs = {
       throw new Error('Invalid job id');
     }
 
-    return supabase
-      .from('jobs')
-      .update({ status: 'in_progress' })
-      .eq('id', id);
+    return supabase.functions.invoke('job-execution', {
+      body: JSON.stringify({
+        action: 'start',
+        jobId: id
+      }),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
   },
 
   complete(supabase: any, id: string) {
@@ -40,9 +45,12 @@ export const Jobs = {
     }
 
     return supabase.functions.invoke('job-execution', {
-      body: {
+      body: JSON.stringify({
         action: 'complete',
         jobId: id
+      }),
+      headers: {
+        'Content-Type': 'application/json'
       }
     });
   }
