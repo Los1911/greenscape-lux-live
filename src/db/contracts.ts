@@ -28,15 +28,10 @@ export const Jobs = {
       throw new Error('Invalid job id');
     }
 
-    return supabase.functions.invoke('job-execution', {
-      body: JSON.stringify({
-        action: 'start',
-        jobId: id
-      }),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    return supabase
+      .from('jobs')
+      .update({ status: 'active' })
+      .eq('id', id);
   },
 
   complete(supabase: any, id: string) {
@@ -44,15 +39,10 @@ export const Jobs = {
       throw new Error('Invalid job id');
     }
 
-    return supabase.functions.invoke('job-execution', {
-      body: JSON.stringify({
-        action: 'complete',
-        jobId: id
-      }),
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    return supabase
+      .from('jobs')
+      .update({ status: 'completed_pending_review' })
+      .eq('id', id);
   }
 };
 
