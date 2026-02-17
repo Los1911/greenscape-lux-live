@@ -19,7 +19,10 @@ const JobWorkflowManager: React.FC = () => {
 
   const fetchJobs = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (!user) return;
 
       const { data, error } = await supabase
@@ -31,6 +34,7 @@ const JobWorkflowManager: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
       setJobs(data || []);
     } catch (err: any) {
       setError(err.message);
@@ -60,7 +64,7 @@ const JobWorkflowManager: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
+      case 'available':
         return 'bg-yellow-500';
       case 'scheduled':
         return 'bg-blue-500';
@@ -123,8 +127,8 @@ const JobWorkflowManager: React.FC = () => {
 
               <div className="flex gap-2 mt-4">
 
-                {/* Client accepted → now scheduled */}
-                {job.status === 'pending' && (
+                {/* Available → Scheduled */}
+                {job.status === 'available' && (
                   <Button
                     size="sm"
                     onClick={() => updateJobStatus(job.id, 'scheduled')}
@@ -134,7 +138,7 @@ const JobWorkflowManager: React.FC = () => {
                   </Button>
                 )}
 
-                {/* Scheduled → Start Work */}
+                {/* Scheduled → Active */}
                 {job.status === 'scheduled' && (
                   <Button
                     size="sm"
@@ -146,7 +150,7 @@ const JobWorkflowManager: React.FC = () => {
                   </Button>
                 )}
 
-                {/* Active → Complete */}
+                {/* Active → Completed */}
                 {job.status === 'active' && (
                   <Button
                     size="sm"
