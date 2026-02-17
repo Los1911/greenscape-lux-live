@@ -96,15 +96,14 @@ export default function AdminJobPricingPanel() {
           priced_at: new Date().toISOString(),
           priced_by: auth?.user?.id ?? null,
           admin_notes: notesInput || null,
-          status: 'priced',
-          admin_override: true   // 🔥 CRITICAL FIX
+          status: 'quoted'
         })
         .eq('id', selectedJob.id)
 
       if (error) throw error
 
       toast({
-        title: 'Price saved',
+        title: 'Quote saved',
         description: `$${price.toFixed(2)} applied`
       })
 
@@ -124,7 +123,7 @@ export default function AdminJobPricingPanel() {
   }
 
   const pricingJobs = jobs.filter(
-    j => j.status === 'pending' || j.status === 'priced'
+    j => j.status === 'pending' || j.status === 'quoted'
   )
 
   if (loading) {
@@ -146,7 +145,6 @@ export default function AdminJobPricingPanel() {
       <TabsContent value="pricing">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-          {/* LEFT SIDE */}
           <Card>
             <CardHeader>
               <CardTitle>Needs Pricing</CardTitle>
@@ -170,7 +168,6 @@ export default function AdminJobPricingPanel() {
             </CardContent>
           </Card>
 
-          {/* RIGHT SIDE */}
           <Card>
             <CardHeader>
               <CardTitle>Job Pricing</CardTitle>
@@ -205,7 +202,7 @@ export default function AdminJobPricingPanel() {
                     disabled={saving}
                     className="w-full"
                   >
-                    {saving ? 'Saving...' : 'Save Price'}
+                    {saving ? 'Saving...' : 'Save Quote'}
                   </Button>
                 </>
               )}
