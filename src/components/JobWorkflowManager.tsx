@@ -7,8 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Clock, MapPin, DollarSign } from 'lucide-react';
 import { Job } from '@/types/job';
 
-
-
 const JobWorkflowManager: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,11 +24,11 @@ const JobWorkflowManager: React.FC = () => {
 
       const { data, error } = await supabase
         .from('jobs')
-        .select('id, service_name, service_type, service_address, status, landscaper_id, created_at, price, customer_name, preferred_date')
+        .select(
+          'id, service_name, service_type, service_address, status, landscaper_id, created_at, price, customer_name, preferred_date'
+        )
         .eq('landscaper_id', user.id)
         .order('created_at', { ascending: false });
-
-
 
       if (error) throw error;
       setJobs(data || []);
@@ -49,11 +47,9 @@ const JobWorkflowManager: React.FC = () => {
         .eq('id', jobId);
 
       if (error) throw error;
-      
-      // Refresh jobs
+
       fetchJobs();
-      
-      // Navigate to completion form if completed
+
       if (status === 'completed') {
         navigate(`/job-complete/${jobId}`);
       }
@@ -64,11 +60,16 @@ const JobWorkflowManager: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-500';
-      case 'accepted': return 'bg-blue-500';
-      case 'in_progress': return 'bg-orange-500';
-      case 'completed': return 'bg-green-500';
-      default: return 'bg-gray-500';
+      case 'pending':
+        return 'bg-yellow-500';
+      case 'scheduled':
+        return 'bg-blue-500';
+      case 'active':
+        return 'bg-orange-500';
+      case 'completed':
+        return 'bg-green-500';
+      default:
+        return 'bg-gray-500';
     }
   };
 
@@ -96,51 +97,59 @@ const JobWorkflowManager: React.FC = () => {
           <Card key={job.id} className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex justify-between items-start">
-                <CardTitle className="text-lg">{job.service_name}</CardTitle>
+                <CardTitle className="text-lg">
+                  {job.service_name}
+                </CardTitle>
                 <Badge className={`${getStatusColor(job.status)} text-white`}>
                   {job.status.replace('_', ' ')}
                 </Badge>
               </div>
             </CardHeader>
+
             <CardContent className="space-y-4">
-              <p className="text-gray-600 text-sm">{job.service_type}</p>
+              <p className="text-gray-600 text-sm">
+                {job.service_type}
+              </p>
 
               <div className="flex items-center text-sm text-gray-500">
                 <MapPin className="w-4 h-4 mr-1" />
                 {job.service_address}
               </div>
-              
+
               <div className="flex items-center text-sm font-medium">
                 <DollarSign className="w-4 h-4 mr-1" />
                 ${job.price}
               </div>
 
-
               <div className="flex gap-2 mt-4">
+
+                {/* Client accepted → now scheduled */}
                 {job.status === 'pending' && (
-                  <Button 
-                    size="sm" 
-                    onClick={() => updateJobStatus(job.id, 'accepted')}
+                  <Button
+                    size="sm"
+                    onClick={() => updateJobStatus(job.id, 'scheduled')}
                     className="flex-1"
                   >
                     Accept
                   </Button>
                 )}
-                
-                {job.status === 'accepted' && (
-                  <Button 
-                    size="sm" 
-                    onClick={() => updateJobStatus(job.id, 'in_progress')}
+
+                {/* Scheduled → Start Work */}
+                {job.status === 'scheduled' && (
+                  <Button
+                    size="sm"
+                    onClick={() => updateJobStatus(job.id, 'active')}
                     className="flex-1"
                   >
                     <Clock className="w-4 h-4 mr-1" />
                     Start Work
                   </Button>
                 )}
-                
-                {job.status === 'in_progress' && (
-                  <Button 
-                    size="sm" 
+
+                {/* Active → Complete */}
+                {job.status === 'active' && (
+                  <Button
+                    size="sm"
                     onClick={() => updateJobStatus(job.id, 'completed')}
                     className="flex-1 bg-green-600 hover:bg-green-700"
                   >
@@ -148,6 +157,7 @@ const JobWorkflowManager: React.FC = () => {
                     Complete
                   </Button>
                 )}
+
               </div>
             </CardContent>
           </Card>

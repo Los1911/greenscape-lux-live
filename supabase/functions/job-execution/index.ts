@@ -2,8 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type'
+  'Access-Control-Allow-Headers': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 interface JobExecutionRequest {
@@ -18,8 +18,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('[job-execution] Request received');
-
+    // ENV GUARD
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
@@ -30,6 +29,7 @@ Deno.serve(async (req) => {
       );
     }
 
+    // AUTH HEADER CHECK
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(
@@ -38,22 +38,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 🔐 Decode JWT directly (verify_jwt already validated it)
+    // JWT DECODE (verify_jwt true already validates token)
     let userId: string;
-
     try {
       const token = authHeader.substring(7);
       const parts = token.split('.');
       if (parts.length !== 3) throw new Error('Invalid token format');
 
-      const base64Payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const payloadJson = atob(base64Payload);
-      const payload = JSON.parse(payloadJson);
+      const base64Payload = parts[1]
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
 
+      const payload = JSON.parse(atob(base64Payload));
       userId = payload.sub;
 
       if (!userId) throw new Error('Missing sub claim');
-    } catch (err) {
+    } catch {
       return new Response(
         JSON.stringify({ success: false, error: 'Invalid authentication' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -62,8 +62,8 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // SAFE BODY PARSE
     let body: JobExecutionRequest;
-
     try {
       body = await req.json();
     } catch {
@@ -82,6 +82,7 @@ Deno.serve(async (req) => {
       );
     }
 
+    // FETCH JOB
     const { data: job, error: jobError } = await supabase
       .from('jobs')
       .select('id, status, landscaper_id, assigned_to')
@@ -111,7 +112,7 @@ Deno.serve(async (req) => {
 
     switch (action) {
       case 'start': {
-        if (job.status !== 'active') {
+        if (!['accepted', 'assigned', 'active'].includes(job.status)) {
           return new Response(
             JSON.stringify({ success: false, error: `Cannot start job. Current status: ${job.status}` }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -125,38 +126,30 @@ Deno.serve(async (req) => {
           );
         }
 
+        const startedAt = new Date().toISOString();
+
+        const { error: updateError } = await supabase
+          .from('jobs')
+          .update({ status: 'in_progress', started_at: startedAt })
+          .eq('id', jobId);
+
+        if (updateError) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Failed to start job' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         return new Response(
-          JSON.stringify({ success: true, message: 'Job is active and ready' }),
+          JSON.stringify({ success: true, status: 'in_progress' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       case 'complete': {
-        if (job.status !== 'active') {
+        if (job.status !== 'in_progress') {
           return new Response(
             JSON.stringify({ success: false, error: `Cannot complete job. Current status: ${job.status}` }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        if (!landscaperProfile || (job.landscaper_id !== landscaperProfile.id && job.assigned_to !== userId)) {
-          return new Response(
-            JSON.stringify({ success: false, error: 'Not assigned to this job' }),
-            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        const { data: photos } = await supabase
-          .from('job_photos')
-          .select('type')
-          .eq('job_id', jobId);
-
-        const beforePhotos = (photos || []).filter(p => p.type === 'before');
-        const afterPhotos = (photos || []).filter(p => p.type === 'after');
-
-        if (beforePhotos.length === 0 || afterPhotos.length === 0) {
-          return new Response(
-            JSON.stringify({ success: false, error: 'At least one before and one after photo required' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -176,11 +169,52 @@ Deno.serve(async (req) => {
         }
 
         return new Response(
-          JSON.stringify({
-            success: true,
-            message: 'Job submitted for review',
-            job: { id: jobId, status: 'completed_pending_review' }
-          }),
+          JSON.stringify({ success: true, status: 'completed_pending_review' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'admin_approve': {
+        if (!isAdmin) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Admin access required' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        await supabase
+          .from('jobs')
+          .update({ status: 'completed', approved_by: userId })
+          .eq('id', jobId);
+
+        return new Response(
+          JSON.stringify({ success: true, status: 'completed' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'admin_reject': {
+        if (!isAdmin) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Admin access required' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (!rejectionReason?.trim()) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Rejection reason required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        await supabase
+          .from('jobs')
+          .update({ status: 'in_progress', rejection_reason: rejectionReason.trim() })
+          .eq('id', jobId);
+
+        return new Response(
+          JSON.stringify({ success: true, status: 'in_progress' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -191,6 +225,7 @@ Deno.serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     }
+
   } catch (error) {
     return new Response(
       JSON.stringify({ success: false, error: 'Internal server error' }),

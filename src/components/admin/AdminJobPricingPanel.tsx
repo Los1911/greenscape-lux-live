@@ -8,8 +8,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
 import { RefreshCw } from 'lucide-react'
 
-/* ===================== TYPES ===================== */
-
 interface Job {
   id: string
   service_name: string | null
@@ -19,23 +17,18 @@ interface Job {
   priced_by: string | null
   status: string | null
   admin_notes: string | null
-  created_at: string
+  created_at: string | null
 }
 
-/* ===================== COMPONENT ===================== */
-
-export function AdminJobPricingPanel() {
+export default function AdminJobPricingPanel() {
   const { toast } = useToast()
 
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
-
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
   const [priceInput, setPriceInput] = useState('')
   const [notesInput, setNotesInput] = useState('')
   const [saving, setSaving] = useState(false)
-
-  /* ===================== LOAD JOBS ===================== */
 
   const loadJobs = useCallback(async () => {
     setLoading(true)
@@ -70,27 +63,19 @@ export function AdminJobPricingPanel() {
 
   useEffect(() => {
     loadJobs()
-
-    const channel = supabase
-      .channel('admin-jobs')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'jobs' },
-        loadJobs
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [loadJobs])
 
-  /* ===================== SAVE PRICE ===================== */
+  const handleSelectJob = (job: Job) => {
+    setSelectedJob(job)
+    setPriceInput(job.price !== null && job.price !== undefined ? String(job.price) : '')
+    setNotesInput(job.admin_notes ?? '')
+  }
 
   const handleSavePrice = async () => {
     if (!selectedJob) return
 
     const price = Number(priceInput)
+
     if (!price || price <= 0) {
       toast({
         title: 'Invalid price',
@@ -109,9 +94,9 @@ export function AdminJobPricingPanel() {
         .update({
           price,
           priced_at: new Date().toISOString(),
-          priced_by: auth.user?.id ?? null,
+          priced_by: auth?.user?.id ?? null,
           admin_notes: notesInput || null,
-          status: 'scheduled' // 🔑 THIS IS THE KEY
+          status: 'priced'
         })
         .eq('id', selectedJob.id)
 
@@ -125,7 +110,7 @@ export function AdminJobPricingPanel() {
       setSelectedJob(null)
       setPriceInput('')
       setNotesInput('')
-      loadJobs()
+      await loadJobs()
     } catch (err: any) {
       toast({
         title: 'Save failed',
@@ -137,12 +122,9 @@ export function AdminJobPricingPanel() {
     }
   }
 
-  /* ===================== FILTERS ===================== */
-
-  // ✅ SINGLE SOURCE OF TRUTH
-  const pricingJobs = jobs.filter(j => j.status === 'pending')
-
-  /* ===================== RENDER ===================== */
+  const pricingJobs = jobs.filter(
+    j => j.status === 'pending' || j.status === 'priced'
+  )
 
   if (loading) {
     return (
@@ -162,20 +144,18 @@ export function AdminJobPricingPanel() {
 
       <TabsContent value="pricing">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* LEFT */}
+
+          {/* LEFT SIDE */}
           <Card>
             <CardHeader>
               <CardTitle>Needs Pricing</CardTitle>
             </CardHeader>
+
             <CardContent className="space-y-2">
               {pricingJobs.map(job => (
                 <button
                   key={job.id}
-                  onClick={() => {
-                    setSelectedJob(job)
-                    setPriceInput(job.price?.toString() || '')
-                    setNotesInput(job.admin_notes || '')
-                  }}
+                  onClick={() => handleSelectJob(job)}
                   className="w-full text-left p-3 rounded border border-gray-700 hover:bg-gray-800"
                 >
                   <div className="font-medium">
@@ -189,11 +169,12 @@ export function AdminJobPricingPanel() {
             </CardContent>
           </Card>
 
-          {/* RIGHT */}
+          {/* RIGHT SIDE */}
           <Card>
             <CardHeader>
               <CardTitle>Job Pricing</CardTitle>
             </CardHeader>
+
             <CardContent>
               {!selectedJob ? (
                 <div className="text-center text-gray-500 py-10">
@@ -201,8 +182,11 @@ export function AdminJobPricingPanel() {
                 </div>
               ) : (
                 <>
-                  <label className="text-sm text-gray-400">Price ($)</label>
+                  <label className="text-sm text-gray-400">
+                    Price ($)
+                  </label>
                   <Input
+                    type="number"
                     value={priceInput}
                     onChange={e => setPriceInput(e.target.value)}
                     className="mb-3"
@@ -226,10 +210,9 @@ export function AdminJobPricingPanel() {
               )}
             </CardContent>
           </Card>
+
         </div>
       </TabsContent>
     </Tabs>
   )
 }
-
-export default AdminJobPricingPanel
