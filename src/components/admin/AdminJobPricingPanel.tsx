@@ -96,7 +96,8 @@ export default function AdminJobPricingPanel() {
           priced_at: new Date().toISOString(),
           priced_by: auth?.user?.id ?? null,
           admin_notes: notesInput || null,
-          status: 'priced'
+          status: 'priced',
+          admin_override: true   // 🔥 CRITICAL FIX
         })
         .eq('id', selectedJob.id)
 
