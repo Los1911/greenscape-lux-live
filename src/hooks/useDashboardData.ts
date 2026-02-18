@@ -68,9 +68,9 @@ export function useDashboardData(userRole: 'client' | 'landscaper' | 'admin') {
     }
   }
 
-  // ===============================
+  // ==========================
   // CLIENT DASHBOARD
-  // ===============================
+  // ==========================
   const fetchClientData = async () => {
     if (!user) return
 
@@ -100,12 +100,18 @@ export function useDashboardData(userRole: 'client' | 'landscaper' | 'admin') {
     if (!jobs) return
 
     const totalJobs = jobs.length
+
+    // 🔥 IMPORTANT FIX:
+    // DO NOT count "accepted" anymore
+    // Database does not allow that enum
     const activeJobs = jobs.filter(job =>
-      ['pending', 'quoted', 'priced', 'accepted', 'assigned', 'in_progress']
+      ['pending', 'quoted', 'priced', 'assigned', 'in_progress']
         .includes(job.status)
     ).length
 
-    const completedJobs = jobs.filter(job => job.status === 'completed').length
+    const completedJobs = jobs.filter(job =>
+      job.status === 'completed'
+    ).length
 
     setStats(prev => ({
       ...prev,
@@ -114,21 +120,12 @@ export function useDashboardData(userRole: 'client' | 'landscaper' | 'admin') {
       completedJobs
     }))
 
-    setRecentJobs(jobs.map(job => ({
-      id: job.id,
-      service_name: job.service_name,
-      service_type: job.service_type,
-      service_address: job.service_address,
-      status: job.status,
-      created_at: job.created_at,
-      preferred_date: job.preferred_date,
-      price: job.price
-    })))
+    setRecentJobs(jobs)
   }
 
-  // ===============================
+  // ==========================
   // LANDSCAPER DASHBOARD
-  // ===============================
+  // ==========================
   const fetchLandscaperData = async () => {
     if (!user) return
 
@@ -156,64 +153,35 @@ export function useDashboardData(userRole: 'client' | 'landscaper' | 'admin') {
       .eq('landscaper_id', landscaperProfile.id)
       .order('created_at', { ascending: false })
 
-    const { data: payments } = await supabase
-      .from('payments')
-      .select('amount, status, created_at')
-      .eq('landscaper_id', landscaperProfile.id)
+    if (!jobs) return
 
-    if (jobs) {
-      const totalJobs = jobs.length
-      const activeJobs = jobs.filter(job =>
-        ['accepted', 'assigned', 'in_progress']
-          .includes(job.status)
-      ).length
+    const totalJobs = jobs.length
 
-      const completedJobs = jobs.filter(job =>
-        job.status === 'completed'
-      ).length
+    // 🔥 removed accepted here too
+    const activeJobs = jobs.filter(job =>
+      ['assigned', 'in_progress']
+        .includes(job.status)
+    ).length
 
-      setRecentJobs(jobs)
+    const completedJobs = jobs.filter(job =>
+      job.status === 'completed'
+    ).length
 
-      setStats(prev => ({
-        ...prev,
-        totalJobs,
-        activeJobs,
-        completedJobs,
-        rating: landscaperProfile.rating || 0,
-        totalReviews: landscaperProfile.total_reviews || 0
-      }))
-    }
+    setRecentJobs(jobs)
 
-    if (payments) {
-      const totalEarnings = payments
-        .filter(p => p.status === 'completed')
-        .reduce((sum, p) => sum + (p.amount || 0), 0)
-
-      const currentMonth = new Date().getMonth()
-
-      const monthlyEarnings = payments
-        .filter(p =>
-          p.status === 'completed' &&
-          new Date(p.created_at).getMonth() === currentMonth
-        )
-        .reduce((sum, p) => sum + (p.amount || 0), 0)
-
-      const pendingPayments = payments
-        .filter(p => p.status === 'pending')
-        .reduce((sum, p) => sum + (p.amount || 0), 0)
-
-      setStats(prev => ({
-        ...prev,
-        totalEarnings,
-        monthlyEarnings,
-        pendingPayments
-      }))
-    }
+    setStats(prev => ({
+      ...prev,
+      totalJobs,
+      activeJobs,
+      completedJobs,
+      rating: landscaperProfile.rating || 0,
+      totalReviews: landscaperProfile.total_reviews || 0
+    }))
   }
 
-  // ===============================
+  // ==========================
   // ADMIN DASHBOARD
-  // ===============================
+  // ==========================
   const fetchAdminData = async () => {
     const [
       { data: allJobs },
@@ -225,8 +193,9 @@ export function useDashboardData(userRole: 'client' | 'landscaper' | 'admin') {
 
     if (allJobs) {
       const totalJobs = allJobs.length
+
       const activeJobs = allJobs.filter(job =>
-        ['pending', 'quoted', 'priced', 'accepted', 'assigned', 'in_progress']
+        ['pending', 'quoted', 'priced', 'assigned', 'in_progress']
           .includes(job.status)
       ).length
 
