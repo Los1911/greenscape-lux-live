@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, MapPin, DollarSign, User, Briefcase } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import Button from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -19,16 +19,22 @@ export default function CreateJobModal({ isOpen, onClose, onJobCreated }: Props)
     location: '',
     date: '',
     time: '',
-    status: 'pending'
+    status: 'available',
   });
-  
+
   const [clients, setClients] = useState<any[]>([]);
   const [landscapers, setLandscapers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   const services = [
-    'Lawn Care', 'Tree Trimming', 'Garden Design', 'Landscaping',
-    'Hedge Trimming', 'Mulching', 'Irrigation', 'Seasonal Cleanup'
+    'Lawn Care',
+    'Tree Trimming',
+    'Garden Design',
+    'Landscaping',
+    'Hedge Trimming',
+    'Mulching',
+    'Irrigation',
+    'Seasonal Cleanup'
   ];
 
   useEffect(() => {
@@ -42,12 +48,12 @@ export default function CreateJobModal({ isOpen, onClose, onJobCreated }: Props)
       .from('profiles')
       .select('email, first_name, last_name')
       .order('first_name');
-    
+
     const { data: landscapersData } = await supabase
       .from('landscapers')
       .select('email, name')
       .order('name');
-    
+
     setClients(clientsData || []);
     setLandscapers(landscapersData || []);
   };
@@ -57,28 +63,30 @@ export default function CreateJobModal({ isOpen, onClose, onJobCreated }: Props)
     setLoading(true);
 
     try {
-      // Combine date and time into ISO string for preferred_date
-      const preferredDateTime = formData.date && formData.time 
-        ? new Date(`${formData.date}T${formData.time}`).toISOString()
-        : new Date(formData.date).toISOString();
+      const preferredDateTime =
+        formData.date && formData.time
+          ? new Date(`${formData.date}T${formData.time}`).toISOString()
+          : null;
 
-      const { error } = await supabase.from('jobs').insert([{
-        service_name: formData.service_name,
-        service_type: formData.service_name,
-        client_email: formData.client_email,
-        landscaper_email: formData.landscaper_email || null,
-        price: parseFloat(formData.price),
-        service_address: formData.location,
-        preferred_date: preferredDateTime,
-        status: formData.status,
-        customer_name: formData.client_email.split('@')[0],
-        created_at: new Date().toISOString()
-      }]);
+      const { error } = await supabase.from('jobs').insert([
+        {
+          service_type: formData.service_name,
+          client_email: formData.client_email,
+          landscaper_email: formData.landscaper_email || null,
+          price: parseFloat(formData.price) || 0,
+          service_address: formData.location,
+          preferred_date: preferredDateTime,
+          status: formData.status,
+          customer_name: formData.client_email.split('@')[0],
+          created_at: new Date().toISOString(),
+        },
+      ]);
 
       if (error) throw error;
 
       onJobCreated();
       onClose();
+
       setFormData({
         service_name: '',
         client_email: '',
@@ -87,7 +95,7 @@ export default function CreateJobModal({ isOpen, onClose, onJobCreated }: Props)
         location: '',
         date: '',
         time: '',
-        status: 'pending'
+        status: 'available',
       });
     } catch (error) {
       console.error('Error creating job:', error);
@@ -100,150 +108,162 @@ export default function CreateJobModal({ isOpen, onClose, onJobCreated }: Props)
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <Card className="bg-black/90 backdrop-blur border border-green-500/30 rounded-2xl ring-1 ring-green-500/20 shadow-[0_0_45px_-10px_rgba(34,197,94,0.4)] w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-green-400" />
-              <h2 className="text-xl font-semibold text-green-300">Create New Job</h2>
-            </div>
-            <Button
-              onClick={onClose}
-              className="rounded-full p-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-300"
+      <Card className="bg-black/90 border border-green-500/30 rounded-2xl w-full max-w-lg p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-semibold text-green-300 flex items-center gap-2">
+            <Briefcase className="w-5 h-5" />
+            Create New Job
+          </h2>
+          <button onClick={onClose}>
+            <X className="w-5 h-5 text-red-400" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* Service */}
+          <div>
+            <label className="block text-sm text-green-300 mb-1">Service</label>
+            <select
+              value={formData.service_name}
+              onChange={(e) =>
+                setFormData({ ...formData, service_name: e.target.value })
+              }
+              required
+              className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
             >
-              <X className="w-4 h-4" />
-            </Button>
+              <option value="">Select a service</option>
+              {services.map((service) => (
+                <option key={service} value={service}>
+                  {service}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-green-300 mb-2">Service</label>
-              <select
-                value={formData.service_name}
-                onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
-                required
-                className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
-              >
-                <option value="">Select a service</option>
-                {services.map(service => (
-                  <option key={service} value={service}>{service}</option>
-                ))}
-              </select>
-            </div>
+          {/* Client */}
+          <div>
+            <label className="block text-sm text-green-300 mb-1">Client Email</label>
+            <input
+              list="clients"
+              value={formData.client_email}
+              onChange={(e) =>
+                setFormData({ ...formData, client_email: e.target.value })
+              }
+              required
+              className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
+            />
+            <datalist id="clients">
+              {clients.map((client) => (
+                <option key={client.email} value={client.email} />
+              ))}
+            </datalist>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-green-300 mb-2">Client Email</label>
-              <input
-                list="clients"
-                value={formData.client_email}
-                onChange={(e) => setFormData({ ...formData, client_email: e.target.value })}
-                required
-                className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                placeholder="Enter client email"
-              />
-              <datalist id="clients">
-                {clients.map(client => (
-                  <option key={client.email} value={client.email} />
-                ))}
-              </datalist>
-            </div>
+          {/* Landscaper */}
+          <div>
+            <label className="block text-sm text-green-300 mb-1">
+              Landscaper (Optional)
+            </label>
+            <input
+              list="landscapers"
+              value={formData.landscaper_email}
+              onChange={(e) =>
+                setFormData({ ...formData, landscaper_email: e.target.value })
+              }
+              className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
+            />
+            <datalist id="landscapers">
+              {landscapers.map((landscaper) => (
+                <option key={landscaper.email} value={landscaper.email} />
+              ))}
+            </datalist>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-green-300 mb-2">Landscaper (Optional)</label>
-              <input
-                list="landscapers"
-                value={formData.landscaper_email}
-                onChange={(e) => setFormData({ ...formData, landscaper_email: e.target.value })}
-                className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                placeholder="Enter landscaper email"
-              />
-              <datalist id="landscapers">
-                {landscapers.map(landscaper => (
-                  <option key={landscaper.email} value={landscaper.email} />
-                ))}
-              </datalist>
-            </div>
+          {/* Price */}
+          <div>
+            <label className="block text-sm text-green-300 mb-1">Price ($)</label>
+            <input
+              type="number"
+              value={formData.price}
+              onChange={(e) =>
+                setFormData({ ...formData, price: e.target.value })
+              }
+              required
+              className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
+            />
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-green-300 mb-2">Price ($)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  required
-                  className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-green-300 mb-2">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="accepted">Accepted</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
-            </div>
+          {/* Status */}
+          <div>
+            <label className="block text-sm text-green-300 mb-1">Status</label>
+            <select
+              value={formData.status}
+              onChange={(e) =>
+                setFormData({ ...formData, status: e.target.value })
+              }
+              className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
+            >
+              <option value="available">Available</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-green-300 mb-2">Location</label>
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                required
-                className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                placeholder="Enter job location"
-              />
-            </div>
+          {/* Location */}
+          <div>
+            <label className="block text-sm text-green-300 mb-1">Location</label>
+            <input
+              type="text"
+              value={formData.location}
+              onChange={(e) =>
+                setFormData({ ...formData, location: e.target.value })
+              }
+              required
+              className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
+            />
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-green-300 mb-2">Date</label>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  required
-                  className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-green-300 mb-2">Time</label>
-                <input
-                  type="time"
-                  value={formData.time}
-                  onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                  required
-                  className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                />
-              </div>
-            </div>
+          {/* Date */}
+          <div>
+            <label className="block text-sm text-green-300 mb-1">Date</label>
+            <input
+              type="date"
+              value={formData.date}
+              onChange={(e) =>
+                setFormData({ ...formData, date: e.target.value })
+              }
+              required
+              className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
+            />
+          </div>
 
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                onClick={onClose}
-                className="flex-1 rounded-full bg-gray-600/20 hover:bg-gray-600/30 border border-gray-500/40 text-gray-300"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={loading}
-                className="flex-1 rounded-full bg-green-600/20 hover:bg-green-600/30 border border-green-500/40 text-green-300 hover:shadow-[0_0_15px_rgba(34,197,94,0.3)]"
-              >
-                {loading ? 'Creating...' : 'Create Job'}
-              </Button>
-            </div>
-          </form>
-        </div>
+          {/* Time */}
+          <div>
+            <label className="block text-sm text-green-300 mb-1">Time</label>
+            <input
+              type="time"
+              value={formData.time}
+              onChange={(e) =>
+                setFormData({ ...formData, time: e.target.value })
+              }
+              required
+              className="w-full bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-white"
+            />
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3 pt-4">
+            <Button type="button" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Creating...' : 'Create Job'}
+            </Button>
+          </div>
+        </form>
       </Card>
     </div>
   );
