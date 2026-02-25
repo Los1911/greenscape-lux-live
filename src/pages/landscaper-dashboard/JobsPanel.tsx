@@ -41,26 +41,25 @@ import {
   WorkAreaPreferences as WorkAreaPrefsType
 } from '@/lib/workAreaPreferences';
 
-// Normalize job data to handle missing/renamed columns safely
-// Price hierarchy: admin_price > price (only confirmed columns)
-// REMOVED: 'amount' (42703 — column does not exist in jobs table)
-// LIFECYCLE: Normalizes legacy 'in_progress' status to canonical 'active'
 function normalizeJobData(rawJob: Record<string, unknown>) {
   const adminPrice = safeNumber(rawJob, 'admin_price');
   const regularPrice = safeNumber(rawJob, 'price');
 
-  
   // Parse selected_services - could be JSON string or array
   let selectedServices: string[] = [];
   const rawServices = rawJob['selected_services'];
+
   if (Array.isArray(rawServices)) {
     selectedServices = rawServices;
   } else if (typeof rawServices === 'string' && rawServices.startsWith('[')) {
-    try { selectedServices = JSON.parse(rawServices); } catch { /* ignore */ }
+    try {
+      selectedServices = JSON.parse(rawServices);
+    } catch {
+      // ignore parse failure
+    }
   }
 
   // STATUS NORMALIZATION: Map legacy 'in_progress' to canonical 'active'
-  // This ensures all downstream logic uses a single status value
   let normalizedStatus = safeString(rawJob, 'status', 'pending');
   if (normalizedStatus === 'in_progress') {
     normalizedStatus = 'active';
@@ -70,28 +69,29 @@ function normalizeJobData(rawJob: Record<string, unknown>) {
     ...rawJob,
     id: safeString(rawJob, 'id'),
     status: normalizedStatus,
-    service_type: safeString(rawJob, 'service_type') || safeString(rawJob, 'service_name'),
-    service_name: safeString(rawJob, 'service_name') || safeString(rawJob, 'service_type'),
-    service_address: safeString(rawJob, 'service_address') || safeString(rawJob, 'property_address'),
-    // Price hierarchy: admin_price > price (only confirmed columns in jobs table)
+    service_type:
+      safeString(rawJob, 'service_type') ||
+      safeString(rawJob, 'service_name'),
+    service_name:
+      safeString(rawJob, 'service_name') ||
+      safeString(rawJob, 'service_type'),
+    service_address:
+      safeString(rawJob, 'service_address') ||
+      safeString(rawJob, 'property_address'),
 
+    // Price hierarchy: admin_price > price
     price: adminPrice || regularPrice,
     admin_price: adminPrice,
+
     is_available: safeBoolean(rawJob, 'is_available'),
     created_at: safeString(rawJob, 'created_at'),
-    // New scope fields
+
     selected_services: selectedServices,
-    // NOTE: 'comments' and 'estimated_duration' do NOT exist on the jobs table (42703)
-    // Client notes live on quote_requests, not jobs. Do not query or display them from jobs.
     preferred_date: safeString(rawJob, 'preferred_date'),
     started_at: safeString(rawJob, 'started_at'),
     landscaper_id: safeString(rawJob, 'landscaper_id'),
-    landscaper_id: safeString(rawJob, 'landscaper_id'),
   };
 }
-
-
-
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
@@ -2619,4 +2619,5 @@ function JobActionsPanel({ jobId, jobStatus }: { jobId: string; jobStatus: strin
     </>
   );
 }
+
 
