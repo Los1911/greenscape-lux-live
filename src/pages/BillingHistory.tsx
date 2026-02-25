@@ -17,17 +17,32 @@ interface BillingRecord {
 }
 
 export default function BillingHistory() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Auth loading guard - show loading UI while auth is initializing
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   useEffect(() => {
     if (user) {
       fetchBillingHistory();
+    } else {
+      setLoading(false);
     }
   }, [user]);
+
 
   const fetchBillingHistory = async () => {
     try {

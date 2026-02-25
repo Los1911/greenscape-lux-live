@@ -24,10 +24,10 @@ export function CohortAnalysisChart() {
   const fetchCohortData = async () => {
     setLoading(true);
     try {
-      // Query jobs grouped by month and service type
+      // Query jobs grouped by month and service type - use price column (not total_amount)
       const { data: jobs, error } = await supabase
         .from('jobs')
-        .select('created_at, status, service_type, total_amount')
+        .select('created_at, status, service_type, price')
         .eq('status', 'completed')
         .order('created_at', { ascending: true });
 
@@ -43,8 +43,9 @@ export function CohortAnalysisChart() {
         }
         const cohortData = cohortMap.get(cohort)!;
         cohortData.jobs.push(job);
-        cohortData.revenue += job.total_amount || 0;
+        cohortData.revenue += job.price || 0;
       });
+
 
       // Convert to CohortData format
       const formattedData: CohortData[] = Array.from(cohortMap.entries())

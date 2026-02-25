@@ -79,7 +79,7 @@ export function DrillDownModal({ metric, onClose }: DrillDownModalProps) {
 
   const getOverviewData = async (metric: string, jobs: any[], payments: any[]) => {
     const completedJobs = jobs.filter(j => j.status === 'completed');
-    const totalRevenue = completedJobs.reduce((sum, j) => sum + (j.total_amount || 0), 0);
+    const totalRevenue = completedJobs.reduce((sum, j) => sum + (j.price || 0), 0);
     const avgJobValue = completedJobs.length > 0 ? totalRevenue / completedJobs.length : 0;
 
     return {
@@ -95,8 +95,9 @@ export function DrillDownModal({ metric, onClose }: DrillDownModalProps) {
     
     jobs.forEach(job => {
       const date = new Date(job.created_at).toISOString().split('T')[0];
-      trendMap.set(date, (trendMap.get(date) || 0) + (job.total_amount || 0));
+      trendMap.set(date, (trendMap.get(date) || 0) + (job.price || 0));
     });
+
 
     return Array.from(trendMap.entries()).map(([date, value]) => ({
       date,
@@ -129,9 +130,10 @@ export function DrillDownModal({ metric, onClose }: DrillDownModalProps) {
       const current = serviceTypes.get(type) || { count: 0, value: 0 };
       serviceTypes.set(type, {
         count: current.count + 1,
-        value: current.value + (job.total_amount || 0)
+        value: current.value + (job.price || 0)
       });
     });
+
 
     return Array.from(serviceTypes.entries()).map(([segment, data]) => ({
       segment,

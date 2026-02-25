@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { RefreshCw, AlertCircle } from 'lucide-react';
 
 interface IndexRecommendation {
   table: string;
@@ -26,23 +28,26 @@ interface QueryPattern {
 }
 
 export default function AIIndexRecommendationEngine() {
+  const { user, loading: authLoading } = useAuth();
   const [recommendations, setRecommendations] = useState<IndexRecommendation[]>([]);
   const [queryPatterns, setQueryPatterns] = useState<QueryPattern[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const analyzeQueryPatterns = async () => {
     setAnalyzing(true);
+    setError(null);
     try {
       const { data, error } = await supabase.functions.invoke('ai-index-analyzer', {
         body: { action: 'analyze_patterns' }
       });
-      
       if (error) throw error;
-      setQueryPatterns(data.patterns || []);
-      setRecommendations(data.recommendations || []);
-    } catch (error) {
-      console.error('Analysis failed:', error);
+      setQueryPatterns(data?.patterns || []);
+      setRecommendations(data?.recommendations || []);
+    } catch (err) {
+      console.error('Analysis failed:', err);
+      setError('Failed to analyze query patterns');
     } finally {
       setAnalyzing(false);
     }
@@ -51,32 +56,51 @@ export default function AIIndexRecommendationEngine() {
   const generateIndexes = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('ai-index-analyzer', {
+      const { error } = await supabase.functions.invoke('ai-index-analyzer', {
         body: { action: 'generate_indexes', recommendations }
       });
-      
       if (error) throw error;
       alert('Index generation completed successfully!');
-    } catch (error) {
-      console.error('Index generation failed:', error);
+    } catch (err) {
+      console.error('Index generation failed:', err);
     } finally {
       setLoading(false);
     }
   };
 
   const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'critical': return 'destructive';
-      case 'high': return 'default';
-      case 'medium': return 'secondary';
-      case 'low': return 'outline';
-      default: return 'outline';
-    }
+    const colors: Record<string, 'destructive' | 'default' | 'secondary' | 'outline'> = {
+      critical: 'destructive', high: 'default', medium: 'secondary', low: 'outline'
+    };
+    return colors[priority] || 'outline';
   };
 
   useEffect(() => {
-    analyzeQueryPatterns();
-  }, []);
+    if (!authLoading && user) {
+      analyzeQueryPatterns();
+    }
+  }, [authLoading, user]);
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <RefreshCw className="h-8 w-8 animate-spin text-green-500" />
+        <span className="ml-2">Loading...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="p-6">
+        <div className="flex flex-col items-center text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+          <p className="text-red-500 mb-4">{error}</p>
+          <Button onClick={analyzeQueryPatterns}>Retry</Button>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -99,63 +123,47 @@ export default function AIIndexRecommendationEngine() {
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
               <TabsTrigger value="patterns">Query Patterns</TabsTrigger>
-              <TabsTrigger value="analysis">Performance Analysis</TabsTrigger>
+              <TabsTrigger value="analysis">Performance</TabsTrigger>
             </TabsList>
-
             <TabsContent value="recommendations" className="space-y-4">
-              {recommendations.map((rec, index) => (
-                <Card key={index}>
+              {recommendations.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">No recommendations available</p>
+              ) : recommendations.map((rec, i) => (
+                <Card key={i}>
                   <CardContent className="pt-4">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold">{rec.table}</h4>
-                      <Badge variant={getPriorityColor(rec.priority)}>
-                        {rec.priority}
-                      </Badge>
+                      <Badge variant={getPriorityColor(rec.priority)}>{rec.priority}</Badge>
                     </div>
                     <p className="text-sm text-gray-600 mb-2">{rec.reason}</p>
                     <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <strong>Columns:</strong> {rec.columns.join(', ')}
-                      </div>
-                      <div>
-                        <strong>Type:</strong> {rec.type}
-                      </div>
-                      <div>
-                        <strong>Impact Score:</strong>
-                        <Progress value={rec.impact} className="mt-1" />
-                      </div>
-                      <div>
-                        <strong>Query Frequency:</strong> {rec.frequency}
-                      </div>
+                      <div><strong>Columns:</strong> {rec.columns?.join(', ') || 'N/A'}</div>
+                      <div><strong>Type:</strong> {rec.type}</div>
+                      <div><strong>Impact:</strong><Progress value={rec.impact || 0} className="mt-1" /></div>
+                      <div><strong>Frequency:</strong> {rec.frequency || 0}</div>
                     </div>
                   </CardContent>
                 </Card>
               ))}
             </TabsContent>
-
             <TabsContent value="patterns" className="space-y-4">
-              {queryPatterns.map((pattern, index) => (
-                <Card key={index}>
+              {queryPatterns.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">No patterns found</p>
+              ) : queryPatterns.map((p, i) => (
+                <Card key={i}>
                   <CardContent className="pt-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="font-medium">Frequency: {pattern.frequency}</span>
-                        <span className="text-sm text-gray-600">
-                          Avg Duration: {pattern.avg_duration}ms
-                        </span>
-                      </div>
-                      <code className="block p-2 bg-gray-100 rounded text-sm">
-                        {pattern.query_text.substring(0, 200)}...
-                      </code>
-                      <div className="text-sm">
-                        <strong>Tables:</strong> {pattern.tables_used.join(', ')}
-                      </div>
+                    <div className="flex justify-between">
+                      <span>Frequency: {p.frequency}</span>
+                      <span className="text-gray-600">Avg: {p.avg_duration}ms</span>
                     </div>
+                    <code className="block p-2 bg-gray-100 rounded text-sm mt-2">
+                      {(p.query_text || '').substring(0, 200)}...
+                    </code>
+                    <div className="text-sm mt-2"><strong>Tables:</strong> {p.tables_used?.join(', ') || 'N/A'}</div>
                   </CardContent>
                 </Card>
               ))}
             </TabsContent>
-
             <TabsContent value="analysis">
               <Card>
                 <CardContent className="pt-4">
@@ -163,7 +171,7 @@ export default function AIIndexRecommendationEngine() {
                     <div>
                       <h4 className="font-semibold mb-2">Index Efficiency</h4>
                       <Progress value={85} className="mb-2" />
-                      <p className="text-sm text-gray-600">85% of queries use indexes</p>
+                      <p className="text-sm text-gray-600">85% queries use indexes</p>
                     </div>
                     <div>
                       <h4 className="font-semibold mb-2">Query Performance</h4>

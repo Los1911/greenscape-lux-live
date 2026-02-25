@@ -44,28 +44,31 @@ serve(async (req) => {
       case 'payment_intent.succeeded':
         await handlePaymentSuccess(event.data.object as Stripe.PaymentIntent)
         break
+
       case 'payment_intent.payment_failed':
         await handlePaymentFailure(event.data.object as Stripe.PaymentIntent)
         break
-<<<<<<< HEAD
+
       case 'charge.refunded':
         await handleChargeRefunded(event.data.object as Stripe.Charge)
         break
+
       case 'customer.subscription.updated':
         await handleSubscriptionUpdate(event.data.object as Stripe.Subscription)
         break
+
+      case 'account.updated':
+        await handleAccountUpdated(event.data.object as Stripe.Account)
+        break
+
+      case 'checkout.session.completed':
+        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session)
+        break
+
       default:
         console.log(`⚠️ Unhandled event type: ${event.type}`)
     }
 
-
-=======
-      case 'customer.subscription.updated':
-        await handleSubscriptionUpdate(event.data.object as Stripe.Subscription)
-        break
-    }
-
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
     return new Response(JSON.stringify({ received: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
@@ -92,7 +95,6 @@ async function handlePaymentFailure(paymentIntent: Stripe.PaymentIntent) {
   }).eq('stripe_payment_intent_id', paymentIntent.id)
 }
 
-<<<<<<< HEAD
 async function handleChargeRefunded(charge: Stripe.Charge) {
   console.log('💰 Processing refund for charge:', charge.id)
   await supabase.from('payments').update({
@@ -101,8 +103,6 @@ async function handleChargeRefunded(charge: Stripe.Charge) {
   }).eq('stripe_charge_id', charge.id)
 }
 
-=======
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
 async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   await supabase.from('subscriptions').upsert({
     stripe_subscription_id: subscription.id,
@@ -110,7 +110,68 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     updated_at: new Date().toISOString()
   })
 }
-<<<<<<< HEAD
 
-=======
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
+async function handleAccountUpdated(account: Stripe.Account) {
+  console.log('🔄 Stripe Connect account updated:', account.id)
+
+  const { data: landscaper } = await supabase
+    .from('landscapers')
+    .select('id, user_id')
+    .eq('stripe_connect_id', account.id)
+    .single()
+
+  if (!landscaper) {
+    console.log('⚠️ No landscaper found for account:', account.id)
+    return
+  }
+
+  const charges_enabled = account.charges_enabled || false
+  const payouts_enabled = account.payouts_enabled || false
+  const details_submitted = account.details_submitted || false
+
+  let verification_status = 'pending'
+  if (charges_enabled && payouts_enabled && details_submitted) {
+    verification_status = 'verified'
+  } else if (account.requirements?.currently_due && account.requirements.currently_due.length > 0) {
+    verification_status = 'requires_action'
+  }
+
+  await supabase
+    .from('landscapers')
+    .update({
+      stripe_charges_enabled: charges_enabled,
+      stripe_payouts_enabled: payouts_enabled,
+      stripe_details_submitted: details_submitted,
+      verification_status,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', landscaper.id)
+
+  console.log('✅ Updated landscaper status:', verification_status)
+}
+
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  console.log('💳 Checkout session completed:', session.id)
+
+  const jobId = session.metadata?.job_id
+
+  if (!jobId) {
+    console.log('⚠️ No job_id found in session metadata')
+    return
+  }
+
+  // LIFECYCLE FIX: Set status to 'scheduled' (NOT 'assigned').
+  // The job becomes 'assigned' only when a landscaper explicitly accepts it.
+  // Flow: payment → scheduled → (landscaper accepts) → assigned → active → completed
+  await supabase
+    .from('jobs')
+    .update({
+      status: 'scheduled',
+      stripe_session_id: session.id,
+      payment_status: 'paid',
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', jobId)
+
+  console.log('✅ Job marked scheduled after payment:', jobId)
+}

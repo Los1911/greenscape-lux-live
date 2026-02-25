@@ -1,6 +1,12 @@
 import { supabase } from '@/lib/supabase';
 import { NavigateFunction } from 'react-router-dom';
 
+// Admin email allowlist - users with these emails get admin access
+const ADMIN_EMAILS = [
+  'admin.1@greenscapelux.com',
+  'bgreen@greenscapelux.com'
+];
+
 export interface UserRoleInfo {
   role: string | null;
   isAuthenticated: boolean;
@@ -10,8 +16,17 @@ export interface UserRoleInfo {
 
 /**
  * Intelligent Dashboard Router
- * Automatically redirects users to their role-specific dashboard based on authentication status and user role
+ * 
+ * AUTHORITATIVE ROLE RESOLUTION:
+ * 1. Check landscapers table FIRST (by user_id = auth.uid())
+ *    - If landscaper record exists → return "landscaper" immediately
+ * 2. Only if NO landscaper record → check profiles table
+ *    - If profile.role === 'admin' → return "admin"
+ *    - Otherwise → return "client"
+ * 
+ * This ensures users with valid landscaper records are NEVER misrouted to Client Dashboard.
  */
+
 export class IntelligentDashboardRouter {
   private static instance: IntelligentDashboardRouter;
   private roleCache = new Map<string, { role: string; timestamp: number }>();
@@ -25,7 +40,7 @@ export class IntelligentDashboardRouter {
   }
 
   /**
-   * Get user role information with caching and fallback handling
+   * Get user role information with AUTHORITATIVE landscaper-first resolution
    */
   async getUserRoleInfo(): Promise<UserRoleInfo> {
     try {
@@ -48,35 +63,88 @@ export class IntelligentDashboardRouter {
         return { role: cached.role, isAuthenticated: true, loading: false };
       }
 
-      // Try user metadata first (fastest)
-      const metadataRole = user.user_metadata?.role;
-      if (metadataRole && ['client', 'landscaper', 'admin'].includes(metadataRole)) {
-        console.log('✅ Got role from metadata:', metadataRole);
-        this.cacheRole(user.id, metadataRole);
-        return { role: metadataRole, isAuthenticated: true, loading: false };
+      console.log('=== INTELLIGENT DASHBOARD ROUTER (AUTHORITATIVE) ===');
+      console.log('📧 Auth User Email:', user.email);
+      console.log('🆔 Auth User ID:', user.id);
+
+      // ========================================
+      // STEP 1: Check landscapers table FIRST
+      // This is the AUTHORITATIVE source for landscaper users
+      // ========================================
+      const { data: landscaperRecord, error: landscaperError } = await supabase
+        .from('landscapers')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      console.log('🌿 Landscaper Record Check:', { 
+        found: !!landscaperRecord, 
+        error: landscaperError?.message 
+      });
+
+      // If landscaper record exists, IMMEDIATELY return landscaper role
+      // Do NOT check profiles.role or user_metadata - landscapers table is authoritative
+      if (landscaperRecord && !landscaperError) {
+        console.log('✅ LANDSCAPER RECORD FOUND - Returning landscaper role');
+        this.cacheRole(user.id, 'landscaper');
+        return { role: 'landscaper', isAuthenticated: true, loading: false };
       }
 
-      // Fallback to database lookup
-      console.log('🔍 Querying database for role...');
-      const { data: userData, error: dbError } = await supabase
-        .from('users')
+      // Log landscaper query error but continue to profile check
+      if (landscaperError) {
+        console.warn('⚠️ Landscaper query error (continuing to profile check):', landscaperError.message);
+      }
+
+      // ========================================
+      // STEP 2: No landscaper record - check profiles table
+      // ========================================
+      console.log('🔍 No landscaper record found, checking profiles table...');
+
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
         .select('role')
-        .eq('id', user.id)
-        .single();
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-      if (dbError) {
-        console.error('❌ Database error fetching role:', dbError);
-        // Return client as safe fallback for authenticated users
-        const fallbackRole = 'client';
-        this.cacheRole(user.id, fallbackRole);
-        return { role: fallbackRole, isAuthenticated: true, loading: false, error: dbError.message };
+      console.log('👤 Profile Data:', { 
+        role: profileData?.role, 
+        error: profileError?.message 
+      });
+
+      // Handle profile query error
+      if (profileError) {
+        console.error('❌ Profile query error:', profileError.message);
+        // Return client as safe default on error
+        this.cacheRole(user.id, 'client');
+        return { role: 'client', isAuthenticated: true, loading: false, error: profileError.message };
       }
 
-      const role = userData?.role || 'client';
-      console.log('✅ Got role from database:', role);
-      this.cacheRole(user.id, role);
+      // Determine role from profile
+      let resolvedRole = 'client'; // Default to client
+
+      if (profileData?.role === 'admin') {
+        resolvedRole = 'admin';
+      } else if (profileData?.role === 'landscaper') {
+        // Profile says landscaper but no landscaper record exists
+        // This is a data inconsistency - default to client for safety
+        console.warn('⚠️ Profile role is landscaper but no landscaper record exists - defaulting to client');
+        resolvedRole = 'client';
+      } else {
+        resolvedRole = 'client';
+      }
+
+      // Admin override for allowlisted emails
+      if (user.email && ADMIN_EMAILS.includes(user.email)) {
+        console.log(`🔐 Admin override for ${user.email}`);
+        resolvedRole = 'admin';
+      }
+
+
+      console.log('🎯 Final Resolved Role:', resolvedRole);
+      this.cacheRole(user.id, resolvedRole);
       
-      return { role, isAuthenticated: true, loading: false };
+      return { role: resolvedRole, isAuthenticated: true, loading: false };
+
     } catch (error) {
       console.error('❌ Exception in getUserRoleInfo:', error);
       return { role: null, isAuthenticated: false, loading: false, error: String(error) };
@@ -99,6 +167,7 @@ export class IntelligentDashboardRouter {
     } else {
       this.roleCache.clear();
     }
+    console.log('🗑️ Role cache cleared', userId ? `for user ${userId}` : 'for all users');
   }
 
   /**
@@ -148,7 +217,15 @@ export class IntelligentDashboardRouter {
         onError(roleInfo.error);
       }
 
-      const dashboardRoute = this.getDashboardRoute(roleInfo.role || 'client');
+      // Only navigate if we have a valid role - don't default to client
+      if (!roleInfo.role) {
+        console.error('❌ No valid role found, cannot navigate to dashboard');
+        if (onError) onError('No valid role found');
+        navigate(fallbackRoute, { replace });
+        return;
+      }
+
+      const dashboardRoute = this.getDashboardRoute(roleInfo.role);
       console.log('🚀 Navigating to dashboard:', dashboardRoute);
       navigate(dashboardRoute, { replace });
 
@@ -176,8 +253,12 @@ export class IntelligentDashboardRouter {
       '/admin-dashboard': ['admin'],
       '/admin': ['admin'],
       '/landscaper-dashboard': ['landscaper'],
-      '/pro-dashboard': ['landscaper'],
+      '/landscaper-profile': ['landscaper'],
+      '/landscaper-jobs': ['landscaper'],
+      '/landscaper-earnings': ['landscaper'],
+      '/landscaper-payouts': ['landscaper'],
       '/client-dashboard': ['client'],
+      '/client-profile': ['client'],
       '/dashboard': ['client']
     };
 

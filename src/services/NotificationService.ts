@@ -11,9 +11,10 @@ export interface CreateNotificationParams {
 export class NotificationService {
   /**
    * Create a new notification for a user
+   * Note: Returns void for RLS compatibility - no data returned from insert
    */
-  static async createNotification(params: CreateNotificationParams) {
-    const { data, error } = await supabase
+  static async createNotification(params: CreateNotificationParams): Promise<void> {
+    const { error } = await supabase
       .from('notifications')
       .insert({
         user_id: params.userId,
@@ -22,17 +23,14 @@ export class NotificationService {
         message: params.message,
         data: params.data || {},
         read: false
-      })
-      .select()
-      .single();
+      });
 
     if (error) {
       console.error('Error creating notification:', error);
       throw error;
     }
-
-    return data;
   }
+
 
   /**
    * Create job assignment notification

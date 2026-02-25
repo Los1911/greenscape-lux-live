@@ -10,7 +10,8 @@ interface JobStatus {
   landscaper: string;
   client: string;
   clientPhone: string;
-  status: 'assigned' | 'en_route' | 'arrived' | 'in_progress' | 'completed';
+  status: 'assigned' | 'en_route' | 'arrived' | 'active' | 'completed';
+
   location: { lat: number; lng: number };
   address: string;
   estimatedArrival?: Date;
@@ -58,13 +59,14 @@ export const JobTracker: React.FC<JobTrackerProps> = ({ jobId, onStatusUpdate })
           } else if (prev.status === 'en_route' && Math.random() > 0.8) {
             newStatus = 'arrived';
           } else if (prev.status === 'arrived' && Math.random() > 0.6) {
-            newStatus = 'in_progress';
+            newStatus = 'active';
             newProgress = 10;
-          } else if (prev.status === 'in_progress') {
+          } else if (prev.status === 'active') {
             newProgress = Math.min(100, prev.progress + Math.floor(Math.random() * 15) + 5);
             if (newProgress >= 100) {
               newStatus = 'completed';
             }
+
           }
 
           const updated = {
@@ -73,7 +75,7 @@ export const JobTracker: React.FC<JobTrackerProps> = ({ jobId, onStatusUpdate })
             progress: newProgress,
             lastUpdate: now,
             ...(newStatus === 'arrived' && !prev.actualArrival && { actualArrival: now }),
-            ...(newStatus === 'in_progress' && !prev.startTime && { startTime: now }),
+            ...(newStatus === 'active' && !prev.startTime && { startTime: now }),
             ...(newStatus === 'completed' && !prev.completionTime && { completionTime: now })
           };
 
@@ -96,7 +98,7 @@ export const JobTracker: React.FC<JobTrackerProps> = ({ jobId, onStatusUpdate })
       case 'assigned': return 'bg-blue-500';
       case 'en_route': return 'bg-yellow-500';
       case 'arrived': return 'bg-orange-500';
-      case 'in_progress': return 'bg-green-500';
+      case 'active': return 'bg-green-500';
       case 'completed': return 'bg-gray-500';
       default: return 'bg-gray-400';
     }
@@ -107,14 +109,14 @@ export const JobTracker: React.FC<JobTrackerProps> = ({ jobId, onStatusUpdate })
       case 'assigned': return 'Job Assigned';
       case 'en_route': return 'Landscaper En Route';
       case 'arrived': return 'Landscaper Arrived';
-      case 'in_progress': return 'Work in Progress';
+      case 'active': return 'Work in Progress';
       case 'completed': return 'Job Completed';
       default: return status;
     }
   };
 
   const calculateETA = () => {
-    if (jobStatus.status === 'arrived' || jobStatus.status === 'in_progress' || jobStatus.status === 'completed') {
+    if (jobStatus.status === 'arrived' || jobStatus.status === 'active' || jobStatus.status === 'completed') {
       return null;
     }
     const eta = new Date();
@@ -172,8 +174,8 @@ export const JobTracker: React.FC<JobTrackerProps> = ({ jobId, onStatusUpdate })
             </span>
           </div>
 
-          {/* Progress Bar for In Progress Jobs */}
-          {jobStatus.status === 'in_progress' && (
+          {/* Progress Bar for Active Jobs */}
+          {jobStatus.status === 'active' && (
             <div className="mb-4">
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-green-200/70">Progress</span>
@@ -187,6 +189,7 @@ export const JobTracker: React.FC<JobTrackerProps> = ({ jobId, onStatusUpdate })
               </div>
             </div>
           )}
+
 
           {/* Location & ETA */}
           <div className="flex items-start space-x-2">

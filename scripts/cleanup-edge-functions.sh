@@ -17,15 +17,17 @@ mkdir -p "$BACKUP_DIR"
 KEEP_FUNCTIONS=(
   "stripe-webhook"
   "create-stripe-customer"
-  "create-stripe-connect-account"
+  "stripe-connect-onboarding"
   "create-payment-intent"
   "unified-email"
-  "attach-payment-method"
+  "create-billing-portal-session"
   "get-payment-methods"
   "delete-payment-method"
-  "create-billing-portal-session"
   "notification-scheduler"
   "send-job-notification"
+  "process-payout"
+  "stripe-connect-webhook"
+  "stripe-connect-notification"
 )
 
 # Prefixes to DELETE

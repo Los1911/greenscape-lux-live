@@ -1,4 +1,5 @@
 import type { JobInsert } from '@/types/job';
+import { JOB_STATUS_VALUES, isValidJobStatus } from '@/constants/jobStatus';
 
 /**
  * Validates that a job insert has all required NOT NULL fields
@@ -41,16 +42,16 @@ export function ensureCustomerName(email?: string | null, name?: string | null):
 }
 
 /**
- * Validates and normalizes a job status
+ * Validates and normalizes a job status against the canonical JOB_STATUS_VALUES.
+ * Returns the status if valid, or 'pending' as a safe default.
  */
 export function normalizeJobStatus(status: string | null | undefined): string {
   const normalized = String(status ?? 'pending').trim().toLowerCase();
   
-  const validStatuses = ['pending', 'quoted', 'accepted', 'in_progress', 'completed', 'cancelled', 'rescheduled'];
-  
-  if (validStatuses.includes(normalized)) {
+  if (isValidJobStatus(normalized)) {
     return normalized;
   }
   
+  // Fallback: return 'pending' for any unrecognized status
   return 'pending';
 }

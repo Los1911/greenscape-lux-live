@@ -1,0 +1,81 @@
+name: Automated Environment Variable Sync
+
+on:
+  # Run on schedule (daily at 2 AM UTC)
+  schedule:
+    - cron: '0 2 * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      force_sync:
+        description: 'Force sync all variables'
+        required: false
+        default: 'false'
+
+  # Run on push to main when env files change
+  push:
+    branches:
+      - main
+    paths:
+      - '.env.production'
+      - '.env.example'
+      - 'scripts/automated-env-sync.js'
+
+jobs:
+  sync-environment-variables:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Load environment variables
+        run: |
+          echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> $GITHUB_ENV
+          echo "VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" >> $GITHUB_ENV
+          echo "STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}" >> $GITHUB_ENV
+          echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> $GITHUB_ENV
+          echo "VERCEL_TOKEN=${{ secrets.VERCEL_TOKEN }}" >> $GITHUB_ENV
+          echo "VERCEL_PROJECT_ID=${{ secrets.VERCEL_PROJECT_ID }}" >> $GITHUB_ENV
+          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+
+      - name: Run synchronization script
+        run: node scripts/automated-env-sync.js
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Environment variable sync failed!"
+          echo "Please check the logs and verify your configuration."
+
+      - name: Create sync report
+        if: always()
+        run: |
+          echo "# Environment Variable Sync Report" > sync-report.md
+          echo "" >> sync-report.md
+          echo "**Date:** $(date)" >> sync-report.md
+          echo "**Status:** ${{ job.status }}" >> sync-report.md
+          echo "**Trigger:** ${{ github.event_name }}" >> sync-report.md
+
+      - name: Upload sync report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: sync-report
+          path: sync-report.md
+          retention-days: 30

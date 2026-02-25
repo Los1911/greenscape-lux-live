@@ -31,16 +31,8 @@ export function LiveLandscaperStats() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-red-900/20 border border-red-500/25 rounded-2xl p-6">
-        <div className="flex items-center gap-2 text-red-400">
-          <AlertCircle className="w-5 h-5" />
-          <span>Failed to load dashboard stats</span>
-        </div>
-      </div>
-    );
-  }
+  // Don't show error state - just render with default/empty stats
+  // This prevents blocking the UI when network requests fail
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">

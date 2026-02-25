@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Vercel Production Deployment - Stripe Key Update
 
 ## 🎯 Quick Action Required
@@ -24,7 +23,7 @@ Click on: **GreenScape Lux** (or your project name)
    - Confirm deletion
 4. **Add new variable**:
    - Click: **Add New** button
-   - **Name**: `VITE_STRIPE_PUBLISHABLE_KEY`
+   - **Name**: `VITE_STRIPE_PUBLIC_KEY`
    - **Value**: `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
    - **Environments**: Check ✅ **Production**
    - Click: **Save**
@@ -43,7 +42,7 @@ Click on: **GreenScape Lux** (or your project name)
 3. Go to: **Console** tab
 4. Look for:
    ```
-   VITE_STRIPE_PUBLISHABLE_KEY: pk_live_51S1Ht0K6kWkUsx...
+   VITE_STRIPE_PUBLIC_KEY: pk_live_51S1Ht0K6kWkUsx...
    ```
 5. ✅ If you see the key → SUCCESS!
 6. ❌ If still "UNDEFINED" → Hard refresh (Ctrl+Shift+R)
@@ -78,15 +77,15 @@ Click on: **GreenScape Lux** (or your project name)
 
 ### Before (Broken)
 ```
-Code expects: VITE_STRIPE_PUBLISHABLE_KEY
+Code expects: VITE_STRIPE_PUBLIC_KEY
 Vercel has:   VITE_STRIPE_PUBLISHABLE_KEY ❌ (wrong name)
 Result:       "UNDEFINED" error
 ```
 
 ### After (Fixed)
 ```
-Code expects: VITE_STRIPE_PUBLISHABLE_KEY
-Vercel has:   VITE_STRIPE_PUBLISHABLE_KEY ✅ (correct name)
+Code expects: VITE_STRIPE_PUBLIC_KEY
+Vercel has:   VITE_STRIPE_PUBLIC_KEY ✅ (correct name)
 Result:       pk_live_51S1Ht0K6kWkUsx... (working!)
 ```
 
@@ -117,7 +116,7 @@ After deployment:
 
 **Issue**: Still seeing "UNDEFINED" after deployment
 **Solution**: 
-1. Verify variable name is exactly: `VITE_STRIPE_PUBLISHABLE_KEY`
+1. Verify variable name is exactly: `VITE_STRIPE_PUBLIC_KEY`
 2. Verify it's enabled for Production environment
 3. Clear browser cache completely
 4. Try incognito/private browsing mode
@@ -133,7 +132,7 @@ After deployment:
 ## ✅ Success Confirmation
 
 You'll know it's working when:
-1. Console shows: `VITE_STRIPE_PUBLISHABLE_KEY: pk_live_51S1Ht0K6kWkUsx...`
+1. Console shows: `VITE_STRIPE_PUBLIC_KEY: pk_live_51S1Ht0K6kWkUsx...`
 2. No Stripe-related errors in console
 3. Payment pages load without issues
 4. Stripe Elements render correctly
@@ -141,72 +140,3 @@ You'll know it's working when:
 ---
 
 **Need Help?** Check the deployment logs in Vercel dashboard for detailed error messages.
-=======
-# 🚀 Vercel Stripe Production Deployment Guide
-
-## ⚡ IMMEDIATE ACTION REQUIRED
-
-### Step 1: Get Live Stripe Keys
-1. Go to [Stripe Dashboard](https://dashboard.stripe.com/)
-2. Switch to **Live mode** (toggle in top-left)
-3. Navigate to **Developers > API Keys**
-4. Copy these values:
-   - **Publishable key** (starts with `pk_live_`)
-   - **Secret key** (starts with `sk_live_`) - Click "Reveal"
-
-### Step 2: Get Webhook Secret
-1. In Stripe Dashboard, go to **Developers > Webhooks**
-2. Find your production webhook endpoint
-3. Click on it and copy the **Signing secret** (starts with `whsec_`)
-
-### Step 3: Update Vercel Environment Variables
-1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
-2. Select your project
-3. Go to **Settings > Environment Variables**
-4. Add/Update these variables for **Production**:
-
-```
-VITE_STRIPE_PUBLISHABLE_KEY=pk_live_[your_key_here]
-STRIPE_SECRET_KEY=sk_live_[your_key_here]  
-STRIPE_WEBHOOK_SECRET=whsec_[your_key_here]
-```
-
-### Step 4: Update Supabase Secrets
-1. Go to Supabase Dashboard
-2. Navigate to **Settings > Vault**
-3. Add these secrets:
-```
-STRIPE_SECRET_KEY=sk_live_[your_key_here]
-STRIPE_WEBHOOK_SECRET=whsec_[your_key_here]
-```
-
-### Step 5: Redeploy Application
-```bash
-# Option 1: Git push (triggers auto-deploy)
-git add .
-git commit -m "Update Stripe production configuration"
-git push origin main
-
-# Option 2: Manual redeploy in Vercel
-# Go to Vercel Dashboard > Deployments > Redeploy
-```
-
-### Step 6: Verify Payment Flow
-1. Visit your production site
-2. Navigate to `/profile#payment`
-3. Try adding a payment method
-4. Confirm no "Invalid API Key" errors appear
-
-## ✅ Success Criteria
-- [ ] No console errors about invalid API keys
-- [ ] Payment method addition works
-- [ ] Stripe Elements load correctly
-- [ ] Webhook events process successfully
-
-## 🔧 Troubleshooting
-If issues persist:
-1. Check browser console for errors
-2. Verify environment variables are set in Vercel
-3. Confirm Supabase secrets are properly configured
-4. Check Stripe webhook logs for failures
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706

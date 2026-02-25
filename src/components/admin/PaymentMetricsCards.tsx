@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, DollarSign, Users, AlertTriangle, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Users, AlertTriangle, Activity, RefreshCw } from 'lucide-react';
 
 interface PaymentMetricsData {
   totalRevenue: number;
@@ -13,15 +13,28 @@ interface PaymentMetricsData {
 }
 
 interface PaymentMetricsCardsProps {
-  data: PaymentMetricsData;
+  data: PaymentMetricsData | null | undefined;
+  isLoading?: boolean;
 }
 
-export const PaymentMetricsCards: React.FC<PaymentMetricsCardsProps> = ({ data }) => {
+const defaultData: PaymentMetricsData = {
+  totalRevenue: 0,
+  successRate: 0,
+  activeSubscriptions: 0,
+  pendingPayouts: 0,
+  failedPayments: 0,
+  webhookHealth: 'healthy'
+};
+
+export const PaymentMetricsCards: React.FC<PaymentMetricsCardsProps> = ({ data, isLoading }) => {
+  // Use default data if data is null/undefined
+  const safeData = data || defaultData;
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
-    }).format(amount / 100);
+    }).format((amount || 0) / 100);
   };
 
   const getHealthColor = (health: string) => {
@@ -40,6 +53,21 @@ export const PaymentMetricsCards: React.FC<PaymentMetricsCardsProps> = ({ data }
     return <TrendingDown className="h-4 w-4 text-red-500" />;
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {[...Array(6)].map((_, i) => (
+          <Card key={i}>
+            <CardContent className="flex justify-center items-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
       {/* Total Revenue */}
@@ -49,10 +77,8 @@ export const PaymentMetricsCards: React.FC<PaymentMetricsCardsProps> = ({ data }
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(data.totalRevenue)}</div>
-          <p className="text-xs text-muted-foreground">
-            Last 24 hours
-          </p>
+          <div className="text-2xl font-bold">{formatCurrency(safeData.totalRevenue)}</div>
+          <p className="text-xs text-muted-foreground">Last 24 hours</p>
         </CardContent>
       </Card>
 
@@ -60,13 +86,11 @@ export const PaymentMetricsCards: React.FC<PaymentMetricsCardsProps> = ({ data }
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-          {getTrendIcon(data.successRate)}
+          {getTrendIcon(safeData.successRate)}
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{data.successRate.toFixed(1)}%</div>
-          <p className="text-xs text-muted-foreground">
-            Payment success rate
-          </p>
+          <div className="text-2xl font-bold">{(safeData.successRate || 0).toFixed(1)}%</div>
+          <p className="text-xs text-muted-foreground">Payment success rate</p>
         </CardContent>
       </Card>
 
@@ -77,10 +101,8 @@ export const PaymentMetricsCards: React.FC<PaymentMetricsCardsProps> = ({ data }
           <Users className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{data.activeSubscriptions}</div>
-          <p className="text-xs text-muted-foreground">
-            Currently active
-          </p>
+          <div className="text-2xl font-bold">{safeData.activeSubscriptions || 0}</div>
+          <p className="text-xs text-muted-foreground">Currently active</p>
         </CardContent>
       </Card>
 
@@ -91,10 +113,8 @@ export const PaymentMetricsCards: React.FC<PaymentMetricsCardsProps> = ({ data }
           <Activity className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{data.pendingPayouts}</div>
-          <p className="text-xs text-muted-foreground">
-            Awaiting processing
-          </p>
+          <div className="text-2xl font-bold">{safeData.pendingPayouts || 0}</div>
+          <p className="text-xs text-muted-foreground">Awaiting processing</p>
         </CardContent>
       </Card>
 
@@ -105,10 +125,8 @@ export const PaymentMetricsCards: React.FC<PaymentMetricsCardsProps> = ({ data }
           <AlertTriangle className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-red-600">{data.failedPayments}</div>
-          <p className="text-xs text-muted-foreground">
-            Last 24 hours
-          </p>
+          <div className="text-2xl font-bold text-red-600">{safeData.failedPayments || 0}</div>
+          <p className="text-xs text-muted-foreground">Last 24 hours</p>
         </CardContent>
       </Card>
 
@@ -119,12 +137,10 @@ export const PaymentMetricsCards: React.FC<PaymentMetricsCardsProps> = ({ data }
           <Activity className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <Badge className={getHealthColor(data.webhookHealth)}>
-            {data.webhookHealth.toUpperCase()}
+          <Badge className={getHealthColor(safeData.webhookHealth || 'healthy')}>
+            {(safeData.webhookHealth || 'healthy').toUpperCase()}
           </Badge>
-          <p className="text-xs text-muted-foreground mt-2">
-            Webhook status
-          </p>
+          <p className="text-xs text-muted-foreground mt-2">Webhook status</p>
         </CardContent>
       </Card>
     </div>

@@ -1,9 +1,0 @@
-{
-  "scripts": {
-    "nuclear-purge": "rm -rf dist/ .next/ node_modules/.cache/ node_modules/.vite/ .vite/ build/ .turbo/ && npm cache clean --force",
-    "fresh-install": "rm -rf node_modules/ package-lock.json && npm install",
-    "fresh-build": "npm run nuclear-purge && npm run fresh-install && npm run build",
-    "force-deploy": "npm run fresh-build && vercel --prod --force",
-    "cache-bust-deploy": "npm run nuclear-purge && npm run fresh-install && npm run build && vercel --prod --force"
-  }
-}

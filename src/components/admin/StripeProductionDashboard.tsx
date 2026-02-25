@@ -17,7 +17,8 @@ interface WebhookEndpoint {
 
 export default function StripeProductionDashboard() {
   const [webhooks, setWebhooks] = useState<WebhookEndpoint[]>([])
-  const [domain, setDomain] = useState('greenscape-lux.vercel.app')
+  const [domain, setDomain] = useState('greenscapelux.com')
+
   const [isConfiguring, setIsConfiguring] = useState(false)
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState('')
@@ -75,7 +76,8 @@ export default function StripeProductionDashboard() {
               id="domain"
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
-              placeholder="your-domain.vercel.app"
+              placeholder="greenscapelux.com"
+
             />
           </div>
 

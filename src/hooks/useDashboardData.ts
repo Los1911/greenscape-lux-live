@@ -1,238 +1,195 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/contexts/AuthContext'
-import { Job } from '@/types/job'
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { JOBS_COLUMNS, LANDSCAPERS_COLUMNS, safeString, safeNumber } from '@/lib/databaseSchema';
 
 interface DashboardStats {
-  totalJobs: number
-  activeJobs: number
-  completedJobs: number
-  totalEarnings: number
-  monthlyEarnings: number
-  pendingPayments: number
-  rating: number
-  totalReviews: number
+  totalJobs: number;
+  activeJobs: number;
+  completedJobs: number;
+  totalEarnings: number;
+  monthlyEarnings: number;
+  rating: number;
+  totalReviews: number;
 }
 
-interface NotificationData {
-  id: string
-  title: string
-  message: string
-  type: 'info' | 'success' | 'warning' | 'error'
-  created_at: string
-  read: boolean
+interface NormalizedJob {
+  id: string;
+  status: string;
+  price: number;
+  created_at: string;
+  landscaper_email?: string | null;
+  [key: string]: unknown;
 }
 
-export function useDashboardData(userRole: 'client' | 'landscaper' | 'admin') {
-  const { user } = useAuth()
+const defaultStats: DashboardStats = {
+  totalJobs: 0,
+  activeJobs: 0,
+  completedJobs: 0,
+  totalEarnings: 0,
+  monthlyEarnings: 0,
+  rating: 0,
+  totalReviews: 0
+};
 
-  const [stats, setStats] = useState<DashboardStats>({
-    totalJobs: 0,
-    activeJobs: 0,
-    completedJobs: 0,
-    totalEarnings: 0,
-    monthlyEarnings: 0,
-    pendingPayments: 0,
-    rating: 0,
-    totalReviews: 0
-  })
+function normalizeJob(rawJob: Record<string, unknown>): NormalizedJob {
+  return {
+    ...rawJob,
+    id: safeString(rawJob, 'id'),
+    status: safeString(rawJob, 'status', 'pending'),
+    price: safeNumber(rawJob, 'price'),
+    created_at: safeString(rawJob, 'created_at'),
+  };
+}
 
-  const [recentJobs, setRecentJobs] = useState<Job[]>([])
-  const [notifications, setNotifications] = useState<NotificationData[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export const useDashboardData = (role: 'client' | 'landscaper' = 'client') => {
+  const { user, session, loading: authLoading } = useAuth();
+  const [jobs, setJobs] = useState<NormalizedJob[]>([]);
+  const [notifications] = useState<any[]>([]);
+  const [stats, setStats] = useState<DashboardStats>(defaultStats);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchClientJobs = useCallback(async (): Promise<NormalizedJob[]> => {
+    if (!user) return [];
+
+    const userEmail = user.email || '';
+
+    const orConditions: string[] = [];
+    orConditions.push(`user_id.eq.${user.id}`);
+    if (userEmail) {
+      orConditions.push(`client_email.eq.${userEmail}`);
+    }
+
+    try {
+      const { data: jobsData, error: jobsError } = await supabase
+        .from('jobs')
+        .select(`
+          ${JOBS_COLUMNS.clientView},
+          landscapers (
+            id,
+            email
+          )
+        `)
+        .or(orConditions.join(','))
+        .order('created_at', { ascending: false });
+
+      if (jobsError) {
+        console.warn('[useDashboardData] Combined query error:', jobsError.message);
+        return [];
+      }
+
+      return (jobsData || []).map((job: any) => {
+        const normalized = normalizeJob(job);
+        return {
+          ...normalized,
+          landscaper_email: job.landscapers?.email ?? null
+        };
+      });
+
+    } catch (err) {
+      console.error('[useDashboardData] Error fetching client jobs:', err);
+      return [];
+    }
+  }, [user]);
 
   useEffect(() => {
-    if (user) {
-      fetchDashboardData()
+    if (authLoading) return;
+    if (!session || !user) {
+      setLoading(false);
+      return;
     }
-  }, [user, userRole])
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true)
-      setError(null)
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      if (userRole === 'client') {
-        await fetchClientData()
-      } else if (userRole === 'landscaper') {
-        await fetchLandscaperData()
-      } else if (userRole === 'admin') {
-        await fetchAdminData()
+        let jobsData: NormalizedJob[] = [];
+
+        if (role === 'landscaper') {
+
+          const { data: landscaper } = await supabase
+            .from('landscapers')
+            .select(LANDSCAPERS_COLUMNS.minimal)
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (landscaper?.id) {
+            const { data } = await supabase
+              .from('jobs')
+              .select(`
+                ${JOBS_COLUMNS.landscaperView},
+                landscapers (
+                  id,
+                  email
+                )
+              `)
+              .eq('landscaper_id', landscaper.id)
+              .order('created_at', { ascending: false });
+
+            jobsData = (data || []).map((job: any) => {
+              const normalized = normalizeJob(job);
+              return {
+                ...normalized,
+                landscaper_email: job.landscapers?.email ?? null
+              };
+            });
+          }
+
+        } else {
+          jobsData = await fetchClientJobs();
+        }
+
+        setJobs(jobsData);
+
+        const activeStatuses = ['assigned', 'scheduled', 'active'];
+        const completedStatuses = ['completed', 'completed_pending_review'];
+
+        const active = jobsData.filter(j => activeStatuses.includes(j.status));
+        const completed = jobsData.filter(j => completedStatuses.includes(j.status));
+
+        const totalEarnings = completed.reduce(
+          (sum, j) => sum + (Number(j.price) || 0),
+          0
+        );
+
+        setStats({
+          totalJobs: jobsData.length,
+          activeJobs: active.length,
+          completedJobs: completed.length,
+          totalEarnings,
+          monthlyEarnings: 0,
+          rating: 0,
+          totalReviews: 0
+        });
+
+      } catch (err) {
+        console.error('[useDashboardData] Error:', err);
+        setStats(defaultStats);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Error fetching dashboard data:', err)
-      setError('Failed to load dashboard data')
-    } finally {
-      setLoading(false)
-    }
-  }
+    };
 
-  // ==========================
-  // CLIENT DASHBOARD
-  // ==========================
-  const fetchClientData = async () => {
-    if (!user) return
+    fetchData();
 
-    const userEmail = user.email || ''
+    if (role === 'client' && user) {
+      const channel = supabase
+        .channel('dashboard-jobs-' + user.id)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'jobs' },
+          () => fetchData()
+        )
+        .subscribe();
 
-    const orConditions = [`user_id.eq.${user.id}`]
-    if (userEmail) {
-      orConditions.push(`client_email.eq.${userEmail}`)
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
 
-    const { data: jobs } = await supabase
-      .from('jobs')
-      .select(`
-        id,
-        service_name,
-        service_type,
-        service_address,
-        status,
-        created_at,
-        preferred_date,
-        scheduled_date,
-        price
-      `)
-      .or(orConditions.join(','))
-      .order('created_at', { ascending: false })
+  }, [authLoading, session, user, role, fetchClientJobs]);
 
-    if (!jobs) return
-
-    const totalJobs = jobs.length
-
-    // 🔥 IMPORTANT FIX:
-    // DO NOT count "accepted" anymore
-    // Database does not allow that enum
-    const activeJobs = jobs.filter(job =>
-      ['pending', 'quoted', 'priced', 'assigned', 'in_progress']
-        .includes(job.status)
-    ).length
-
-    const completedJobs = jobs.filter(job =>
-      job.status === 'completed'
-    ).length
-
-    setStats(prev => ({
-      ...prev,
-      totalJobs,
-      activeJobs,
-      completedJobs
-    }))
-
-    setRecentJobs(jobs)
-  }
-
-  // ==========================
-  // LANDSCAPER DASHBOARD
-  // ==========================
-  const fetchLandscaperData = async () => {
-    if (!user) return
-
-    const { data: landscaperProfile } = await supabase
-      .from('landscapers')
-      .select('id, rating, total_reviews')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!landscaperProfile) return
-
-    const { data: jobs } = await supabase
-      .from('jobs')
-      .select(`
-        id,
-        service_name,
-        service_type,
-        service_address,
-        status,
-        created_at,
-        preferred_date,
-        price,
-        customer_name
-      `)
-      .eq('landscaper_id', landscaperProfile.id)
-      .order('created_at', { ascending: false })
-
-    if (!jobs) return
-
-    const totalJobs = jobs.length
-
-    // 🔥 removed accepted here too
-    const activeJobs = jobs.filter(job =>
-      ['assigned', 'in_progress']
-        .includes(job.status)
-    ).length
-
-    const completedJobs = jobs.filter(job =>
-      job.status === 'completed'
-    ).length
-
-    setRecentJobs(jobs)
-
-    setStats(prev => ({
-      ...prev,
-      totalJobs,
-      activeJobs,
-      completedJobs,
-      rating: landscaperProfile.rating || 0,
-      totalReviews: landscaperProfile.total_reviews || 0
-    }))
-  }
-
-  // ==========================
-  // ADMIN DASHBOARD
-  // ==========================
-  const fetchAdminData = async () => {
-    const [
-      { data: allJobs },
-      { data: allPayments }
-    ] = await Promise.all([
-      supabase.from('jobs').select('id, status, created_at'),
-      supabase.from('payments').select('amount, status, created_at')
-    ])
-
-    if (allJobs) {
-      const totalJobs = allJobs.length
-
-      const activeJobs = allJobs.filter(job =>
-        ['pending', 'quoted', 'priced', 'assigned', 'in_progress']
-          .includes(job.status)
-      ).length
-
-      const completedJobs = allJobs.filter(job =>
-        job.status === 'completed'
-      ).length
-
-      setStats(prev => ({
-        ...prev,
-        totalJobs,
-        activeJobs,
-        completedJobs
-      }))
-    }
-
-    if (allPayments) {
-      const totalEarnings = allPayments
-        .filter(p => p.status === 'completed')
-        .reduce((sum, p) => sum + (p.amount || 0), 0)
-
-      setStats(prev => ({
-        ...prev,
-        totalEarnings
-      }))
-    }
-  }
-
-  const refreshData = () => {
-    fetchDashboardData()
-  }
-
-  return {
-    stats,
-    recentJobs,
-    notifications,
-    loading,
-    error,
-    refreshData
-  }
-}
+  return { jobs, notifications, stats, loading, error };
+};

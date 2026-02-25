@@ -17,7 +17,7 @@ export default function ActionsPanel() {
       const { data } = await supabase
         .from('landscapers')
         .select('approved')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
       
       setIsApproved(data?.approved || false);

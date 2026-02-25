@@ -1,99 +1,117 @@
-import React, { useEffect } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { dashboardRouter } from '@/utils/intelligentDashboardRouter';
+import { 
+  shouldEnforcePasswordReset, 
+  getPasswordResetRedirectUrl 
+} from '@/utils/passwordResetGuard';
 
 interface SimpleProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: 'client' | 'landscaper' | 'admin';
 }
 
+/**
+ * SimpleProtectedRoute - Protects routes based on authentication and role
+ * 
+ * NOTE: Client onboarding is handled by OnboardingGuard which wraps ClientDashboardV2.
+ * This component does NOT check onboarding status - the Guard is the sole authority.
+ */
 export default function SimpleProtectedRoute({ 
   children, 
   requiredRole 
 }: SimpleProtectedRouteProps) {
-  const { user, role, loading } = useAuth();
-  const location = useLocation();
+  const { user, role, loading, session } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const hasRedirected = useRef(false);
+  const [roleTimeout, setRoleTimeout] = useState(false);
+  const [passwordResetRequired, setPasswordResetRequired] = useState(false);
 
-  // Handle automatic redirection for role mismatches
+  // Check for password reset enforcement
   useEffect(() => {
-    if (!loading && user && role && requiredRole && role !== requiredRole) {
-      console.log(`🔄 Role mismatch detected. User role: ${role}, Required: ${requiredRole}`);
-      // Use intelligent router to redirect to appropriate dashboard
+    if (!loading && session) {
+      const needsPasswordReset = shouldEnforcePasswordReset(session);
+      
+      if (needsPasswordReset) {
+        console.log('[SimpleProtectedRoute] Password reset required - blocking access');
+        setPasswordResetRequired(true);
+      } else {
+        setPasswordResetRequired(false);
+      }
+    }
+  }, [loading, session]);
+
+  // Timeout for role loading - prevents infinite spinner (1.5s for fast recovery)
+  useEffect(() => {
+    if (!loading && user && !role && !roleTimeout) {
+      const timer = setTimeout(() => {
+        console.warn('[SimpleProtectedRoute] Role timeout - proceeding without role');
+        setRoleTimeout(true);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, user, role, roleTimeout]);
+
+  // Handle role mismatch redirect
+  useEffect(() => {
+    if (!loading && user && role && requiredRole && role !== requiredRole && !hasRedirected.current && !passwordResetRequired) {
+      hasRedirected.current = true;
+      console.log(`[SimpleProtectedRoute] Role mismatch: ${role} vs ${requiredRole}`);
       dashboardRouter.navigateToRoleDashboard(navigate, { replace: true });
     }
-  }, [loading, user, role, requiredRole, navigate]);
+  }, [loading, user, role, requiredRole, navigate, passwordResetRequired]);
 
-  if (import.meta.env.DEV) {
-    console.log('SimpleProtectedRoute DEBUG:', { 
-      user: !!user, 
-      userId: user?.id, 
-      role, 
-      loading, 
-      requiredRole,
-      currentPath: location.pathname,
-      timestamp: new Date().toISOString()
-    });
-  }
-
-  // Show loading spinner while auth is being determined
+  // Loading state - show spinner with consistent styling
   if (loading) {
-    if (import.meta.env.DEV) {
-      console.log('Auth still loading, showing spinner');
-    }
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-900" role="status" aria-label="Loading authentication">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-400"></div>
-      </div>
-    );
-  }
-
-  // If no user, redirect to appropriate login
-  if (!user) {
-    if (import.meta.env.DEV) {
-      console.log('No user found, redirecting to login');
-    }
-    const loginUrl = requiredRole === 'admin' 
-      ? '/admin-login' 
-      : requiredRole === 'landscaper' 
-        ? '/pro-login' 
-        : '/client-login';
-    return <Navigate to={loginUrl} replace />;
-  }
-
-  // If user exists but no role yet, wait a bit more
-  if (!role) {
-    if (import.meta.env.DEV) {
-      console.log('User exists but no role yet, waiting...');
-    }
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-900" role="status" aria-label="Loading user role">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-400"></div>
-      </div>
-    );
-  }
-
-  // If role doesn't match required role, the useEffect will handle redirection
-  // Show loading while redirect is happening
-  if (requiredRole && role !== requiredRole) {
-    if (import.meta.env.DEV) {
-      console.log('Role mismatch - redirecting to appropriate dashboard:', { requiredRole, actualRole: role });
-    }
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-900">
-        <div className="text-center text-white max-w-md mx-auto px-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-400 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold mb-2">Redirecting...</h2>
-          <p className="text-gray-300 mb-4">Taking you to your dashboard</p>
-          <p className="text-sm text-gray-400">Your role: {role}</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-[#020b06] to-black">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-emerald-400/70 text-sm mt-3">Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (import.meta.env.DEV) {
-    console.log('All checks passed, rendering children');
+  // No user - redirect to login
+  if (!user) {
+    const loginUrl = requiredRole === 'admin' ? '/admin-login' : '/portal-login';
+    return <Navigate to={loginUrl} replace />;
   }
+
+  // PASSWORD RESET ENFORCEMENT: Block access if recovery session is active
+  if (passwordResetRequired) {
+    console.log('[SimpleProtectedRoute] Redirecting to password reset page');
+    return <Navigate to={getPasswordResetRedirectUrl()} replace state={{ from: location }} />;
+  }
+
+  // Waiting for role (not timed out yet)
+  if (!role && !roleTimeout) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-[#020b06] to-black">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-emerald-400/70 text-sm mt-3">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Role mismatch - show redirect message
+  if (requiredRole && role && role !== requiredRole) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-[#020b06] to-black">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-emerald-400/70 text-sm mt-3">Redirecting to your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Success - render children immediately
+  // NOTE: For client routes, OnboardingGuard handles onboarding checks
   return <>{children}</>;
 }

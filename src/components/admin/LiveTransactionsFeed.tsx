@@ -4,8 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
-import { DollarSign, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { DollarSign, Clock, CheckCircle, XCircle, RefreshCw, AlertCircle } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -23,14 +24,17 @@ interface LiveTransactionsFeedProps {
 }
 
 export const LiveTransactionsFeed: React.FC<LiveTransactionsFeedProps> = ({ limit = 50 }) => {
+  const { user, loading: authLoading } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'succeeded' | 'failed' | 'pending'>('all');
 
   useEffect(() => {
+    if (authLoading || !user) return;
+
     fetchTransactions();
     
-    // Set up real-time subscription
     const subscription = supabase
       .channel('payments')
       .on('postgres_changes', {
@@ -45,11 +49,12 @@ export const LiveTransactionsFeed: React.FC<LiveTransactionsFeedProps> = ({ limi
     return () => {
       subscription.unsubscribe();
     };
-  }, [limit]);
+  }, [limit, authLoading, user, filter]);
 
   const fetchTransactions = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       let query = supabase
         .from('payments')
         .select('*')
@@ -60,12 +65,13 @@ export const LiveTransactionsFeed: React.FC<LiveTransactionsFeedProps> = ({ limi
         query = query.eq('status', filter);
       }
 
-      const { data, error } = await query;
+      const { data, error: fetchError } = await query;
       
-      if (error) throw error;
+      if (fetchError) throw fetchError;
       setTransactions(data || []);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
+    } catch (err) {
+      console.error('Error fetching transactions:', err);
+      setError('Failed to load transactions');
     } finally {
       setIsLoading(false);
     }
@@ -105,8 +111,35 @@ export const LiveTransactionsFeed: React.FC<LiveTransactionsFeedProps> = ({ limi
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
-    }).format(amount / 100);
+    }).format((amount || 0) / 100);
   };
+
+  // Auth loading state
+  if (authLoading) {
+    return (
+      <Card>
+        <CardContent className="flex justify-center items-center py-12">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
+          <AlertCircle className="h-8 w-8 text-red-500" />
+          <p className="text-red-600">{error}</p>
+          <Button onClick={fetchTransactions} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -135,7 +168,7 @@ export const LiveTransactionsFeed: React.FC<LiveTransactionsFeedProps> = ({ limi
         <ScrollArea className="h-96">
           {isLoading ? (
             <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <RefreshCw className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : transactions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
@@ -155,10 +188,10 @@ export const LiveTransactionsFeed: React.FC<LiveTransactionsFeedProps> = ({ limi
                         {formatAmount(transaction.amount)}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {transaction.customer_email}
+                        {transaction.customer_email || 'No email'}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {transaction.description}
+                        {transaction.description || 'No description'}
                       </div>
                     </div>
                   </div>
@@ -167,7 +200,7 @@ export const LiveTransactionsFeed: React.FC<LiveTransactionsFeedProps> = ({ limi
                       {transaction.status}
                     </Badge>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {formatDistanceToNow(new Date(transaction.created_at), { addSuffix: true })}
+                      {transaction.created_at ? formatDistanceToNow(new Date(transaction.created_at), { addSuffix: true }) : 'Unknown'}
                     </div>
                   </div>
                 </div>

@@ -41,12 +41,12 @@ export async function fetchClientProfile(): Promise<ClientProfile | null> {
     // Add timeout to database queries
     const queryTimeout = 3000; // 3 seconds
 
-    // First try to get by user_id with timeout
+    // First try to get by user_id with timeout - use maybeSingle() to prevent PGRST116 errors
     const userIdPromise = supabase
-      .from('profiles')
-      .select('id, first_name, last_name, email, phone, address, stripe_customer_id')
-      .eq('id', user.id)
-      .single();
+      .from('clients')
+      .select('id, user_id, first_name, last_name, email, phone, address, stripe_customer_id')
+      .eq('user_id', user.id)
+      .maybeSingle();
     
     const userIdTimeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('User ID query timeout')), queryTimeout)
@@ -63,14 +63,15 @@ export async function fetchClientProfile(): Promise<ClientProfile | null> {
       error = timeoutError;
     }
 
+
     // If not found by user_id, try by email with timeout
-    if (error && user.email) {
+    if (!client && user.email) {
       console.log('fetchClientProfile: Trying by email:', user.email);
       const emailPromise = supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, phone, address, stripe_customer_id')
+        .from('clients')
+        .select('id, user_id, first_name, last_name, email, phone, address, stripe_customer_id')
         .eq('email', user.email)
-        .single();
+        .maybeSingle();
       
       const emailTimeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Email query timeout')), queryTimeout)
@@ -92,6 +93,7 @@ export async function fetchClientProfile(): Promise<ClientProfile | null> {
         console.error('fetchClientProfile: Email query timeout:', timeoutError);
       }
     }
+
 
     if (error || !client) {
       console.error('fetchClientProfile: Final error or no client:', error);

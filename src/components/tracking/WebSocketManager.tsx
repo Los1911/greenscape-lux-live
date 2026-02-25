@@ -1,9 +1,13 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+// TODO: Re-enable WebSocket functionality after production deployment
+// WebSocket code has been disabled to prevent errors with placeholder endpoints in Famous previews
+// This is a STUB implementation that provides the same interface but does nothing
+
+import React, { createContext, useContext } from 'react';
 
 interface WebSocketMessage {
   type: string;
   data: any;
-  timestamp: string;
+  timestamp: number;
 }
 
 interface WebSocketContextType {
@@ -16,12 +20,21 @@ interface WebSocketContextType {
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
 
-export const useWebSocket = () => {
-  const context = useContext(WebSocketContext);
-  if (!context) {
-    throw new Error('useWebSocket must be used within WebSocketProvider');
-  }
-  return context;
+// Stub hook that returns safe defaults - no actual WebSocket connection
+export const useWebSocket = (): WebSocketContextType => {
+  // Return stub values - allows components to render without WebSocketProvider
+  return {
+    isConnected: false,
+    connectionStatus: 'disconnected',
+    lastMessage: null,
+    sendMessage: () => {
+      console.log('[WEBSOCKET STUB] sendMessage() called but disabled');
+    },
+    subscribe: () => {
+      console.log('[WEBSOCKET STUB] subscribe() called but disabled');
+      return () => {}; // Return no-op unsubscribe function
+    }
+  };
 };
 
 interface WebSocketProviderProps {
@@ -29,126 +42,24 @@ interface WebSocketProviderProps {
   url?: string;
 }
 
-export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ 
-  children, 
-  url = 'wss://your-websocket-endpoint.com' 
-}) => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
-  const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
-  
-  const wsRef = useRef<WebSocket | null>(null);
-  const subscribersRef = useRef<Map<string, Set<(data: any) => void>>>(new Map());
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
-  const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 5;
-
-  const connect = () => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
-    
-    setConnectionStatus('connecting');
-    
-    try {
-      wsRef.current = new WebSocket(url);
-      
-      wsRef.current.onopen = () => {
-        setIsConnected(true);
-        setConnectionStatus('connected');
-        reconnectAttemptsRef.current = 0;
-        console.log('WebSocket connected');
-      };
-      
-      wsRef.current.onmessage = (event) => {
-        try {
-          const message: WebSocketMessage = JSON.parse(event.data);
-          setLastMessage(message);
-          
-          // Notify subscribers
-          const subscribers = subscribersRef.current.get(message.type);
-          if (subscribers) {
-            subscribers.forEach(callback => callback(message.data));
-          }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-        }
-      };
-      
-      wsRef.current.onclose = () => {
-        setIsConnected(false);
-        setConnectionStatus('disconnected');
-        console.log('WebSocket disconnected');
-        
-        // Attempt reconnection
-        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-          const delay = Math.pow(2, reconnectAttemptsRef.current) * 1000; // Exponential backoff
-          reconnectTimeoutRef.current = setTimeout(() => {
-            reconnectAttemptsRef.current++;
-            connect();
-          }, delay);
-        }
-      };
-      
-      wsRef.current.onerror = (error) => {
-        setConnectionStatus('error');
-        console.error('WebSocket error:', error);
-      };
-    } catch (error) {
-      setConnectionStatus('error');
-      console.error('Failed to create WebSocket connection:', error);
-    }
-  };
-
-  const sendMessage = (message: any) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      // Ensure only serializable objects are sent
-      const serializedMessage = JSON.parse(JSON.stringify(message));
-      wsRef.current.send(JSON.stringify(serializedMessage));
-    } else {
-      console.warn('WebSocket not connected, message not sent:', message);
-    }
-  };
-
-  const subscribe = (type: string, callback: (data: any) => void) => {
-    if (!subscribersRef.current.has(type)) {
-      subscribersRef.current.set(type, new Set());
-    }
-    subscribersRef.current.get(type)!.add(callback);
-    
-    return () => {
-      const subscribers = subscribersRef.current.get(type);
-      if (subscribers) {
-        subscribers.delete(callback);
-        if (subscribers.size === 0) {
-          subscribersRef.current.delete(type);
-        }
-      }
-    };
-  };
-
-  useEffect(() => {
-    connect();
-    
-    return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, [url]);
-
-  const value: WebSocketContextType = {
-    isConnected,
-    connectionStatus,
-    lastMessage,
-    sendMessage,
-    subscribe
+// Stub provider that just renders children without WebSocket connection
+export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
+  // TODO: Re-enable WebSocket connection after production deployment
+  const stubValue: WebSocketContextType = {
+    isConnected: false,
+    connectionStatus: 'disconnected',
+    lastMessage: null,
+    sendMessage: () => {
+      console.log('[WEBSOCKET STUB] sendMessage() called but disabled');
+    },
+    subscribe: () => () => {}
   };
 
   return (
-    <WebSocketContext.Provider value={value}>
+    <WebSocketContext.Provider value={stubValue}>
       {children}
     </WebSocketContext.Provider>
   );
 };
+
+export default WebSocketProvider;

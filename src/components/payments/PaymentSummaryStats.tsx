@@ -1,6 +1,5 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Calendar, Clock, Receipt } from 'lucide-react';
 
 interface PaymentSummaryStatsProps {
   transactions: Array<{
@@ -39,6 +38,10 @@ export default function PaymentSummaryStats({ transactions }: PaymentSummaryStat
       .filter(t => t.type === 'refund')
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
+    const pendingAmount = recentTransactions
+      .filter(t => t.status === 'pending' || t.status === 'processing')
+      .reduce((sum, t) => sum + t.amount, 0);
+
     const growth = previousAmount > 0 
       ? ((totalAmount - previousAmount) / previousAmount) * 100 
       : 0;
@@ -47,6 +50,7 @@ export default function PaymentSummaryStats({ transactions }: PaymentSummaryStat
       totalAmount,
       totalFees,
       refundAmount,
+      pendingAmount,
       growth,
       transactionCount: recentTransactions.length
     };
@@ -62,59 +66,75 @@ export default function PaymentSummaryStats({ transactions }: PaymentSummaryStat
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Revenue (30d)</CardTitle>
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(stats.totalAmount)}</div>
-          <div className={`text-xs flex items-center ${stats.growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {stats.growth >= 0 ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
-            {Math.abs(stats.growth).toFixed(1)}% from last month
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Total Revenue */}
+      <div className="bg-black/40 border border-emerald-500/15 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="h-8 w-8 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+            <DollarSign className="h-4 w-4 text-emerald-400" />
           </div>
-        </CardContent>
-      </Card>
+          <span className="text-xs sm:text-sm text-gray-400 truncate">Revenue (30d)</span>
+        </div>
+        <p className="text-lg sm:text-2xl font-bold text-white truncate">
+          {formatCurrency(stats.totalAmount)}
+        </p>
+        <div className={`text-xs flex items-center mt-1 ${stats.growth >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+          {stats.growth >= 0 ? (
+            <TrendingUp className="h-3 w-3 mr-1 flex-shrink-0" />
+          ) : (
+            <TrendingDown className="h-3 w-3 mr-1 flex-shrink-0" />
+          )}
+          <span className="truncate">{Math.abs(stats.growth).toFixed(1)}% vs last month</span>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Fees</CardTitle>
-          <TrendingDown className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(stats.totalFees)}</div>
-          <p className="text-xs text-muted-foreground">
-            Processing & platform fees
-          </p>
-        </CardContent>
-      </Card>
+      {/* Pending */}
+      <div className="bg-black/40 border border-emerald-500/15 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="h-8 w-8 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+            <Clock className="h-4 w-4 text-amber-400" />
+          </div>
+          <span className="text-xs sm:text-sm text-gray-400 truncate">Pending</span>
+        </div>
+        <p className="text-lg sm:text-2xl font-bold text-white truncate">
+          {formatCurrency(stats.pendingAmount)}
+        </p>
+        <p className="text-xs text-gray-500 mt-1 truncate">
+          Awaiting completion
+        </p>
+      </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Refunds</CardTitle>
-          <TrendingDown className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(stats.refundAmount)}</div>
-          <p className="text-xs text-muted-foreground">
-            Total refunded amount
-          </p>
-        </CardContent>
-      </Card>
+      {/* Refunds */}
+      <div className="bg-black/40 border border-emerald-500/15 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="h-8 w-8 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
+            <TrendingDown className="h-4 w-4 text-red-400" />
+          </div>
+          <span className="text-xs sm:text-sm text-gray-400 truncate">Refunds</span>
+        </div>
+        <p className="text-lg sm:text-2xl font-bold text-white truncate">
+          {formatCurrency(stats.refundAmount)}
+        </p>
+        <p className="text-xs text-gray-500 mt-1 truncate">
+          Total refunded
+        </p>
+      </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Transactions</CardTitle>
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{stats.transactionCount}</div>
-          <p className="text-xs text-muted-foreground">
-            Last 30 days
-          </p>
-        </CardContent>
-      </Card>
+      {/* Transactions */}
+      <div className="bg-black/40 border border-emerald-500/15 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="h-8 w-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+            <Receipt className="h-4 w-4 text-blue-400" />
+          </div>
+          <span className="text-xs sm:text-sm text-gray-400 truncate">Transactions</span>
+        </div>
+        <p className="text-lg sm:text-2xl font-bold text-white">
+          {stats.transactionCount}
+        </p>
+        <p className="text-xs text-gray-500 mt-1 truncate">
+          Last 30 days
+        </p>
+      </div>
     </div>
   );
 }

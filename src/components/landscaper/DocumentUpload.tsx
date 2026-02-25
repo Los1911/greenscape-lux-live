@@ -138,12 +138,11 @@ function DocumentUploadInner({ onUpload, uploadedDocs, onError }: DocumentUpload
       
       console.log('Inserting to database:', insertData)
 
-      const { data: dbData, error: insErr } = await supabase
+      const { error: insErr } = await supabase
         .from('landscaper_documents')
         .insert(insertData)
-        .select()
 
-      console.log('Database insert result:', { dbData, insErr })
+      console.log('Database insert result:', { error: insErr })
 
       if (insErr) {
         console.error('Database insert error:', insErr)
@@ -152,6 +151,7 @@ function DocumentUploadInner({ onUpload, uploadedDocs, onError }: DocumentUpload
 
       showToast('Document uploaded successfully', 'success')
       await fetchDocuments()
+
       
       if (onUpload) {
         await onUpload(file, type)

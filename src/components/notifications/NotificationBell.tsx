@@ -21,28 +21,16 @@ interface Notification {
 }
 
 export function NotificationBell() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [userRole, setUserRole] = useState<'client' | 'landscaper' | null>(null);
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Don't render if no user
-  if (!user) {
-    return null;
-  }
-
-  useEffect(() => {
-    if (user) {
-      fetchUserRole();
-      fetchNotifications();
-      subscribeToNotifications();
-    }
-  }, [user]);
-
+  // Fetch user role
   const fetchUserRole = async () => {
     if (!user) return;
     const { data } = await supabase
@@ -56,23 +44,36 @@ export function NotificationBell() {
     }
   };
 
-
-
+  // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
-
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
-
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen]);
+
+  // Main data fetch effect
+  useEffect(() => {
+    if (user) {
+      fetchUserRole();
+      fetchNotifications();
+      const cleanup = subscribeToNotifications();
+      return cleanup;
+    }
+  }, [user]);
+
+  // Don't render if no user - AFTER ALL HOOKS
+  if (!user) {
+    return null;
+  }
+
 
   const fetchNotifications = async () => {
     if (!user) return;
@@ -374,8 +375,8 @@ export function NotificationBell() {
       </Button>
 
       {isOpen && (
-        <Card className="absolute right-0 top-12 w-96 max-h-[32rem] overflow-hidden z-50 shadow-xl border-2">
-          <div className="p-4 border-b bg-gradient-to-r from-emerald-50 to-green-50">
+        <Card className="notification-dropdown absolute right-0 top-12 w-80 sm:w-96 max-w-[calc(100vw-2rem)] max-h-[32rem] overflow-hidden z-50 shadow-xl border-2">
+          <div className="p-3 sm:p-4 border-b bg-gradient-to-r from-emerald-50 to-green-50">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-lg">Notifications</h3>
               <div className="flex gap-2">

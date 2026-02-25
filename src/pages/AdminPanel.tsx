@@ -1,10 +1,32 @@
+/**
+ * LEGACY ADMIN PANEL
+ * 
+ * Status: DISABLED (via feature flag FEATURE_ADMIN_CONTACT_PANEL)
+ * 
+ * This page provides:
+ * - Contact form submission management
+ * - Email template builder
+ * 
+ * NOT part of GreenScape Lux operational admin system.
+ * Kept dormant for potential future CMS functionality.
+ * 
+ * To re-enable:
+ * 1. Set VITE_FEATURE_ADMIN_CONTACT_PANEL=true in environment
+ * 2. Ensure 'contacts' table exists in database
+ * 3. Test thoroughly before production use
+ * 
+ * @deprecated Use AdminDashboard for operational admin tasks
+ */
+
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Trash2, Mail, Phone, MapPin, Calendar, Settings, FileText } from 'lucide-react';
+import { Trash2, Mail, Phone, MapPin, Calendar, Settings, FileText, RefreshCw } from 'lucide-react';
 import EmailTemplateBuilderSimple from '@/components/admin/EmailTemplateBuilderSimple';
 
 interface Contact {
@@ -18,25 +40,50 @@ interface Contact {
   created_at: string;
 }
 
+/**
+ * @deprecated This component is disabled via feature flag
+ * Access is controlled by FeatureGatedRoute in App.tsx
+ */
 export default function AdminPanel() {
+  const { user, role, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Auth and role guard
+  useEffect(() => {
+    if (authLoading) return;
+    
+    if (!user) {
+      navigate('/admin-login', { replace: true });
+      return;
+    }
+    
+    if (role && role !== 'admin') {
+      navigate(role === 'landscaper' ? '/landscaper-dashboard' : '/client-dashboard', { replace: true });
+    }
+  }, [authLoading, user, role, navigate]);
 
   useEffect(() => {
+    // Only fetch data after auth is resolved and user is admin
+    if (authLoading || !user || (role && role !== 'admin')) return;
     fetchContacts();
-  }, []);
+  }, [authLoading, user, role]);
 
   const fetchContacts = async () => {
     try {
-      const { data, error } = await supabase
+      setError(null);
+      const { data, error: fetchError } = await supabase
         .from('contacts')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
       setContacts(data || []);
-    } catch (error) {
-      console.error('Error fetching contacts:', error);
+    } catch (err) {
+      console.error('Error fetching contacts:', err);
+      setError('Failed to load contacts. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -44,15 +91,15 @@ export default function AdminPanel() {
 
   const deleteContact = async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error: deleteError } = await supabase
         .from('contacts')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
       setContacts(contacts.filter(c => c.id !== id));
-    } catch (error) {
-      console.error('Error deleting contact:', error);
+    } catch (err) {
+      console.error('Error deleting contact:', err);
     }
   };
 
@@ -66,6 +113,35 @@ export default function AdminPanel() {
     });
   };
 
+  // Auth loading guard - prevents white screen on refresh
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw className="h-8 w-8 text-emerald-400 animate-spin" />
+          <p className="text-gray-400">Verifying admin access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md text-center space-y-4">
+          <h2 className="text-xl font-bold text-gray-900">Unable to Load Data</h2>
+          <p className="text-gray-600">{error}</p>
+          <Button onClick={fetchContacts} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Data loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -76,6 +152,8 @@ export default function AdminPanel() {
       </div>
     );
   }
+
+
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">

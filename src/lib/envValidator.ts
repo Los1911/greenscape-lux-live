@@ -1,5 +1,5 @@
 // Environment Variable Validator and Debugger
-// SAFE VERSION: Allows both legacy and publishable keys
+// This helps diagnose why environment variables might be undefined
 
 interface EnvValidationResult {
   isValid: boolean;
@@ -11,47 +11,36 @@ interface EnvValidationResult {
 export const validateEnvironment = (): EnvValidationResult => {
   const errors: string[] = [];
   const warnings: string[] = [];
-
-  // Safe access to Vite env vars
-  const env =
-    (typeof import.meta !== "undefined" && import.meta.env) || {};
-
+  
+  // Safe access to environment variables
+  const env = (typeof import !== 'undefined' && import.meta?.env) || {};
+  
+  // Check for required Vite environment variables
   const supabaseUrl = env.VITE_SUPABASE_URL;
   const supabaseKey = env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-  console.group("🔍 Environment Variable Debug (Safe Mode)");
-  console.log("All import.meta.env:", env);
-  console.log("VITE_SUPABASE_URL:", supabaseUrl);
-  console.log(
-    "VITE_SUPABASE_PUBLISHABLE_KEY:",
-    supabaseKey ? "***" + supabaseKey.slice(-8) : "undefined"
-  );
-  console.log("MODE:", env.MODE);
-  console.log("DEV:", env.DEV);
-  console.log("PROD:", env.PROD);
+  // Log all available environment variables for debugging
+  console.group('🔍 Environment Variable Debug');
+  console.log('All import.meta.env:', env);
+  console.log('VITE_SUPABASE_URL:', supabaseUrl);
+  console.log('VITE_SUPABASE_PUBLISHABLE_KEY:', supabaseKey ? '***' + supabaseKey.slice(-8) : 'undefined');
+  console.log('MODE:', env.MODE);
+  console.log('DEV:', env.DEV);
+  console.log('PROD:', env.PROD);
   console.groupEnd();
-
-  // ---- SAFE VALIDATION ONLY ----
-
-  // URL check
+  
+  // Validate required variables
   if (!supabaseUrl) {
-    errors.push("VITE_SUPABASE_URL is undefined");
-  } else if (!supabaseUrl.startsWith("https://")) {
-    warnings.push("VITE_SUPABASE_URL should start with https://");
+    errors.push('VITE_SUPABASE_URL is undefined');
+  } else if (!supabaseUrl.startsWith('https://')) {
+    warnings.push('VITE_SUPABASE_URL should start with https://');
   }
-
-  // Key format checks (allow legacy + new)
-  const isLegacyKey = supabaseKey?.startsWith("eyJ"); // old anon JWT
-  const isNewKey =
-    supabaseKey?.startsWith("sbp_") ||
-    supabaseKey?.startsWith("sb_publishable_");
-
+  
   if (!supabaseKey) {
-    errors.push("VITE_SUPABASE_PUBLISHABLE_KEY is undefined");
-  } else if (!isLegacyKey && !isNewKey) {
-    warnings.push("Supabase key format is non standard but may still be valid");
+    errors.push('VITE_SUPABASE_PUBLISHABLE_KEY is undefined');
+  } else if (supabaseKey.length < 100) {
+    warnings.push('VITE_SUPABASE_PUBLISHABLE_KEY seems too short');
   }
-
+  
   return {
     isValid: errors.length === 0,
     errors,
@@ -66,20 +55,16 @@ export const validateEnvironment = (): EnvValidationResult => {
   };
 };
 
-// Auto validate only in development
-const env =
-  (typeof import.meta !== "undefined" && import.meta.env) || {};
 
+// Auto-validate on import in development with safe access
+const env = (typeof import !== 'undefined' && import.meta?.env) || {};
 if (env.DEV) {
   const validation = validateEnvironment();
-
+  
   if (!validation.isValid) {
-    console.error("❌ Environment validation failed:", validation.errors);
-  }
-  if (validation.warnings.length > 0) {
-    console.warn("⚠️ Environment warnings:", validation.warnings);
-  }
-  if (validation.isValid && validation.warnings.length === 0) {
-    console.log("✅ Environment validation passed");
+    console.error('❌ Environment validation failed:', validation.errors);
+    console.warn('⚠️ Environment warnings:', validation.warnings);
+  } else {
+    console.log('✅ Environment validation passed');
   }
 }

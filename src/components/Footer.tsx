@@ -5,9 +5,9 @@ const Footer: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Hide "Request a Quote" button on landscaper/pro dashboard pages
-  const isLandscaperDashboard = location.pathname.startsWith('/landscaper-dashboard') || 
-                                 location.pathname.startsWith('/pro-dashboard');
+  // Hide "Request a Quote" button on landscaper dashboard pages
+  const isLandscaperDashboard = location.pathname.startsWith('/landscaper-dashboard');
+
   
   return (
     <footer className="bg-black py-12 px-6 border-t border-emerald-500/10">
@@ -85,8 +85,9 @@ const Footer: React.FC = () => {
         <div className="border-t border-gray-800 pt-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-gray-400 text-sm text-center sm:text-left">
-              © 2025 GreenScape Lux. All rights reserved.
+              © 2026 GreenScape Lux. All rights reserved.
             </p>
+
             {!isLandscaperDashboard && (
               <button
                 onClick={() => navigate('/get-quote')}

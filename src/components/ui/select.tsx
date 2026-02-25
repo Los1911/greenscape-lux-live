@@ -17,7 +17,19 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 transition-colors",
+      "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm",
+      "placeholder:text-muted-foreground/60",
+      // Focus states - GreenScape Lux branded emerald glow with dark offset
+      "focus-visible:outline-none",
+      "focus-visible:ring-2 focus-visible:ring-emerald-400/60",
+      "focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+      "focus-visible:border-primary/50",
+      // States
+      "disabled:cursor-not-allowed disabled:opacity-50",
+      "[&>span]:line-clamp-1",
+      // Transitions & touch optimization
+      "transition-colors",
+      "[-webkit-tap-highlight-color:transparent]",
       className
     )}
     {...props}
@@ -117,6 +129,7 @@ const SelectItem = React.forwardRef<
     ref={ref}
     className={cn(
       "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent/50 focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 transition-colors",
+      "[-webkit-tap-highlight-color:transparent]",
       className
     )}
     {...props}

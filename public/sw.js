@@ -1,33 +1,23 @@
-<<<<<<< HEAD
 // Service Worker with Smart Caching
-const CACHE_VERSION = 'v1.0.0'; // Static version, update manually when needed
+// IMPORTANT: Update CACHE_VERSION on every deployment to bust cache
+const CACHE_VERSION = 'v4.0.0-final-20260126';
 const CACHE_NAME = `greenscape-lux-${CACHE_VERSION}`;
 
-// Resources to exclude from caching
+
+// Resources to ALWAYS fetch from network (never cache)
 const EXCLUDED_PATHS = [
   '/version.json',
+  '/index.html',
   '/api/',
   'supabase.co',
   'stripe.com',
-  'maps.googleapis.com'
-=======
-// Enhanced Service Worker with Cache Invalidation
-const CACHE_VERSION = Date.now();
-const CACHE_NAME = `greenscape-lux-v${CACHE_VERSION}`;
-const STATIC_CACHE = `static-${CACHE_VERSION}`;
-const DYNAMIC_CACHE = `dynamic-${CACHE_VERSION}`;
-
-// Critical resources that should always be fresh
-const CRITICAL_RESOURCES = [
-  '/version.json',
-  '/get-a-quote',
-  '/api/'
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
+  'maps.googleapis.com',
+  '.hot-update.',
+  '__vite'
 ];
 
+// Resources to pre-cache (minimal - only truly static assets)
 const urlsToCache = [
-  '/',
-<<<<<<< HEAD
   '/manifest.json'
 ];
 
@@ -36,66 +26,86 @@ function shouldExclude(url) {
   return EXCLUDED_PATHS.some(path => url.includes(path));
 }
 
+// Check if this is a navigation request (HTML page)
+function isNavigationRequest(request) {
+  return request.mode === 'navigate' || 
+         request.destination === 'document' ||
+         request.headers.get('accept')?.includes('text/html');
+}
+
 // Install event
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(urlsToCache))
-      .catch(() => {})
-  );
-  self.skipWaiting(); // Activate immediately
-=======
-  '/manifest.json',
-  '/favicon.ico'
-];
-// Install event - cache resources
-self.addEventListener('install', (event) => {
-  // Service Worker installing
+  console.log('[SW] Installing new service worker:', CACHE_VERSION);
+  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        // Service worker cache opened successfully
+        console.log('[SW] Pre-caching static assets');
         return cache.addAll(urlsToCache);
       })
-      .catch((error) => {
-        // Cache failed in production
+      .catch((err) => {
+        console.warn('[SW] Pre-cache failed:', err);
       })
   );
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
+  
+  // Activate immediately - don't wait for old SW to be released
+  self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up ALL old caches
 self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating new service worker:', CACHE_VERSION);
+  
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
+          // Delete ALL caches that don't match current version
           if (cacheName !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+      console.log('[SW] Old caches cleared');
     })
   );
-<<<<<<< HEAD
-  return self.clients.claim(); // Take control immediately
+  
+  // Take control of all clients immediately
+  return self.clients.claim();
 });
 
-// Fetch event - network first for critical resources
+// Fetch event - Network first for everything important
 self.addEventListener('fetch', (event) => {
+  // Only handle GET requests
   if (event.request.method !== 'GET') return;
+  
+  // Only handle http(s) requests
   if (!event.request.url.startsWith('http')) return;
-  if (shouldExclude(event.request.url)) {
-    // Network only for excluded paths
-    event.respondWith(fetch(event.request));
+  
+  const url = event.request.url;
+  
+  // ALWAYS go to network for excluded paths and navigation requests
+  if (shouldExclude(url) || isNavigationRequest(event.request)) {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        // Only fallback to cache for navigation if network fails
+        if (isNavigationRequest(event.request)) {
+          return caches.match('/');
+        }
+        throw new Error('Network request failed');
+      })
+    );
     return;
   }
 
-  // Network first, fallback to cache
+  // For static assets: Network first, cache fallback
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        if (response && response.status === 200) {
+        // Only cache successful responses
+        if (response && response.status === 200 && response.type === 'basic') {
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
@@ -104,192 +114,60 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => {
+        // Network failed, try cache
         return caches.match(event.request).then((response) => {
-          return response || caches.match('/');
-        });
-=======
-});
-
-// Fetch event - serve from cache, fallback to network
-self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') {
-    return;
-  }
-
-  // Skip chrome-extension and other non-http requests
-  if (!event.request.url.startsWith('http')) {
-    return;
-  }
-
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached version or fetch from network
-        return response || fetch(event.request).then((fetchResponse) => {
-          // Don't cache non-successful responses
-          if (!fetchResponse || fetchResponse.status !== 200 || fetchResponse.type !== 'basic') {
-            return fetchResponse;
+          if (response) {
+            console.log('[SW] Serving from cache:', url);
+            return response;
           }
-
-          // Clone the response for caching
-          const responseToCache = fetchResponse.clone();
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-
-          return fetchResponse;
+          // No cache, return offline fallback for navigation
+          if (isNavigationRequest(event.request)) {
+            return caches.match('/');
+          }
+          throw new Error('No cache available');
         });
-      })
-      .catch(() => {
-        // Fallback for offline scenarios
-        if (event.request.destination === 'document') {
-          return caches.match('/index.html');
-        }
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
       })
   );
 });
 
-<<<<<<< HEAD
-// Message handling
+// Message handling - support for manual cache clearing
 self.addEventListener('message', (event) => {
+  console.log('[SW] Received message:', event.data);
+  
   if (event.data?.type === 'SKIP_WAITING') {
+    console.log('[SW] Skip waiting requested');
     self.skipWaiting();
   }
-});
-=======
-// Message event - handle messages from main thread
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-
-// Push notification event
-// Push notification event
-self.addEventListener('push', (event) => {
-  if (!event.data) {
-    return;
-  }
-
-  try {
-    const data = event.data.json();
-    const options = {
-      body: data.body || 'GreenScape Lux Notification',
-      icon: '/icon-192x192.png',
-      badge: '/icon-192x192.png',
-      vibrate: [200, 100, 200],
-      tag: data.tag || 'default',
-      requireInteraction: data.priority === 'high',
-      data: {
-        url: data.url || '/notifications',
-        timestamp: Date.now(),
-        alertType: data.alertType,
-        ...data.customData
-      },
-      actions: [
-        {
-          action: 'view',
-          title: 'View Dashboard',
-          icon: '/icon-192x192.png'
-        },
-        {
-          action: 'dismiss',
-          title: 'Dismiss',
-          icon: '/icon-192x192.png'
-        }
-      ]
-    };
-
-    event.waitUntil(
-      self.registration.showNotification(data.title || 'GreenScape Lux Alert', options)
-    );
-  } catch (error) {
-    // Fallback for simple text notifications
-    const options = {
-      body: event.data.text(),
-      icon: '/icon-192x192.png',
-      badge: '/icon-192x192.png'
-    };
-    
-    event.waitUntil(
-      self.registration.showNotification('GreenScape Lux', options)
-    );
-  }
-});
-
-// Notification click event
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-
-  const urlToOpen = event.notification.data?.url || '/notifications';
-
-  if (event.action === 'view') {
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true })
-        .then((clientList) => {
-          // Check if dashboard is already open
-          for (const client of clientList) {
-            if (client.url.includes('/notifications') && 'focus' in client) {
-              return client.focus();
-            }
-          }
-          // Open new window if not found
-          if (clients.openWindow) {
-            return clients.openWindow(urlToOpen);
-          }
+  
+  if (event.data?.type === 'CLEAR_CACHE') {
+    console.log('[SW] Cache clear requested');
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          console.log('[SW] Deleting cache:', cacheName);
+          return caches.delete(cacheName);
         })
-    );
-  } else if (event.action === 'dismiss') {
-    // Just close the notification
-    return;
-  } else {
-    // Default click action
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true })
-        .then((clientList) => {
-          if (clientList.length > 0) {
-            return clientList[0].focus();
-          }
-          if (clients.openWindow) {
-            return clients.openWindow(urlToOpen);
-          }
-        })
-    );
+      );
+    }).then(() => {
+      console.log('[SW] All caches cleared');
+      // Notify the client
+      if (event.source) {
+        event.source.postMessage({ type: 'CACHE_CLEARED' });
+      }
+    });
+  }
+  
+  if (event.data?.type === 'GET_VERSION') {
+    // Respond with current cache version
+    if (event.source) {
+      event.source.postMessage({ 
+        type: 'VERSION_INFO',
+        version: CACHE_VERSION,
+        cacheName: CACHE_NAME
+      });
+    }
   }
 });
 
-// Background sync for offline notifications
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'notification-sync') {
-    event.waitUntil(
-      // Sync pending notifications when back online
-      fetch('/api/sync-notifications', { method: 'POST' })
-        .catch(() => {
-          // Handle sync failure silently
-        })
-    );
-  }
-});
-
-// Message event for communication with main thread
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  } else if (event.data && event.data.type === 'TEST_NOTIFICATION') {
-    // Handle test notifications from dashboard
-    const options = {
-      body: event.data.body || 'Test notification',
-      icon: '/icon-192x192.png',
-      tag: 'test-notification'
-    };
-    
-    self.registration.showNotification(
-      event.data.title || 'Test Alert', 
-      options
-    );
-  }
-});
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
+// Log when SW is ready
+console.log('[SW] Service worker loaded, version:', CACHE_VERSION);

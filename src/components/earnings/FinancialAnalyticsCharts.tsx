@@ -34,21 +34,21 @@ export default function FinancialAnalyticsCharts() {
   const renderEarningsChart = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Monthly Earnings Trend</h3>
-        <div className="text-sm text-gray-600">Last 6 months</div>
+        <h3 className="text-lg font-semibold text-white">Monthly Earnings Trend</h3>
+        <div className="text-sm text-slate-400">Last 6 months</div>
       </div>
       <div className="h-64 flex items-end justify-between gap-2">
         {mockChartData.map((data, index) => (
           <div key={index} className="flex flex-col items-center flex-1">
-            <div className="w-full bg-gray-200 rounded-t-lg relative overflow-hidden">
+            <div className="w-full bg-slate-800 rounded-t-lg relative overflow-hidden">
               <div 
-                className="bg-gradient-to-t from-green-500 to-green-400 rounded-t-lg transition-all duration-500 hover:from-green-600 hover:to-green-500"
+                className="bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t-lg transition-all duration-500 hover:from-emerald-500 hover:to-emerald-300"
                 style={{ height: `${(data.earnings / maxEarnings) * 200}px` }}
               ></div>
             </div>
             <div className="text-center mt-2">
-              <div className="text-sm font-medium">${data.earnings.toLocaleString()}</div>
-              <div className="text-xs text-gray-600">{data.month}</div>
+              <div className="text-sm font-medium text-white">${data.earnings.toLocaleString()}</div>
+              <div className="text-xs text-slate-400">{data.month}</div>
             </div>
           </div>
         ))}
@@ -59,21 +59,21 @@ export default function FinancialAnalyticsCharts() {
   const renderJobsChart = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Jobs Completed Trend</h3>
-        <div className="text-sm text-gray-600">Last 6 months</div>
+        <h3 className="text-lg font-semibold text-white">Jobs Completed Trend</h3>
+        <div className="text-sm text-slate-400">Last 6 months</div>
       </div>
       <div className="h-64 flex items-end justify-between gap-2">
         {mockChartData.map((data, index) => (
           <div key={index} className="flex flex-col items-center flex-1">
-            <div className="w-full bg-gray-200 rounded-t-lg relative overflow-hidden">
+            <div className="w-full bg-slate-800 rounded-t-lg relative overflow-hidden">
               <div 
-                className="bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg transition-all duration-500 hover:from-blue-600 hover:to-blue-500"
+                className="bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-lg transition-all duration-500 hover:from-blue-500 hover:to-blue-300"
                 style={{ height: `${(data.jobs / maxJobs) * 200}px` }}
               ></div>
             </div>
             <div className="text-center mt-2">
-              <div className="text-sm font-medium">{data.jobs} jobs</div>
-              <div className="text-xs text-gray-600">{data.month}</div>
+              <div className="text-sm font-medium text-white">{data.jobs} jobs</div>
+              <div className="text-xs text-slate-400">{data.month}</div>
             </div>
           </div>
         ))}
@@ -84,22 +84,22 @@ export default function FinancialAnalyticsCharts() {
   const renderJobBreakdown = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Earnings by Job Type</h3>
-        <div className="text-sm text-gray-600">Current period</div>
+        <h3 className="text-lg font-semibold text-white">Earnings by Job Type</h3>
+        <div className="text-sm text-slate-400">Current period</div>
       </div>
       <div className="space-y-3">
         {jobTypeData.map((job, index) => (
           <div key={index} className="space-y-2">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">{job.type}</span>
+              <span className="text-sm font-medium text-slate-300">{job.type}</span>
               <div className="text-right">
-                <div className="text-sm font-semibold">${job.earnings.toLocaleString()}</div>
-                <div className="text-xs text-gray-600">{job.percentage}%</div>
+                <div className="text-sm font-semibold text-white">${job.earnings.toLocaleString()}</div>
+                <div className="text-xs text-slate-400">{job.percentage}%</div>
               </div>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-slate-700 rounded-full h-2">
               <div 
-                className="bg-gradient-to-r from-purple-500 to-purple-400 h-2 rounded-full transition-all duration-500"
+                className="bg-gradient-to-r from-purple-600 to-purple-400 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${job.percentage}%` }}
               ></div>
             </div>
@@ -110,19 +110,23 @@ export default function FinancialAnalyticsCharts() {
   );
 
   return (
-    <Card>
+    <Card className="bg-slate-900 border-slate-700">
       <CardHeader>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 text-white">
+            <BarChart3 className="h-5 w-5 text-slate-400" />
             Financial Analytics
           </CardTitle>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button
               variant={activeChart === 'earnings' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setActiveChart('earnings')}
-              className="flex items-center gap-1"
+              className={`flex items-center gap-1 ${
+                activeChart === 'earnings' 
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                  : 'border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
             >
               <TrendingUp className="h-4 w-4" />
               Earnings
@@ -131,7 +135,11 @@ export default function FinancialAnalyticsCharts() {
               variant={activeChart === 'jobs' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setActiveChart('jobs')}
-              className="flex items-center gap-1"
+              className={`flex items-center gap-1 ${
+                activeChart === 'jobs' 
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                  : 'border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
             >
               <Calendar className="h-4 w-4" />
               Jobs
@@ -140,7 +148,11 @@ export default function FinancialAnalyticsCharts() {
               variant={activeChart === 'breakdown' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setActiveChart('breakdown')}
-              className="flex items-center gap-1"
+              className={`flex items-center gap-1 ${
+                activeChart === 'breakdown' 
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                  : 'border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
             >
               <PieChart className="h-4 w-4" />
               Breakdown

@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { CreditCard, Plus, AlertTriangle, Clock } from 'lucide-react';
+import { CreditCard, Plus, AlertTriangle, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { PaymentMethodModal } from './PaymentMethodModal';
 import { PaymentMethodCard } from './PaymentMethodCard';
+import { getPaymentMethods, deletePaymentMethod, createStripeCustomer, invokeEdgeFunction } from '@/lib/edgeFunctions';
 
 interface PaymentMethod {
   id: string;
@@ -39,13 +40,13 @@ export const EnhancedPaymentMethodManager: React.FC<EnhancedPaymentMethodManager
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user, session } = useAuth();
 
   useEffect(() => {
-    if (open && user?.id) {
+    if (open && user?.id && session) {
       fetchPaymentMethods();
     }
-  }, [open, user?.id]);
+  }, [open, user?.id, session]);
 
   const getCardStatus = (method: PaymentMethod): PaymentMethod['status'] => {
     const now = new Date();
@@ -59,6 +60,8 @@ export const EnhancedPaymentMethodManager: React.FC<EnhancedPaymentMethodManager
   };
 
   const fetchPaymentMethods = async () => {
+    if (!session) return;
+    
     try {
       setLoading(true);
 
@@ -75,14 +78,12 @@ export const EnhancedPaymentMethodManager: React.FC<EnhancedPaymentMethodManager
       let customerId = profile?.stripe_customer_id;
       
       if (!customerId) {
-        const { data: createResult, error: createError } = await supabase.functions.invoke('create-stripe-customer', {
-          body: {
-            userId: user?.id,
-            email: profile?.email || user?.email,
-            firstName: profile?.first_name || '',
-            lastName: profile?.last_name || ''
-          }
-        });
+        const { data: createResult, error: createError } = await createStripeCustomer(
+          user?.id || '',
+          profile?.email || user?.email || '',
+          `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim(),
+          session.access_token
+        );
 
         if (createError || !createResult?.success) {
           throw new Error('Failed to initialize payment system');
@@ -92,16 +93,9 @@ export const EnhancedPaymentMethodManager: React.FC<EnhancedPaymentMethodManager
       }
       
       setStripeCustomerId(customerId);
-      // Try enhanced endpoint first, fallback to standard
-      const { data: methodsResult, error: methodsError } = await supabase.functions.invoke('enhanced-list-payment-methods', {
-        body: { customerId }
-      }).catch(async () => {
-        // Fallback to standard endpoint
-        return await supabase.functions.invoke('list-payment-methods', {
-          body: { customerId }
-        });
-      });
-
+      
+      console.log('[ENHANCED_PAYMENT] Fetching payment methods for customer:', customerId);
+      const { data: methodsResult, error: methodsError } = await getPaymentMethods(customerId, session.access_token);
 
       if (methodsError) {
         throw new Error(`Failed to fetch payment methods: ${methodsError.message}`);
@@ -112,6 +106,7 @@ export const EnhancedPaymentMethodManager: React.FC<EnhancedPaymentMethodManager
           ...method,
           status: getCardStatus(method)
         }));
+        console.log('[ENHANCED_PAYMENT] Payment methods fetched:', enhancedMethods.length);
         setPaymentMethods(enhancedMethods);
       } else {
         throw new Error(methodsResult?.error || 'Failed to fetch payment methods');
@@ -126,18 +121,19 @@ export const EnhancedPaymentMethodManager: React.FC<EnhancedPaymentMethodManager
   };
 
   const handleDeletePaymentMethod = async (paymentMethodId: string) => {
+    if (!session) return;
+    
     try {
       setDeletingId(paymentMethodId);
 
-      const { data, error } = await supabase.functions.invoke('delete-payment-method', {
-        body: { paymentMethodId }
-      });
+      const { data, error } = await deletePaymentMethod(paymentMethodId, session.access_token);
 
       if (error) throw error;
 
       if (data?.success) {
         toast.success('Payment method deleted successfully');
         fetchPaymentMethods();
+        window.dispatchEvent(new CustomEvent('profileUpdated'));
       } else {
         throw new Error(data?.error || 'Failed to delete payment method');
       }
@@ -150,15 +146,17 @@ export const EnhancedPaymentMethodManager: React.FC<EnhancedPaymentMethodManager
   };
 
   const handleSetDefaultPaymentMethod = async (paymentMethodId: string) => {
+    if (!session) return;
+    
     try {
       setSettingDefaultId(paymentMethodId);
 
-      const { data, error } = await supabase.functions.invoke('set-default-payment-method', {
+      const { data, error } = await invokeEdgeFunction('set-default-payment-method', {
         body: { 
           customerId: stripeCustomerId,
           paymentMethodId 
         }
-      });
+      }, session.access_token);
 
       if (error) throw error;
 
@@ -185,10 +183,7 @@ export const EnhancedPaymentMethodManager: React.FC<EnhancedPaymentMethodManager
     setShowAddPaymentModal(false);
     onSuccess?.();
     toast.success('Payment method added successfully!');
-  };
-
-  const formatCardBrand = (brand: string) => {
-    return brand.charAt(0).toUpperCase() + brand.slice(1);
+    window.dispatchEvent(new CustomEvent('profileUpdated'));
   };
 
   const getStatusIcon = (status: PaymentMethod['status']) => {

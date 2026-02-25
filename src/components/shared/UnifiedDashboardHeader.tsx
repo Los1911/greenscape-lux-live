@@ -32,13 +32,14 @@ export default function UnifiedDashboardHeader({
   const handleLogout = async () => {
     try {
       console.log(`${type} logout initiated`);
-      const redirectPath = type === 'client' ? '/client-login' : '/';
+      const redirectPath = type === 'client' ? '/portal-login' : '/';
       await signOutAndRedirect(supabase, redirectPath);
     } catch (error) {
       console.error(`${type} logout error:`, error);
-      window.location.href = type === 'client' ? '/client-login' : '/';
+      window.location.href = type === 'client' ? '/portal-login' : '/';
     }
   };
+
 
   const handleBack = () => {
     // Use explicit navigation instead of navigate(-1)
@@ -58,28 +59,28 @@ export default function UnifiedDashboardHeader({
     return (
       <>
         <LiveNotificationSystem />
-        <header className="bg-white shadow-sm border-b">
+        <header className="dashboard-header bg-white shadow-sm border-b" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
+            <div className="flex justify-between items-center py-4 min-h-[56px]">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
                   {type === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
                 </h1>
-                <p className="text-gray-600">
+                <p className="text-sm sm:text-base text-gray-600 truncate">
                   Welcome back{userName ? `, ${userName}` : ''}! Here's your overview.
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                 {showNotifications && <NotificationBell />}
 
                 <Button
                   onClick={handleLogout}
                   variant="outline"
                   size="sm"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
                 >
                   <LogOut className="w-4 h-4" />
-                  Logout
+                  <span className="hidden sm:inline">Logout</span>
                 </Button>
               </div>
             </div>

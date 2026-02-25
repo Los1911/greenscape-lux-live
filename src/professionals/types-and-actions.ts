@@ -6,7 +6,7 @@ import { Job, JobStatus as CanonicalJobStatus } from '@/types/job';
 // Re-export canonical Job type
 export type { Job } from '@/types/job';
 
-export type JobStatus = "scheduled" | "in_progress" | "completed" | "canceled";
+export type JobStatus = "scheduled" | "active" | "completed" | "canceled";
 
 export type CommType = "call" | "sms" | "email" | "note";
 
@@ -14,7 +14,7 @@ export interface DayPoint { date: string; amount: number }
 
 export function normalizeStatus(s: string | null | undefined): JobStatus {
   const v = String(s ?? "").trim().toLowerCase().replace(" ", "_");
-  if (v === "in_progress" || v === "completed" || v === "canceled") return v as JobStatus;
+  if (v === "active" || v === "completed" || v === "canceled") return v as JobStatus;
   return "scheduled";
 }
 

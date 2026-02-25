@@ -26,7 +26,16 @@ const RadioGroupItem = React.forwardRef<
     <RadioGroupPrimitive.Item
       ref={ref}
       className={cn(
-        "aspect-square h-4 w-4 rounded-full border border-primary/60 text-primary ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200",
+        "aspect-square h-4 w-4 rounded-full border border-primary/60 text-primary",
+        // Focus states - GreenScape Lux branded emerald glow with dark offset
+        "focus-visible:outline-none",
+        "focus-visible:ring-2 focus-visible:ring-emerald-400/60",
+        "focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+        // States
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        // Transitions & touch optimization
+        "transition-all duration-200",
+        "[-webkit-tap-highlight-color:transparent]",
         className
       )}
       {...props}

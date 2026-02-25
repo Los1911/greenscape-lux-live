@@ -11,7 +11,8 @@ import { SystemHealthMonitor } from './SystemHealthMonitor';
 import { PaymentAlertsSystem } from './PaymentAlertsSystem';
 import { PaymentChartsAndGraphs } from './PaymentChartsAndGraphs';
 import { supabase } from '@/lib/supabase';
-import { AlertTriangle, DollarSign, TrendingUp, Activity } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { AlertTriangle, DollarSign, TrendingUp, Activity, RefreshCw } from 'lucide-react';
 
 interface PaymentDashboardData {
   totalRevenue: number;
@@ -23,6 +24,7 @@ interface PaymentDashboardData {
 }
 
 export const PaymentMonitoringDashboard: React.FC = () => {
+  const { user, loading: authLoading } = useAuth();
   const [dashboardData, setDashboardData] = useState<PaymentDashboardData>({
     totalRevenue: 0,
     successRate: 0,
@@ -32,17 +34,22 @@ export const PaymentMonitoringDashboard: React.FC = () => {
     webhookHealth: 'healthy'
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<any[]>([]);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+    
     fetchDashboardData();
     
     if (autoRefresh) {
-      const interval = setInterval(fetchDashboardData, 30000); // Refresh every 30 seconds
+      const interval = setInterval(fetchDashboardData, 30000);
       return () => clearInterval(interval);
     }
-  }, [autoRefresh]);
+  }, [authLoading, user, autoRefresh]);
+
 
   const fetchDashboardData = async () => {
     try {
@@ -90,13 +97,32 @@ export const PaymentMonitoringDashboard: React.FC = () => {
           timestamp: new Date()
         }]);
       }
-
+      setError(null);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      setError('Failed to load payment data');
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error && !isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <AlertTriangle className="h-12 w-12 text-red-500" />
+        <p className="text-red-600">{error}</p>
+        <Button onClick={fetchDashboardData}>Retry</Button>
+      </div>
+    );
+  }
 
   const getHealthBadgeColor = (health: string) => {
     switch (health) {
@@ -106,6 +132,7 @@ export const PaymentMonitoringDashboard: React.FC = () => {
       default: return 'bg-gray-500';
     }
   };
+
 
   return (
     <div className="space-y-6 p-6">

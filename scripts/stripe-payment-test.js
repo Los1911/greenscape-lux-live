@@ -13,11 +13,12 @@ console.log('=======================================\n');
 
 // Configuration
 const config = {
-  baseUrl: process.env.VERCEL_URL || 'https://greenscape-lux.vercel.app',
+  baseUrl: process.env.VITE_APP_URL || 'https://greenscapelux.com',
   testAmount: 10000, // $100.00 in cents
   stripePublishableKey: process.env.VITE_STRIPE_PUBLISHABLE_KEY,
   webhookSecret: process.env.STRIPE_WEBHOOK_SECRET
 };
+
 
 // Validate configuration
 if (!config.stripePublishableKey) {

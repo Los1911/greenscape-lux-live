@@ -1,251 +1,325 @@
-# Automated Maintenance System Guide
+# Automated Environment Variable Synchronization - Setup Guide
 
 ## Overview
+This guide explains how to set up and use the automated environment variable synchronization system that keeps your variables in sync across DeployPad, Vercel, and GitHub Actions.
 
-GreenScape Lux now includes an automated maintenance system that identifies and manages deprecated files in the repository. The system runs monthly and generates reports of files that may be candidates for deletion.
+## System Components
 
-## Features
+### 1. Frontend Dashboard
+- **Location**: Admin Panel → Environment Variables
+- **Features**: 
+  - Real-time sync status
+  - One-click sync button
+  - Alert notifications
+  - Platform status overview
 
-### 🔍 Intelligent Detection
-- **Pattern matching**: Identifies files with AUDIT, DIAGNOSTIC, FIX, REPORT patterns
-- **Age analysis**: Flags files not modified in 90+ days
-- **Git history**: Analyzes commit history for each file
-- **Size tracking**: Reports file sizes for cleanup impact assessment
+### 2. Backend Services
+- **EnvironmentSyncService**: Core sync logic
+- **AutomatedEnvSyncService**: Health checks and alerts
+- **EnvKeySyncer**: Platform-specific API integrations
 
-### 🛡️ Safety Safeguards
-- **Protected patterns**: Never flags production-critical files
-- **Manual approval**: Requires explicit confirmation before deletion
-- **Deletion logging**: Maintains comprehensive log of all deletions
-- **Rollback support**: Git history preserved for easy recovery
+### 3. Automation Scripts
+- **Node.js Script**: `scripts/automated-env-sync.js`
+- **GitHub Workflow**: `.github/workflows/automated-env-sync.yml`
 
-### 📊 Reporting
-- **Detailed reports**: Generated in `maintenance-reports/` directory
-- **GitHub Issues**: Automatically creates issues with findings
-- **Artifacts**: Reports uploaded to GitHub Actions for 90 days
-- **Historical logs**: Tracks all maintenance activities
+## Initial Setup
 
-## Quick Start
+### Step 1: Configure API Credentials
 
-### Run Manual Scan
+#### Add to Supabase Secrets
+```bash
+# Vercel credentials
+VERCEL_TOKEN=<your_vercel_api_token>
+VERCEL_PROJECT_ID=<your_project_id>
+
+# GitHub credentials (optional, uses GITHUB_TOKEN from Actions)
+GITHUB_REPO=owner/repository-name
+```
+
+#### Add to GitHub Secrets
+1. Go to repository Settings → Secrets and variables → Actions
+2. Add the following secrets:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`
+   - `STRIPE_PUBLISHABLE_KEY`
+   - `GOOGLE_MAPS_API_KEY`
+   - `VERCEL_TOKEN`
+   - `VERCEL_PROJECT_ID`
+
+### Step 2: Get API Tokens
+
+#### Vercel Token
+1. Go to https://vercel.com/account/tokens
+2. Create new token with name "Environment Sync"
+3. Copy token and add to secrets
+
+#### Vercel Project ID
+1. Go to your Vercel project settings
+2. Copy Project ID from General tab
+3. Add to secrets
+
+#### GitHub Token
+- Automatically provided by GitHub Actions
+- No manual setup required
+
+### Step 3: Enable Automated Sync
+
+The GitHub Actions workflow runs automatically:
+- **Daily**: At 2 AM UTC
+- **On Push**: When env files change
+- **Manual**: Via GitHub Actions UI
+
+To manually trigger:
+1. Go to Actions tab in GitHub
+2. Select "Automated Environment Variable Sync"
+3. Click "Run workflow"
+
+## Using the Dashboard
+
+### Access the Dashboard
+1. Log in as admin
+2. Navigate to Admin Panel
+3. Click "Environment Variables" in sidebar
+
+### Dashboard Features
+
+#### Sync Status Cards
+- Shows status for each platform (DeployPad, Vercel, GitHub)
+- Displays last sync time
+- Shows number of variables synced
+
+#### Alert System
+- Red alerts for missing variables
+- Yellow alerts for outdated variables
+- Orange alerts for sync errors
+
+#### One-Click Sync
+1. Click "Sync All Platforms" button
+2. Wait for confirmation message
+3. Review sync results
+
+#### Health Check
+1. Click "Check Status" button
+2. System validates all variables
+3. Generates alerts for issues
+
+## Manual Synchronization
+
+### Using Node.js Script
 
 ```bash
-# Generate report (no deletion)
-bash scripts/automated-maintenance.sh
+# Set environment variables
+export VITE_SUPABASE_URL="https://your-project.supabase.co"
+export VITE_SUPABASE_PUBLISHABLE_KEY="your-key"
+export STRIPE_PUBLISHABLE_KEY="pk_live_..."
+export GOOGLE_MAPS_API_KEY="your-key"
+export VERCEL_TOKEN="your-token"
+export VERCEL_PROJECT_ID="prj_..."
+export GITHUB_TOKEN="ghp_..."
+export GITHUB_REPO="owner/repo"
 
-# Review the report
-cat maintenance-reports/deprecated-files-$(date +%Y-%m-%d).md
+# Run sync script
+node scripts/automated-env-sync.js
 ```
 
-### Approve Deletion
+### Expected Output
+```
+🚀 Starting environment variable synchronization...
 
-```bash
-# Run with approval flag
-bash scripts/automated-maintenance.sh --approve
+📝 Syncing VITE_SUPABASE_URL...
+✅ Synced VITE_SUPABASE_URL to Vercel
+✅ Synced VITE_SUPABASE_URL to GitHub Actions
 
-# Type 'DELETE' when prompted to confirm
+📝 Syncing VITE_SUPABASE_PUBLISHABLE_KEY...
+✅ Synced VITE_SUPABASE_PUBLISHABLE_KEY to Vercel
+✅ Synced VITE_SUPABASE_PUBLISHABLE_KEY to GitHub Actions
+
+==================================================
+📊 Synchronization Summary
+==================================================
+Total variables: 4
+✅ Successfully synced: 4
+❌ Failed: 0
+
+✨ Synchronization complete!
 ```
 
-## Automated Monthly Execution
+## Monitoring & Alerts
 
-The system runs automatically via GitHub Actions:
+### Automated Health Checks
+- Run every 5 minutes
+- Check for missing variables
+- Detect outdated configurations
+- Generate alerts automatically
 
-**Schedule**: 1st of every month at 2 AM UTC
+### Alert Types
 
-**Workflow**: `.github/workflows/monthly-maintenance.yml`
-
-**Actions**:
-1. Scans repository for deprecated files
-2. Generates detailed report
-3. Creates GitHub issue with findings
-4. Uploads report as artifact
-5. Waits for manual approval
-
-### Manual Trigger
-
-Trigger the workflow manually:
-1. Navigate to **Actions** tab on GitHub
-2. Select **"Monthly Repository Maintenance"**
-3. Click **"Run workflow"**
-4. Select branch and click **"Run workflow"**
-
-## Configuration
-
-### Edit Settings
-
-File: `scripts/maintenance-config.json`
-
-```json
-{
-  "settings": {
-    "daysThreshold": 90,
-    "reportDirectory": "maintenance-reports",
-    "deletionLogFile": "maintenance-reports/deletion-log.md"
-  }
-}
+#### Missing Variable Alert
+```
+❌ Missing environment variable: VITE_SUPABASE_URL
+Platform: current
+Action: Add variable to environment
 ```
 
-### Deprecated Patterns
-
-Files matching these patterns are flagged:
-- `*AUDIT*.md`
-- `*DIAGNOSTIC*.md`
-- `*FIX*.md`
-- `*REPORT*.md`
-- `*GUIDE*.md`
-- `*IMPLEMENTATION*.md`
-- `*DEPLOYMENT*.md`
-- `*CLEANUP*.md`
-- `*STATUS*.md`
-- `*COMPLETE*.md`
-
-### Protected Patterns
-
-These files are **never** flagged:
-- `README.md`, `CHANGELOG.md`, `LICENSE.md`
-- `.github/**/*` (workflows)
-- `supabase/**/*` (database functions)
-- `src/**/*` (source code)
-- `package.json`, `vite.config.ts`
-- `.env*` (environment files)
-
-## Report Structure
-
-### Sample Report
-
-```markdown
-# Deprecated Files Maintenance Report
-**Generated:** 2025-01-15
-**Threshold:** Files not modified in 90 days
-
-## Summary
-Found 45 candidates for deletion
-
-### Files Older Than 90 Days
-| File | Days Old | Last Modified | Size |
-|------|----------|---------------|------|
-| STRIPE_AUDIT.md | 120 | 2024-09-15 | 45KB |
-| FIX_COMPLETE.md | 95 | 2024-10-10 | 12KB |
-
-## Git History Analysis
-- **STRIPE_AUDIT.md**: abc123 - Initial audit (4 months ago)
-- **FIX_COMPLETE.md**: def456 - Fix applied (3 months ago)
-
-## Recommended Actions
-Total files identified: **45**
+#### Sync Error Alert
+```
+⚠️ Sync failed for STRIPE_PUBLISHABLE_KEY
+Platform: vercel
+Error: API authentication failed
+Action: Check API token validity
 ```
 
-## Deletion Log
-
-All deletions are logged in `maintenance-reports/deletion-log.md`:
-
-```markdown
-## Deletion Session: 2025-01-15 14:30:00
-- `STRIPE_AUDIT.md` (120 days old)
-- `FIX_COMPLETE.md` (95 days old)
-**Total deleted:** 2 files
+#### Outdated Variable Alert
 ```
-
-## Rollback Procedure
-
-If files are accidentally deleted:
-
-### Option 1: Git Restore
-
-```bash
-# View deletion log
-cat maintenance-reports/deletion-log.md
-
-# Restore specific file
-git checkout HEAD~1 -- path/to/deleted/file.md
-
-# Restore all files from last commit
-git checkout HEAD~1 -- .
+⏰ Variable outdated: GOOGLE_MAPS_API_KEY
+Platform: github
+Last synced: 7 days ago
+Action: Run sync to update
 ```
-
-### Option 2: Git History
-
-```bash
-# Find commit before deletion
-git log --oneline -- path/to/deleted/file.md
-
-# Restore from specific commit
-git checkout <commit-hash> -- path/to/deleted/file.md
-```
-
-## Best Practices
-
-### Before Approval
-1. ✅ Review the generated report thoroughly
-2. ✅ Check git history for each flagged file
-3. ✅ Verify no production dependencies
-4. ✅ Confirm files are truly deprecated
-5. ✅ Backup important documentation
-
-### After Deletion
-1. ✅ Review deletion log
-2. ✅ Verify build still succeeds (`npm run build`)
-3. ✅ Check environment variables (`npm run verify:env`)
-4. ✅ Test critical functionality
-5. ✅ Commit changes with descriptive message
-
-### Monthly Routine
-1. 📧 Receive GitHub issue notification
-2. 📊 Review maintenance report
-3. 🔍 Analyze flagged files
-4. ✅ Approve deletion if appropriate
-5. 🧪 Verify build and tests
-6. 📝 Update documentation if needed
 
 ## Troubleshooting
 
-### Script Won't Run
+### Common Issues
 
-```bash
-# Make executable
-chmod +x scripts/automated-maintenance.sh
+#### 1. "Missing credentials" Error
+**Problem**: API tokens not configured
+**Solution**: 
+- Check Supabase secrets for VERCEL_TOKEN
+- Verify VERCEL_PROJECT_ID is set
+- Ensure GitHub secrets are configured
 
-# Check bash version
-bash --version  # Requires 4.0+
-```
+#### 2. "API authentication failed"
+**Problem**: Invalid or expired token
+**Solution**:
+- Generate new Vercel token
+- Update token in secrets
+- Re-run sync
 
-### Protected File Flagged
+#### 3. "Variable not found in environment"
+**Problem**: Variable not set in current environment
+**Solution**:
+- Add variable to .env.production
+- Set in deployment platform
+- Re-run sync
 
-Edit `scripts/maintenance-config.json` and add to `protectedPatterns`:
+#### 4. Sync succeeds but variables not updating
+**Problem**: Platform caching or propagation delay
+**Solution**:
+- Wait 5-10 minutes for propagation
+- Trigger new deployment
+- Clear platform cache
 
-```json
-{
-  "protectedPatterns": [
-    "YOUR_FILE_PATTERN.md"
-  ]
-}
-```
+### Verification Steps
 
-### GitHub Action Fails
+1. **Check Dashboard**
+   - All platforms show "OK" status
+   - No active alerts
+   - Recent sync timestamp
 
-1. Check workflow logs in Actions tab
-2. Verify permissions: `contents: write`, `pull-requests: write`
-3. Ensure `maintenance-reports/` directory exists
-4. Check git configuration in workflow
+2. **Verify in Vercel**
+   - Go to project settings
+   - Check Environment Variables tab
+   - Confirm values match
 
-## Security Considerations
+3. **Verify in GitHub**
+   - Go to repository settings
+   - Check Secrets and variables
+   - Confirm secrets exist
 
-- ✅ Script requires explicit `--approve` flag for deletion
-- ✅ Confirmation prompt requires typing "DELETE"
-- ✅ Protected patterns prevent critical file deletion
-- ✅ All deletions logged with timestamps
-- ✅ Git history preserved for rollback
-- ✅ GitHub Actions requires manual approval
+4. **Test in Application**
+   - Deploy new version
+   - Check browser console for env values
+   - Verify features work correctly
 
-## Support
+## Best Practices
 
-For issues or questions:
-1. Check `maintenance-reports/README.md`
-2. Review deletion log for history
-3. Examine `scripts/maintenance-config.json`
-4. Check GitHub Actions workflow logs
-5. Restore from git history if needed
+### 1. Regular Monitoring
+- Check dashboard weekly
+- Review alerts promptly
+- Run manual health checks before deployments
 
----
+### 2. Secure Credentials
+- Never commit API tokens to git
+- Use Supabase secrets for sensitive values
+- Rotate tokens regularly (quarterly)
 
-**Last Updated:** 2025-01-15
-**Version:** 1.0.0
+### 3. Sync Timing
+- Run sync before major deployments
+- Schedule during low-traffic periods
+- Allow time for propagation
+
+### 4. Documentation
+- Document any manual changes
+- Keep this guide updated
+- Share access with team
+
+## Maintenance Schedule
+
+### Daily
+- Automated sync runs at 2 AM UTC
+- Health checks every 5 minutes
+- Alert generation as needed
+
+### Weekly
+- Review dashboard for alerts
+- Verify sync status
+- Check platform consoles
+
+### Monthly
+- Review sync logs
+- Update documentation
+- Audit API token access
+
+### Quarterly
+- Rotate API tokens
+- Review and update variables
+- Test disaster recovery
+
+## Support & Resources
+
+### Documentation
+- [Vercel API Docs](https://vercel.com/docs/rest-api)
+- [GitHub Actions Secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
+- [Supabase Environment Variables](https://supabase.com/docs/guides/cli/managing-environments)
+
+### Getting Help
+1. Check dashboard alerts for specific errors
+2. Review sync logs in GitHub Actions
+3. Verify API token validity
+4. Contact platform support if needed
+
+## Disaster Recovery
+
+### If Sync Completely Fails
+
+1. **Manual Backup**
+   ```bash
+   # Export current variables
+   vercel env pull .env.backup
+   ```
+
+2. **Manual Restore**
+   - Copy variables from .env.backup
+   - Manually add to each platform
+   - Verify in platform console
+
+3. **Re-enable Automation**
+   - Fix underlying issue
+   - Test with manual sync
+   - Re-enable automated workflow
+
+### Emergency Contacts
+- Platform Support: [Contact links]
+- Team Lead: [Contact info]
+- On-Call Engineer: [Contact info]
+
+## Conclusion
+
+The automated environment variable synchronization system ensures:
+- ✅ Consistent configuration across platforms
+- ✅ Automated monitoring and alerts
+- ✅ One-click synchronization
+- ✅ Audit trail and logging
+- ✅ Reduced manual configuration errors
+
+Follow this guide to maintain a reliable, synchronized environment across all deployment platforms.

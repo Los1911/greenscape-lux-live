@@ -1,112 +1,140 @@
 #!/bin/bash
 
-# Force Cache-Busted Deployment with Verification
-# Usage: ./scripts/force-deploy-with-verification.sh [production|preview]
+# =============================================================================
+# Force Deploy with Cache Verification
+# =============================================================================
+# This script forces a clean production deployment and verifies the cache
+# is properly busted.
+#
+# Usage: ./scripts/force-deploy-with-verification.sh
+# =============================================================================
 
 set -e
 
-ENVIRONMENT=${1:-production}
-TIMESTAMP=$(date +%s)
-COMMIT_HASH=$(git rev-parse --short HEAD)
-COMMIT_FULL=$(git rev-parse HEAD)
-BUILD_ID="${COMMIT_HASH}-${TIMESTAMP}"
+echo "═══════════════════════════════════════════════════════════════"
+echo "🚀 GreenScape Lux - Force Deploy with Cache Verification"
+echo "═══════════════════════════════════════════════════════════════"
 
-echo "🚀 Starting Force Deployment with Cache Busting"
-echo "================================================"
-echo "Environment: $ENVIRONMENT"
-echo "Commit Hash: $COMMIT_HASH"
-echo "Build ID: $BUILD_ID"
-echo "Timestamp: $TIMESTAMP"
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Expected version (update this on each deployment)
+EXPECTED_VERSION="admin-jobs-fix-v3-20260126"
+PRODUCTION_URL="https://greenscapelux.com"
+
+echo ""
+echo "📦 Expected Version: $EXPECTED_VERSION"
+echo "🌐 Production URL: $PRODUCTION_URL"
 echo ""
 
-# Step 1: Update version file
-echo "📝 Step 1: Creating version metadata..."
-cat > public/version.json << EOF
-{
-  "commitHash": "$COMMIT_HASH",
-  "commitFull": "$COMMIT_FULL",
-  "buildId": "$BUILD_ID",
-  "timestamp": $TIMESTAMP,
-  "environment": "$ENVIRONMENT",
-  "deployedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-}
-EOF
-echo "✅ Version file created"
+# Step 1: Clean local build artifacts
+echo "🧹 Step 1: Cleaning local build artifacts..."
+rm -rf dist node_modules/.vite
+echo "   ✅ Build artifacts cleaned"
 
-# Step 2: Update index.html with version meta tag
-echo "📝 Step 2: Injecting version into index.html..."
-if [ -f "index.html" ]; then
-  sed -i.bak "s/<meta name=\"version\" content=\".*\">/<meta name=\"version\" content=\"$BUILD_ID\">/" index.html || \
-  sed -i '' "s/<meta name=\"version\" content=\".*\">/<meta name=\"version\" content=\"$BUILD_ID\">/" index.html 2>/dev/null || true
-fi
-echo "✅ Version meta tag updated"
+# Step 2: Install dependencies
+echo ""
+echo "📥 Step 2: Installing dependencies..."
+npm ci
+echo "   ✅ Dependencies installed"
 
-# Step 3: Commit version changes
-echo "📝 Step 3: Committing version metadata..."
-git add public/version.json index.html 2>/dev/null || true
-git commit -m "Deploy: $BUILD_ID [skip ci]" --no-verify 2>/dev/null || echo "No changes to commit"
+# Step 3: Build the application
+echo ""
+echo "🔨 Step 3: Building application..."
+npm run build
+echo "   ✅ Build completed"
 
-# Step 4: Deploy to Vercel
-echo "🚀 Step 4: Deploying to Vercel..."
-if [ "$ENVIRONMENT" = "production" ]; then
-  vercel --prod --yes --force
+# Step 4: Verify build output contains correct version
+echo ""
+echo "🔍 Step 4: Verifying build output..."
+if grep -r "admin-jobs-fix-v3" dist/assets/*.js > /dev/null 2>&1; then
+    echo "   ✅ Build contains correct version marker"
 else
-  vercel --yes --force
+    echo -e "   ${YELLOW}⚠️  Version marker not found in build output${NC}"
 fi
-echo "✅ Deployment complete"
 
-# Step 5: Wait for deployment to propagate
-echo "⏳ Step 5: Waiting 10 seconds for CDN propagation..."
-sleep 10
-
-# Step 6: Purge Vercel cache
-echo "🧹 Step 6: Purging Vercel cache..."
-if [ "$ENVIRONMENT" = "production" ]; then
-  DOMAIN="www.greenscapelux.com"
+# Step 5: Check version.json in dist
+echo ""
+echo "📄 Step 5: Checking version.json..."
+if [ -f "dist/version.json" ]; then
+    cat dist/version.json
+    echo ""
+    echo "   ✅ version.json exists"
 else
-  DOMAIN=$(vercel ls --yes | grep -m1 "https://" | awk '{print $2}' | sed 's/https:\/\///')
+    echo -e "   ${RED}❌ version.json not found in dist${NC}"
 fi
 
-echo "Purging cache for: $DOMAIN"
-curl -X PURGE "https://$DOMAIN/*" || echo "Cache purge attempted"
-echo "✅ Cache purge complete"
-
-# Step 7: Verify deployment
-echo "🔍 Step 7: Verifying deployment..."
-sleep 5
-
-DEPLOYED_VERSION=$(curl -s "https://$DOMAIN/version.json?t=$TIMESTAMP" | grep -o '"commitHash":"[^"]*"' | cut -d'"' -f4)
-
+# Step 6: Deploy to Vercel (if Vercel CLI is available)
 echo ""
-echo "================================================"
-echo "📊 DEPLOYMENT VERIFICATION"
-echo "================================================"
-echo "Expected Commit: $COMMIT_HASH"
-echo "Deployed Commit: $DEPLOYED_VERSION"
-echo ""
-
-if [ "$DEPLOYED_VERSION" = "$COMMIT_HASH" ]; then
-  echo "✅ SUCCESS: Deployment verified!"
-  echo "✅ Live version matches local commit"
+echo "🚀 Step 6: Deploying to Vercel..."
+if command -v vercel &> /dev/null; then
+    echo "   Vercel CLI found, deploying..."
+    vercel --prod --force --yes
+    echo "   ✅ Deployment initiated"
 else
-  echo "⚠️  WARNING: Version mismatch detected"
-  echo "⚠️  This may indicate CDN caching issues"
+    echo -e "   ${YELLOW}⚠️  Vercel CLI not found. Please deploy manually:${NC}"
+    echo "      1. Go to Vercel Dashboard"
+    echo "      2. Select your project"
+    echo "      3. Click 'Redeploy' with 'Clear Build Cache' option"
 fi
 
+# Step 7: Wait for deployment to propagate
 echo ""
-echo "================================================"
-echo "🧪 MANUAL VERIFICATION STEPS"
-echo "================================================"
-echo "1. Open incognito/private window"
-echo "2. Visit: https://$DOMAIN/version.json?t=$TIMESTAMP"
-echo "3. Verify commitHash: $COMMIT_HASH"
-echo "4. Test quote form: https://$DOMAIN/get-quote"
-echo "5. Open DevTools Console (F12)"
-echo "6. Look for: '🏁 ClientQuoteForm component mounted/rendered'"
-echo "7. Submit form and verify all step logs appear"
+echo "⏳ Step 7: Waiting for deployment to propagate (30 seconds)..."
+sleep 30
+
+# Step 8: Verify production deployment
 echo ""
-echo "🔗 Quick Links:"
-echo "   Version: https://$DOMAIN/version.json?t=$TIMESTAMP"
-echo "   Quote Form: https://$DOMAIN/get-quote"
+echo "🔍 Step 8: Verifying production deployment..."
+
+# Fetch version.json from production
+PROD_VERSION=$(curl -s -H "Cache-Control: no-cache" "$PRODUCTION_URL/version.json?t=$(date +%s)" 2>/dev/null)
+
+if [ -n "$PROD_VERSION" ]; then
+    echo "   Production version.json:"
+    echo "$PROD_VERSION" | head -20
+    echo ""
+    
+    # Check if version matches
+    if echo "$PROD_VERSION" | grep -q "$EXPECTED_VERSION"; then
+        echo -e "   ${GREEN}✅ Production is serving correct version!${NC}"
+    else
+        echo -e "   ${RED}❌ Production version mismatch!${NC}"
+        echo "      Expected: $EXPECTED_VERSION"
+        echo "      Please check Vercel deployment status"
+    fi
+    
+    # Check query source
+    if echo "$PROD_VERSION" | grep -q '"querySource": "jobs"'; then
+        echo -e "   ${GREEN}✅ Query source is 'jobs' (correct)${NC}"
+    else
+        echo -e "   ${RED}❌ Query source is NOT 'jobs' - stale deployment!${NC}"
+    fi
+else
+    echo -e "   ${YELLOW}⚠️  Could not fetch version.json from production${NC}"
+    echo "      URL: $PRODUCTION_URL/version.json"
+fi
+
+# Step 9: Summary
 echo ""
-echo "================================================"
+echo "═══════════════════════════════════════════════════════════════"
+echo "📋 Deployment Summary"
+echo "═══════════════════════════════════════════════════════════════"
+echo ""
+echo "Next Steps:"
+echo "1. Open $PRODUCTION_URL in an incognito window"
+echo "2. Open DevTools Console (F12)"
+echo "3. Look for: 'Build Version: $EXPECTED_VERSION'"
+echo "4. Look for: 'Query Source: jobs'"
+echo "5. Navigate to /admin-dashboard"
+echo "6. Verify no 400 errors in Network tab"
+echo ""
+echo "If still seeing old version:"
+echo "1. Clear browser cache completely"
+echo "2. Check Vercel Dashboard for deployment status"
+echo "3. Verify domain is pointing to correct project"
+echo ""
+echo "═══════════════════════════════════════════════════════════════"

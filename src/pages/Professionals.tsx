@@ -32,9 +32,10 @@ const Professionals: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <Card className="bg-gray-900/50 border-green-500/30 p-8 text-center hover:border-green-400/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(74,222,128,0.2)] h-full flex flex-col">
                 <div className="text-green-400 text-4xl mb-4">1️⃣</div>
-                <h3 className="text-white font-bold text-xl mb-4">Request a Quote</h3>
-                <p className="text-gray-300 text-sm flex-1">Fill out our Instant Quote form with a few simple details about your yard, needs, and timeline.</p>
+                <h3 className="text-white font-bold text-xl mb-4">Request an Estimate</h3>
+                <p className="text-gray-300 text-sm flex-1">Fill out our estimate request form with details about your property, needs, and timeline.</p>
               </Card>
+
 
               <Card className="bg-gray-900/50 border-green-500/30 p-8 text-center hover:border-green-400/50 transition-all duration-300 hover:shadow-[0_0_15px_rgba(74,222,128,0.2)] h-full flex flex-col">
                 <div className="text-green-400 text-4xl mb-4">2️⃣</div>
@@ -60,15 +61,11 @@ const Professionals: React.FC = () => {
               <ul className="space-y-3 text-gray-300">
                 <li className="flex items-center">
                   <span className="text-green-400 mr-3 text-lg">•</span>
-                  <span>Lawn Care and Maintenance</span>
+                  <span>Lawn Maintenance</span>
                 </li>
                 <li className="flex items-center">
                   <span className="text-green-400 mr-3 text-lg">•</span>
                   <span>Mulch and Rock Installation</span>
-                </li>
-                <li className="flex items-center">
-                  <span className="text-green-400 mr-3 text-lg">•</span>
-                  <span>Edging and Borders</span>
                 </li>
                 <li className="flex items-center">
                   <span className="text-green-400 mr-3 text-lg">•</span>
@@ -84,6 +81,7 @@ const Professionals: React.FC = () => {
                 </li>
               </ul>
             </Card>
+
 
             {/* Right Column - Why Choose */}
             <Card className="bg-gray-900/50 border-green-500/30 p-8 hover:border-green-400/50 transition-all duration-300 h-full">

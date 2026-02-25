@@ -4,8 +4,9 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { Database, Users, Activity, Clock, RefreshCw } from 'lucide-react';
+import { Database, Users, Activity, Clock, RefreshCw, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ConnectionStats {
   total: number;
@@ -24,28 +25,30 @@ interface ConnectionHistory {
   waitingConnections: number;
 }
 
+const defaultStats: ConnectionStats = {
+  total: 0,
+  active: 0,
+  idle: 0,
+  waiting: 0,
+  maxConnections: 100,
+  avgWaitTime: 0,
+  peakConnections: 0
+};
+
 export const ConnectionPoolStatus: React.FC = () => {
-  const [stats, setStats] = useState<ConnectionStats>({
-    total: 0,
-    active: 0,
-    idle: 0,
-    waiting: 0,
-    maxConnections: 100,
-    avgWaitTime: 0,
-    peakConnections: 0
-  });
-  
+  const { user, loading: authLoading } = useAuth();
+  const [stats, setStats] = useState<ConnectionStats>(defaultStats);
   const [history, setHistory] = useState<ConnectionHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchConnectionStats = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       
       const { data: connectionData } = await supabase.rpc('get_connection_pool_stats');
-      const { data: historyData } = await supabase.rpc('get_connection_history', {
-        hours: 24
-      });
+      const { data: historyData } = await supabase.rpc('get_connection_history', { hours: 24 });
       
       if (connectionData) {
         setStats({
@@ -68,19 +71,11 @@ export const ConnectionPoolStatus: React.FC = () => {
         }));
         setHistory(formattedHistory);
       }
-    } catch (error) {
-      console.error('Error fetching connection stats:', error);
+    } catch (err) {
+      console.error('Error fetching connection stats:', err);
       
       // Generate mock data for demo
-      setStats({
-        total: 45,
-        active: 28,
-        idle: 15,
-        waiting: 2,
-        maxConnections: 100,
-        avgWaitTime: 125,
-        peakConnections: 67
-      });
+      setStats({ total: 45, active: 28, idle: 15, waiting: 2, maxConnections: 100, avgWaitTime: 125, peakConnections: 67 });
       
       const mockHistory = Array.from({ length: 24 }, (_, i) => ({
         timestamp: new Date(Date.now() - (23 - i) * 3600000).toLocaleTimeString(),
@@ -95,11 +90,12 @@ export const ConnectionPoolStatus: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchConnectionStats();
+    if (authLoading || !user) return;
     
+    fetchConnectionStats();
     const interval = setInterval(fetchConnectionStats, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [authLoading, user]);
 
   const getUtilizationColor = (percentage: number) => {
     if (percentage > 80) return 'text-red-500';
@@ -107,7 +103,7 @@ export const ConnectionPoolStatus: React.FC = () => {
     return 'text-green-500';
   };
 
-  const utilizationPercentage = (stats.total / stats.maxConnections) * 100;
+  const utilizationPercentage = stats.maxConnections > 0 ? (stats.total / stats.maxConnections) * 100 : 0;
 
   const pieData = [
     { name: 'Active', value: stats.active, color: '#8884d8' },
@@ -117,16 +113,32 @@ export const ConnectionPoolStatus: React.FC = () => {
 
   const COLORS = ['#8884d8', '#82ca9d', '#ffc658'];
 
+  if (authLoading) {
+    return (
+      <div className="flex justify-center py-8">
+        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 gap-4">
+        <AlertCircle className="h-8 w-8 text-red-500" />
+        <p className="text-red-600">{error}</p>
+        <Button onClick={fetchConnectionStats} variant="outline">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">Connection Pool Status</h3>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={fetchConnectionStats}
-          disabled={isLoading}
-        >
+        <Button variant="outline" size="sm" onClick={fetchConnectionStats} disabled={isLoading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
@@ -146,40 +158,30 @@ export const ConnectionPoolStatus: React.FC = () => {
                 {utilizationPercentage.toFixed(1)}%
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.maxConnections - stats.total} available
-            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Connections</CardTitle>
+            <CardTitle className="text-sm font-medium">Active</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.active}</div>
-            <div className="flex items-center mt-2">
-              <Badge variant={stats.active > 50 ? 'destructive' : stats.active > 30 ? 'secondary' : 'default'}>
-                {stats.active > 50 ? 'High' : stats.active > 30 ? 'Medium' : 'Normal'}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {((stats.active / stats.total) * 100).toFixed(1)}% of total
-            </p>
+            <Badge variant={stats.active > 50 ? 'destructive' : 'default'}>
+              {stats.active > 50 ? 'High' : 'Normal'}
+            </Badge>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Idle Connections</CardTitle>
+            <CardTitle className="text-sm font-medium">Idle</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.idle}</div>
-            <p className="text-xs text-muted-foreground">
-              Available for reuse
-            </p>
+            <p className="text-xs text-muted-foreground">Available for reuse</p>
           </CardContent>
         </Card>
 
@@ -190,14 +192,9 @@ export const ConnectionPoolStatus: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.avgWaitTime}ms</div>
-            <div className="flex items-center mt-2">
-              <Badge variant={stats.avgWaitTime > 500 ? 'destructive' : stats.avgWaitTime > 200 ? 'secondary' : 'default'}>
-                {stats.avgWaitTime > 500 ? 'Slow' : stats.avgWaitTime > 200 ? 'Fair' : 'Fast'}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.waiting} currently waiting
-            </p>
+            <Badge variant={stats.avgWaitTime > 500 ? 'destructive' : 'default'}>
+              {stats.avgWaitTime > 500 ? 'Slow' : 'Fast'}
+            </Badge>
           </CardContent>
         </Card>
       </div>
@@ -206,21 +203,11 @@ export const ConnectionPoolStatus: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle>Connection Distribution</CardTitle>
-            <CardDescription>Current connection status breakdown</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
+                <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" label>
                   {pieData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
@@ -235,88 +222,22 @@ export const ConnectionPoolStatus: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle>Connection History (24h)</CardTitle>
-            <CardDescription>Connection usage over time</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={250}>
               <LineChart data={history}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="timestamp" />
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="activeConnections" 
-                  stroke="#8884d8" 
-                  name="Active"
-                  strokeWidth={2}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="idleConnections" 
-                  stroke="#82ca9d" 
-                  name="Idle"
-                  strokeWidth={2}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="waitingConnections" 
-                  stroke="#ffc658" 
-                  name="Waiting"
-                  strokeWidth={2}
-                />
+                <Line type="monotone" dataKey="activeConnections" stroke="#8884d8" name="Active" strokeWidth={2} />
+                <Line type="monotone" dataKey="idleConnections" stroke="#82ca9d" name="Idle" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Connection Pool Configuration</CardTitle>
-          <CardDescription>Current pool settings and recommendations</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <h4 className="font-medium">Pool Size</h4>
-              <div className="text-2xl font-bold">{stats.maxConnections}</div>
-              <p className="text-sm text-muted-foreground">Maximum connections</p>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium">Peak Usage</h4>
-              <div className="text-2xl font-bold">{stats.peakConnections}</div>
-              <p className="text-sm text-muted-foreground">Highest recorded</p>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium">Efficiency</h4>
-              <div className="text-2xl font-bold">
-                {stats.total > 0 ? ((stats.active / stats.total) * 100).toFixed(1) : 0}%
-              </div>
-              <p className="text-sm text-muted-foreground">Active/Total ratio</p>
-            </div>
-          </div>
-          
-          <div className="mt-4 p-4 bg-muted rounded-lg">
-            <h5 className="font-medium mb-2">Recommendations</h5>
-            <ul className="text-sm space-y-1">
-              {utilizationPercentage > 80 && (
-                <li className="text-red-600">• Consider increasing pool size - current utilization is high</li>
-              )}
-              {stats.avgWaitTime > 500 && (
-                <li className="text-yellow-600">• High wait times detected - optimize slow queries</li>
-              )}
-              {stats.idle / stats.total > 0.5 && (
-                <li className="text-blue-600">• Many idle connections - consider reducing pool size</li>
-              )}
-              {utilizationPercentage < 50 && stats.avgWaitTime < 100 && (
-                <li className="text-green-600">• Pool configuration appears optimal</li>
-              )}
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

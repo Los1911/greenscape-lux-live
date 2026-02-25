@@ -6,7 +6,7 @@ TypeError: Load failed
 ```
 
 ## Root Causes
-1. **Stripe key variable mismatch**: `.env.production` uses `VITE_STRIPE_PUBLISHABLE_KEY` but code expected `VITE_STRIPE_PUBLISHABLE_KEY`
+1. **Stripe key variable mismatch**: `.env.production` uses `VITE_STRIPE_PUBLIC_KEY` but code expected `VITE_STRIPE_PUBLISHABLE_KEY`
 2. **Possible Supabase project status**: Project may be paused or have network issues
 3. **Missing client options**: Enhanced configuration needed for better connectivity
 

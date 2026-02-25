@@ -14,11 +14,19 @@ export default defineConfig(({ mode }) => {
   // Validate critical environment variables at build time
   const requiredEnvVars = [
     'VITE_SUPABASE_URL',
-    'VITE_SUPABASE_ANON_KEY',
+    'VITE_SUPABASE_PUBLISHABLE_KEY',
     'VITE_STRIPE_PUBLISHABLE_KEY'
   ];
   
-  const missingVars = requiredEnvVars.filter(key => !env[key]);
+  // Check for new variable name, fallback to old for backwards compatibility
+  const supabaseKey = env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY;
+  
+  const missingVars = requiredEnvVars.filter(key => {
+    if (key === 'VITE_SUPABASE_PUBLISHABLE_KEY') {
+      return !supabaseKey;
+    }
+    return !env[key];
+  });
   
   if (missingVars.length > 0 && mode === 'production') {
     console.warn('⚠️ WARNING: Missing environment variables:', missingVars);
@@ -27,11 +35,7 @@ export default defineConfig(({ mode }) => {
   }
   
   return {
-<<<<<<< HEAD
     base: '', // Empty string for GitHub Pages with custom domain
-=======
-    base: '/',
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
     server: {
       host: "::",
       port: 8080,
@@ -41,7 +45,8 @@ export default defineConfig(({ mode }) => {
       __BUILD_HASH__: JSON.stringify(buildHash),
       // Explicitly define env vars (Vite does this automatically, but being explicit helps debugging)
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
-      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
+      'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify(supabaseKey),
+      'import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY),
       'import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_STRIPE_PUBLISHABLE_KEY),
       'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify(env.VITE_GOOGLE_MAPS_API_KEY),
     },
@@ -50,6 +55,8 @@ export default defineConfig(({ mode }) => {
       {
         name: 'version-generator',
         generateBundle() {
+          this.emitFile({
+
           this.emitFile({
             type: 'asset',
             fileName: 'version.json',

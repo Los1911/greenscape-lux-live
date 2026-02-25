@@ -161,7 +161,7 @@ npm run build
 ### Environment Variables Check
 ```bash
 npm run verify:env
-# Confirms VITE_STRIPE_PUBLISHABLE_KEY is set
+# Confirms VITE_STRIPE_PUBLIC_KEY is set
 # Confirms VITE_GOOGLE_MAPS_API_KEY is set
 ```
 

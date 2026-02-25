@@ -4,8 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
-import { DollarSign, User, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { DollarSign, User, Clock, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface CommissionPayout {
   id: string;
@@ -23,15 +24,19 @@ interface CommissionPayout {
 }
 
 export const CommissionPayoutTracker: React.FC = () => {
+  const { user, loading: authLoading } = useAuth();
   const [payouts, setPayouts] = useState<CommissionPayout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'processing' | 'completed' | 'failed'>('all');
   const [totalPending, setTotalPending] = useState(0);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+    
     fetchPayouts();
     
-    // Set up real-time subscription
     const subscription = supabase
       .channel('payouts')
       .on('postgres_changes', {
@@ -46,7 +51,9 @@ export const CommissionPayoutTracker: React.FC = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [filter]);
+  }, [authLoading, user, filter]);
+
+
 
   const fetchPayouts = async () => {
     try {
@@ -130,9 +137,17 @@ export const CommissionPayoutTracker: React.FC = () => {
     }).format(amount / 100);
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

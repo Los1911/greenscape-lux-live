@@ -14,7 +14,7 @@ interface PaymentAlert {
 }
 
 interface PaymentAlertsSystemProps {
-  alerts: PaymentAlert[];
+  alerts: PaymentAlert[] | null | undefined;
   onDismiss: (id: number) => void;
 }
 
@@ -22,6 +22,9 @@ export const PaymentAlertsSystem: React.FC<PaymentAlertsSystemProps> = ({
   alerts, 
   onDismiss 
 }) => {
+  // Safe alerts array
+  const safeAlerts = alerts || [];
+
   const getAlertIcon = (type: string) => {
     switch (type) {
       case 'error': return <AlertCircle className="h-4 w-4" />;
@@ -49,27 +52,38 @@ export const PaymentAlertsSystem: React.FC<PaymentAlertsSystemProps> = ({
     }
   };
 
-  if (alerts.length === 0) {
+  const formatTimestamp = (timestamp: Date | string | undefined) => {
+    if (!timestamp) return 'Unknown time';
+    try {
+      const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+      if (isNaN(date.getTime())) return 'Unknown time';
+      return formatDistanceToNow(date, { addSuffix: true });
+    } catch {
+      return 'Unknown time';
+    }
+  };
+
+  if (safeAlerts.length === 0) {
     return null;
   }
 
   return (
     <div className="space-y-3">
-      {alerts.map((alert) => (
-        <Alert key={alert.id} variant={getAlertVariant(alert.type) as any}>
+      {safeAlerts.map((alert) => (
+        <Alert key={alert.id} variant={getAlertVariant(alert.type || 'info') as any}>
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3">
-              {getAlertIcon(alert.type)}
+              {getAlertIcon(alert.type || 'info')}
               <div className="flex-1">
                 <AlertDescription className="mb-2">
-                  {alert.message}
+                  {alert.message || 'No message'}
                 </AlertDescription>
                 <div className="flex items-center gap-2">
-                  <Badge className={getAlertBadgeColor(alert.type)}>
-                    {alert.type.toUpperCase()}
+                  <Badge className={getAlertBadgeColor(alert.type || 'info')}>
+                    {(alert.type || 'info').toUpperCase()}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(alert.timestamp, { addSuffix: true })}
+                    {formatTimestamp(alert.timestamp)}
                   </span>
                 </div>
               </div>

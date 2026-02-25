@@ -12,7 +12,8 @@ interface Landscaper {
   email: string;
   payout_enabled: boolean;
   payout_schedule: 'daily' | 'weekly';
-  stripe_account_id?: string;
+  stripe_connect_id?: string;
+
   pending_amount: number;
   last_payout: string;
   failed_payouts: number;
@@ -45,21 +46,60 @@ export default function PayoutManagementPanel() {
 
   const fetchData = async () => {
     try {
-      const [landscapersRes, logsRes] = await Promise.all([
-        supabase.from('landscapers').select('id, name, email, payout_enabled, payout_schedule, stripe_account_id'),
-        supabase.from('payout_logs').select('id, landscaper_id, amount, status, error_message, created_at').order('created_at', { ascending: false }).limit(50)
-      ]);
-      if (landscapersRes.data) {
-        const enhanced = landscapersRes.data.map(l => ({
-          ...l,
-          pending_amount: Math.random() * 500 + 100,
-          failed_payouts: Math.floor(Math.random() * 3),
-          last_payout: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString()
-        }));
-        setLandscapers(enhanced);
+      // First fetch landscaper records with actual columns
+      const { data: landscaperData, error: landscaperError } = await supabase
+        .from('landscapers')
+        .select('id, user_id, business_name, stripe_connect_id');
+      
+      if (landscaperError) {
+        console.error('Error fetching landscapers:', landscaperError);
       }
 
-      if (logsRes.data) setPayoutLogs(logsRes.data);
+      // Fetch payout logs
+      const { data: logsData, error: logsError } = await supabase
+        .from('payout_logs')
+        .select('id, landscaper_id, amount, status, error_message, created_at')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (logsError) {
+        console.error('Error fetching payout logs:', logsError);
+      }
+
+      // Get profile data for landscapers
+      if (landscaperData && landscaperData.length > 0) {
+        const userIds = landscaperData.map(l => l.user_id).filter(Boolean);
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('user_id, email, first_name, last_name')
+          .in('user_id', userIds);
+
+        // Create profile map
+        const profileMap = new Map(
+          (profileData || []).map(p => [p.user_id, p])
+        );
+
+        // Combine data with mock payout fields (since these columns don't exist in DB)
+        const enhanced = landscaperData.map(l => {
+          const profile = profileMap.get(l.user_id) || {};
+          return {
+            id: l.id,
+            name: l.business_name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown',
+            email: profile.email || '',
+            payout_enabled: true, // Default since column doesn't exist
+            payout_schedule: 'weekly' as const, // Default since column doesn't exist
+            stripe_connect_id: l.stripe_connect_id,
+            pending_amount: Math.random() * 500 + 100,
+            failed_payouts: Math.floor(Math.random() * 3),
+            last_payout: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString()
+          };
+        });
+        setLandscapers(enhanced);
+      } else {
+        setLandscapers([]);
+      }
+
+      if (logsData) setPayoutLogs(logsData);
 
       // Calculate analytics
       const totalPending = landscapers.reduce((sum, l) => sum + l.pending_amount, 0);
@@ -76,6 +116,9 @@ export default function PayoutManagementPanel() {
       console.error('Error fetching payout data:', error);
     }
   };
+
+
+
 
   const handleBulkAction = async (action: string) => {
     setLoading(true);

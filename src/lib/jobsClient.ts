@@ -35,29 +35,33 @@ export const jobsClient = {
 
   /**
    * Create new job with validation
+   * Note: Returns only error status for RLS compatibility - use getById after insert if data needed
    */
-  async create(job: JobInsert) {
+  async create(job: JobInsert): Promise<{ error: any }> {
     // Validate required fields
     validateJobInsert(job);
     
-    return supabase
+    const { error } = await supabase
       .from('jobs')
-      .insert(job)
-      .select('id, service_name, service_type, service_address, price, preferred_date, status, customer_name, created_at, updated_at')
-      .single();
+      .insert(job);
+    
+    return { error };
   },
+
 
   /**
    * Update existing job
+   * Note: Returns only error status for RLS compatibility - use getById after update if data needed
    */
-  async update(id: string, updates: JobUpdate) {
-    return supabase
+  async update(id: string, updates: JobUpdate): Promise<{ error: any }> {
+    const { error } = await supabase
       .from('jobs')
       .update(updates)
-      .eq('id', id)
-      .select('id, service_name, service_type, service_address, price, preferred_date, status, customer_name, created_at, updated_at')
-      .single();
+      .eq('id', id);
+    
+    return { error };
   },
+
 
   /**
    * Delete job

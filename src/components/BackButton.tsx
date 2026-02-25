@@ -2,14 +2,13 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
+import { getDashboardRoute, isPublicRoute } from '@/utils/navigationHelpers';
 
 interface BackButtonProps {
   className?: string;
   fallbackPath?: string;
 }
-
-// Universal fallback route for the entire app
-const UNIVERSAL_FALLBACK = '/';
 
 // Context-aware fallback routes based on current page
 const CONTEXT_FALLBACKS: Record<string, string> = {
@@ -26,42 +25,77 @@ const CONTEXT_FALLBACKS: Record<string, string> = {
   '/thank-you': '/get-quote',
   '/reset-password': '/portal-login',
   '/forgot-password': '/portal-login',
+  '/portal-login': '/get-started',
+  '/get-started': '/',
+};
+
+// Auth-aware fallbacks that return dashboard instead of public routes
+const getAuthAwareFallback = (currentPath: string, role: string | null): string => {
+  const contextFallback = CONTEXT_FALLBACKS[currentPath];
+  
+  if (contextFallback) {
+    // If the fallback is a public route and user is authenticated, go to dashboard
+    if (isPublicRoute(contextFallback)) {
+      return getDashboardRoute(role);
+    }
+    return contextFallback;
+  }
+  
+  // Default to dashboard for authenticated users
+  return getDashboardRoute(role);
 };
 
 export default function BackButton({ className = '', fallbackPath }: BackButtonProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, role } = useAuth();
+  
+  const isAuthenticated = !!user;
 
   const handleBack = () => {
     // Priority 1: Use explicit fallbackPath if provided
     if (fallbackPath) {
+      // Even with explicit fallback, don't allow authenticated users to go to public routes
+      if (isAuthenticated && isPublicRoute(fallbackPath)) {
+        navigate(getDashboardRoute(role));
+        return;
+      }
       navigate(fallbackPath);
       return;
     }
 
-    // Priority 2: Use browser history if available
-    // Check if we have meaningful history (length > 2 means user navigated within app)
-    // iOS Safari and modern browsers support this reliably
-    const hasHistory = window.history.length > 2;
-    
-    if (hasHistory) {
-      // Use browser back - this follows the user's actual navigation path
-      navigate(-1);
+    const currentPath = location.pathname;
+
+    // Priority 2: For authenticated users, use auth-aware navigation
+    if (isAuthenticated) {
+      const safeFallback = getAuthAwareFallback(currentPath, role);
+      navigate(safeFallback);
       return;
     }
 
-    // Priority 3: Use context-aware fallback based on current page
-    const currentPath = location.pathname;
+    // Priority 3: For unauthenticated users, try browser history
+    try {
+      const hasHistory = window.history.length > 2;
+      
+      if (hasHistory) {
+        navigate(-1);
+        return;
+      }
+    } catch (error) {
+      console.warn('Cannot access history, using fallback navigation');
+    }
+
+    // Priority 4: Use context-aware fallback for unauthenticated users
     const contextFallback = CONTEXT_FALLBACKS[currentPath];
-    
     if (contextFallback) {
       navigate(contextFallback);
       return;
     }
 
-    // Priority 4: Universal fallback to home page
-    navigate(UNIVERSAL_FALLBACK);
+    // Priority 5: Universal fallback to home page
+    navigate('/');
   };
+
 
   return (
     <Button

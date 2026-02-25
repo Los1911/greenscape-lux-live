@@ -11,9 +11,10 @@
 ### Payment Processing (5)
 1. ✅ **stripe-webhook** - Handles all Stripe webhook events
 2. ✅ **create-stripe-customer** - Creates Stripe customers
-3. ✅ **create-stripe-connect-account** - Landscaper onboarding
+3. ✅ **stripe-connect-onboarding** - Landscaper onboarding (replaces deprecated create-stripe-connect-account)
 4. ✅ **create-payment-intent** - Payment processing
 5. ✅ **create-billing-portal-session** - Customer billing portal
+
 
 ### Payment Methods (3)
 6. ✅ **attach-payment-method** - Attach cards to customers

@@ -1,25 +1,44 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { JobCard } from "@/components/landscaper/JobCard";
 import { useToast } from "@/components/ui/use-toast";
+import { MapPin, Calendar, DollarSign, CheckCircle, XCircle, RefreshCw, Lock, Shield } from "lucide-react";
+import { 
+  jobRequiresInsurance, 
+  landscaperHasVerifiedInsurance,
+  canLandscaperAcceptJob,
+  INSURANCE_REQUIRED_ERROR 
+} from "@/lib/insuranceRequirements";
+import { InsuranceRequiredBadge, InsuranceRequiredBanner, LockedJobOverlay } from "@/components/landscaper/InsuranceRequiredBadge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
-interface Quote {
+interface Job {
   id: string;
-  customer_name: string;
-  customer_email: string;
-  location: string;
   service_type: string;
-  preferred_date: string;
-  notes?: string;
+  service_name?: string;
+  service_address?: string;
+  preferred_date?: string;
   status: string;
+  price?: number;
+  is_available: boolean;
+  assigned_to?: string;
   created_at: string;
+  selected_services?: string[];
 }
+
+
 
 export default function AvailableJobs() {
   const [isApproved, setIsApproved] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [jobs, setJobs] = useState<Quote[]>([]);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [landscaperProfile, setLandscaperProfile] = useState<any>(null);
+  const [hasInsurance, setHasInsurance] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -27,15 +46,20 @@ export default function AvailableJobs() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { data } = await supabase
+          // Load landscaper profile including insurance_verified
+          const { data: landscaper } = await supabase
             .from('landscapers')
-            .select('approved')
-            .eq('id', user.id)
-            .single();
+            .select('id, user_id, business_name, approved, insurance_verified')
+            .eq('user_id', user.id)
+            .maybeSingle();
           
-          const approved = data?.approved || false;
+          const approved = landscaper?.approved || false;
+          const insuranceVerified = landscaperHasVerifiedInsurance(landscaper || {});
+          
           setIsApproved(approved);
-          
+          setLandscaperProfile(landscaper);
+          setHasInsurance(insuranceVerified);
+
           if (approved) {
             await loadAvailableJobs();
           }
@@ -51,10 +75,13 @@ export default function AvailableJobs() {
 
   const loadAvailableJobs = async () => {
     try {
+      // Query jobs where: status='available', is_available=true, assigned_to IS NULL
       const { data, error } = await supabase
-        .from('quotes')
+        .from('jobs')
         .select('*')
-        .in('status', ['pending', 'available', null])
+        .eq('status', 'available')
+        .eq('is_available', true)
+        .is('assigned_to', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -69,104 +96,114 @@ export default function AvailableJobs() {
     }
   };
 
-  const handleAcceptJob = async (quoteId: string) => {
-    setActionLoading(true);
+  const handleAcceptJob = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+
+    // Frontend check for insurance requirement
+    const { canAccept, reason } = canLandscaperAcceptJob(job, landscaperProfile || {});
+    if (!canAccept) {
+      toast({
+        title: "Insurance Required",
+        description: reason || INSURANCE_REQUIRED_ERROR,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setActionLoading(jobId);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Get landscaper info
-      const { data: landscaper } = await supabase
-        .from('landscapers')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      if (!landscaperProfile) throw new Error('Landscaper profile not found');
 
-      if (!landscaper) throw new Error('Landscaper not found');
+      // Backend validation - call edge function to verify insurance
+      const { data: validationResult, error: validationError } = await supabase.functions.invoke(
+        'validate-job-acceptance',
+        { body: { jobId, landscaperId: user.id } }
+      );
 
-      // Get quote details
-      const quote = jobs.find(j => j.id === quoteId);
-      if (!quote) throw new Error('Quote not found');
-
-      // Create job from quote with correct schema
-      const { error: jobError } = await supabase
-        .from('jobs')
-        .insert({
-          customer_name: quote.customer_name || quote.customer_email?.split('@')[0] || 'Unknown',
-          service_name: quote.service_type,
-          service_type: quote.service_type,
-          service_address: quote.location,
-          preferred_date: quote.preferred_date,
-          status: 'scheduled',
-          landscaper_id: user.id,
-          client_email: quote.customer_email,
-          price: 0 // Default price, can be updated later
-        });
-
-      if (jobError) throw jobError;
-
-      // Send notification emails
-      try {
-        await supabase.functions.invoke('job-assignment-notification', {
-          body: {
-            jobId: quoteId,
-            customerEmail: quote.customer_email,
-            landscaperEmail: landscaper.email,
-            jobDetails: {
-              customerName: quote.customer_name,
-              serviceType: quote.service_type,
-              location: quote.location,
-              preferredDate: quote.preferred_date,
-              notes: quote?.notes ?? ''
-            }
-          }
-        });
-      } catch (emailError) {
-        console.error('Failed to send notification emails:', emailError);
+      if (validationError) {
+        console.error('[AvailableJobs] Validation error:', validationError);
+        throw new Error('Failed to validate job acceptance');
       }
 
-      // Update quote status
-      const { error: updateError } = await supabase
-        .from('quotes')
-        .update({ status: 'assigned' })
-        .eq('id', quoteId);
+      if (!validationResult?.success) {
+        throw new Error(validationResult?.error || INSURANCE_REQUIRED_ERROR);
+      }
+
+      // Build update payload with ALL required fields
+      const updatePayload: Record<string, any> = {
+        status: 'assigned',
+        is_available: false,
+        assigned_to: user.id,
+        landscaper_id: landscaperProfile.id,
+      };
+
+      // Optional fields
+      if (landscaperProfile.email) {
+        updatePayload.landscaper_email = landscaperProfile.email;
+      }
+
+      // CRITICAL: Explicitly remove any non-existent fields
+      delete updatePayload.accepted_at;
+      delete updatePayload.acceptance_date;
+      delete updatePayload.accepted_by;
+
+      console.log('[AvailableJobs] Accept Job - Final Update Payload:', {
+        jobId,
+        updatePayload,
+        authUserId: user.id,
+        landscaperProfileId: landscaperProfile.id,
+        fieldsIncluded: Object.keys(updatePayload),
+      });
+
+      const { data, error: updateError } = await supabase
+        .from('jobs')
+        .update(updatePayload)
+        .eq('id', jobId)
+        .select();
+
+      console.log('[AvailableJobs] Accept Job - Supabase Response:', {
+        success: !updateError,
+        data,
+        error: updateError,
+        jobId,
+      });
 
       if (updateError) throw updateError;
 
-      setJobs(prev => prev.filter(j => j.id !== quoteId));
+      // Remove job from local state
+      setJobs(prev => prev.filter(j => j.id !== jobId));
       
       toast({
-        title: "Success",
-        description: "Job accepted successfully!",
+        title: "Job Accepted!",
+        description: "You have successfully accepted this job.",
       });
 
-    } catch (error) {
-      console.error('Error accepting job:', error);
+    } catch (error: any) {
+      console.error('[AvailableJobs] Error accepting job:', error);
       toast({
         title: "Error",
-        description: "Failed to accept job",
+        description: error.message || "Failed to accept job",
         variant: "destructive"
       });
     } finally {
-      setActionLoading(false);
+      setActionLoading(null);
     }
   };
 
-  const handleDeclineJob = async (quoteId: string) => {
-    setActionLoading(true);
+
+  const handleDeclineJob = async (jobId: string) => {
+    setActionLoading(jobId);
     try {
-      const { error } = await supabase
-        .from('quotes')
-        .update({ status: 'declined' })
-        .eq('id', quoteId);
-
-      if (error) throw error;
-
-      setJobs(prev => prev.filter(j => j.id !== quoteId));
+      // For decline, just remove from local view - job stays available for others
+      setJobs(prev => prev.filter(j => j.id !== jobId));
       
       toast({
-        title: "Job declined",
-        description: "The job has been declined",
+        title: "Job Declined",
+        description: "The job remains available for other landscapers.",
       });
 
     } catch (error) {
@@ -177,11 +214,16 @@ export default function AvailableJobs() {
         variant: "destructive"
       });
     } finally {
-      setActionLoading(false);
+      setActionLoading(null);
     }
   };
 
-  if (loading) return <div className="text-white">Loading...</div>;
+  if (loading) return <div className="text-emerald-300/70">Loading...</div>;
+
+  // Separate jobs into accessible and insurance-locked
+  const accessibleJobs = jobs.filter(job => !jobRequiresInsurance(job) || hasInsurance);
+  const lockedJobs = jobs.filter(job => jobRequiresInsurance(job) && !hasInsurance);
+  const hasLockedJobs = lockedJobs.length > 0;
 
   return (
     <div className="space-y-4">
@@ -192,10 +234,21 @@ export default function AvailableJobs() {
         <h3 className="text-lg font-semibold text-white">Available Jobs</h3>
         {jobs.length > 0 && (
           <span className="bg-emerald-600 text-white px-2 py-1 rounded-full text-xs">
-            {jobs.length}
+            {accessibleJobs.length}{hasLockedJobs ? ` (+${lockedJobs.length} locked)` : ''}
           </span>
         )}
       </div>
+
+      {/* Insurance banner for landscapers without verified insurance */}
+      {hasLockedJobs && (
+        <InsuranceRequiredBanner 
+          className="mb-4"
+          onUploadClick={() => {
+            // Navigate to documents upload
+            window.location.href = '/landscaper/profile?tab=documents';
+          }}
+        />
+      )}
       
       {!isApproved ? (
         <div className="text-gray-400">Account approval required to view jobs.</div>
@@ -203,13 +256,29 @@ export default function AvailableJobs() {
         <div className="text-gray-400">No available jobs at the moment.</div>
       ) : (
         <div className="space-y-3 max-h-96 overflow-y-auto">
-          {jobs.map((job) => (
+          {/* Accessible Jobs */}
+          {accessibleJobs.map((job) => (
             <JobCard
               key={job.id}
               job={job}
               onAccept={handleAcceptJob}
               onDecline={handleDeclineJob}
-              loading={actionLoading}
+              actionLoading={actionLoading}
+              requiresInsurance={jobRequiresInsurance(job)}
+              isLocked={false}
+            />
+          ))}
+
+          {/* Locked Jobs (shown in disabled state) */}
+          {lockedJobs.map((job) => (
+            <JobCard
+              key={job.id}
+              job={job}
+              onAccept={handleAcceptJob}
+              onDecline={handleDeclineJob}
+              actionLoading={actionLoading}
+              requiresInsurance={true}
+              isLocked={true}
             />
           ))}
         </div>
@@ -217,3 +286,113 @@ export default function AvailableJobs() {
     </div>
   );
 }
+
+interface JobCardProps {
+  job: Job;
+  onAccept: (id: string) => void;
+  onDecline: (id: string) => void;
+  actionLoading: string | null;
+  requiresInsurance: boolean;
+  isLocked: boolean;
+}
+
+function JobCard({ job, onAccept, onDecline, actionLoading, requiresInsurance, isLocked }: JobCardProps) {
+  return (
+    <div
+      className={`relative bg-black/40 border rounded-xl p-4 space-y-3 transition-all ${
+        isLocked 
+          ? 'border-amber-500/30 opacity-75' 
+          : 'border-emerald-500/25'
+      }`}
+    >
+      {/* Locked overlay */}
+      {isLocked && <LockedJobOverlay />}
+
+      {/* Job Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-2 py-1 rounded-lg bg-green-500/20 text-green-300 text-xs font-medium">
+              Available
+            </span>
+            {requiresInsurance && (
+              <InsuranceRequiredBadge variant="badge" />
+            )}
+          </div>
+          <h4 className="text-white font-semibold mt-2">
+            {job.service_type || job.service_name || 'Service'}
+          </h4>
+        </div>
+        {job.price && job.price > 0 && (
+          <span className="text-emerald-400 font-bold">${job.price.toFixed(2)}</span>
+        )}
+      </div>
+
+      {/* Job Details */}
+      <div className="space-y-1 text-sm">
+        <div className="flex items-center gap-2 text-gray-400">
+          <MapPin className="w-4 h-4 text-emerald-400" />
+          <span>{job.service_address || 'No address'}</span>
+        </div>
+
+        {job.preferred_date && (
+          <div className="flex items-center gap-2 text-gray-400">
+            <Calendar className="w-4 h-4 text-emerald-400" />
+            <span>{new Date(job.preferred_date).toLocaleDateString()}</span>
+          </div>
+        )}
+      </div>
+
+      {/* NOTE: 'comments' column does NOT exist on jobs table (42703). Removed. */}
+
+
+      {/* Action Buttons */}
+      <div className="flex gap-2 pt-2">
+        {isLocked ? (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  disabled
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gray-700 text-gray-500 font-medium text-sm cursor-not-allowed"
+                >
+                  <Lock className="w-4 h-4" />
+                  Insurance Required
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="bg-gray-900 border-amber-500/30 text-amber-200">
+                <p className="flex items-center gap-2">
+                  <Shield className="w-4 h-4" />
+                  Verify your insurance to unlock this job
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          <>
+            <button
+              onClick={() => onAccept(job.id)}
+              disabled={actionLoading === job.id}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-medium text-sm transition-all disabled:opacity-50"
+            >
+              {actionLoading === job.id ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4" />
+              )}
+              Accept
+            </button>
+            <button
+              onClick={() => onDecline(job.id)}
+              disabled={actionLoading === job.id}
+              className="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm transition-all disabled:opacity-50"
+            >
+              <XCircle className="w-4 h-4" />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+

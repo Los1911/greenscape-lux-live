@@ -1,403 +1,156 @@
-import React, { useState, useEffect } from 'react';
-import {
-  MapPin,
-  Shield,
-  CheckCircle,
-  AlertCircle,
-  Clock
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-
-interface GeofenceZone {
-  id: string;
-  jobId: string;
-  jobTitle: string;
-  latitude: number;
-  longitude: number;
-  radius: number; // in meters
-  isActive: boolean;
-  autoCheckin: boolean;
-}
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/lib/supabase';
+import { Geofence, upsertGeofence, getGeofenceEvents, GeofenceEvent } from '@/utils/geofencing';
+import { MapPin, Activity, Clock, CheckCircle, XCircle } from 'lucide-react';
 
 interface GeofenceManagerProps {
-  jobs: Array<{
-    id: string;
-    title: string;
-    latitude: number;
-    longitude: number;
-    status: string;
-  }>;
-  onAutoCheckin: (
-    jobId: string,
-    location: { lat: number; lng: number }
-  ) => void;
+  jobId: string;
+  jobLocation: { lat: number; lng: number };
+  onGeofenceUpdate?: (geofence: Geofence) => void;
 }
 
-const GeofenceManager: React.FC<GeofenceManagerProps> = ({
-  jobs,
-  onAutoCheckin
-}) => {
-  const [geofences, setGeofences] = useState<GeofenceZone[]>([]);
-  const [currentLocation, setCurrentLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
-  const [watchId, setWatchId] = useState<number | null>(null);
-  const [isTracking, setIsTracking] = useState(false);
-  const [checkedInJobs, setCheckedInJobs] = useState<Set<string>>(new Set());
+export function GeofenceManager({ jobId, jobLocation, onGeofenceUpdate }: GeofenceManagerProps) {
+  const [geofence, setGeofence] = useState<Geofence | null>(null);
+  const [radius, setRadius] = useState(50);
+  const [events, setEvents] = useState<GeofenceEvent[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Initialize geofences for active jobs
   useEffect(() => {
-    const initialGeofences: GeofenceZone[] = jobs
-      .filter(
-        (job) =>
-          job.status === 'assigned' ||
-          job.status === 'in_progress'
-      )
-      .map((job) => ({
-        id: `geofence-${job.id}`,
-        jobId: job.id,
-        jobTitle: job.title,
-        latitude: job.latitude,
-        longitude: job.longitude,
-        radius: 100, // 100 meter radius
-        isActive: true,
-        autoCheckin: true
-      }));
+    loadGeofence();
+    loadEvents();
+  }, [jobId]);
 
-    setGeofences(initialGeofences);
-  }, [jobs]);
-
-  // Start or stop GPS tracking
-  useEffect(() => {
-    if (isTracking) {
-      startLocationTracking();
-    } else {
-      stopLocationTracking();
-    }
-
-    return () => stopLocationTracking();
-  }, [isTracking]);
-
-  // Check geofences when location updates
-  useEffect(() => {
-    if (currentLocation && geofences.length > 0) {
-      checkGeofences();
-    }
-  }, [currentLocation, geofences]);
-
-  const startLocationTracking = () => {
-    if (!navigator.geolocation) {
-      console.error('Geolocation not supported');
-      return;
-    }
-
-    const id = navigator.geolocation.watchPosition(
-      (position) => {
-        setCurrentLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
-      },
-      (error) => {
-        console.error('Geolocation error:', error);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 30000
-      }
-    );
-
-    setWatchId(id);
-  };
-
-  const stopLocationTracking = () => {
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
-      setWatchId(null);
+  const loadGeofence = async () => {
+    const { data } = await supabase
+      .from('geofences')
+      .select('*')
+      .eq('job_id', jobId)
+      .single();
+    
+    if (data) {
+      setGeofence(data);
+      setRadius(data.radius_meters);
     }
   };
 
-  const calculateDistance = (
-    point1: { lat: number; lng: number },
-    point2: { lat: number; lng: number }
-  ): number => {
-    const R = 6371000; // Earth radius in meters
-    const dLat =
-      ((point2.lat - point1.lat) * Math.PI) / 180;
-    const dLng =
-      ((point2.lng - point1.lng) * Math.PI) / 180;
-
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((point1.lat * Math.PI) / 180) *
-        Math.cos((point2.lat * Math.PI) / 180) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2);
-
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+  const loadEvents = async () => {
+    const data = await getGeofenceEvents(jobId);
+    setEvents(data);
   };
 
-  const checkGeofences = () => {
-    if (!currentLocation) return;
-
-    geofences.forEach((geofence) => {
-      if (!geofence.isActive || !geofence.autoCheckin) return;
-
-      // ✅ FAIL-SOFT GUARD
-      if (
-        geofence.latitude == null ||
-        geofence.longitude == null
-      ) {
-        console.warn(
-          '[GeofenceManager] Skipping geofence — missing coordinates',
-          geofence.jobId
-        );
-        return;
-      }
-
-      const distance = calculateDistance(
-        currentLocation,
-        {
-          lat: geofence.latitude,
-          lng: geofence.longitude
-        }
+  const handleSaveGeofence = async () => {
+    setLoading(true);
+    try {
+      const data = await upsertGeofence(
+        jobId,
+        jobLocation.lat,
+        jobLocation.lng,
+        radius
       );
-
-      if (
-        distance <= geofence.radius &&
-        !checkedInJobs.has(geofence.jobId)
-      ) {
-        setCheckedInJobs((prev) =>
-          new Set(prev).add(geofence.jobId)
-        );
-        onAutoCheckin(geofence.jobId, currentLocation);
-
-        if (
-          'Notification' in window &&
-          Notification.permission === 'granted'
-        ) {
-          new Notification(
-            `Auto checked-in to ${geofence.jobTitle}`,
-            {
-              body: 'You have entered the job site area.'
-            }
-          );
-        }
-      }
-    });
-  };
-
-  const toggleGeofence = (geofenceId: string) => {
-    setGeofences((prev) =>
-      prev.map((g) =>
-        g.id === geofenceId
-          ? { ...g, isActive: !g.isActive }
-          : g
-      )
-    );
-  };
-
-  const toggleAutoCheckin = (geofenceId: string) => {
-    setGeofences((prev) =>
-      prev.map((g) =>
-        g.id === geofenceId
-          ? { ...g, autoCheckin: !g.autoCheckin }
-          : g
-      )
-    );
-  };
-
-  const requestNotificationPermission = async () => {
-    if (
-      'Notification' in window &&
-      Notification.permission === 'default'
-    ) {
-      await Notification.requestPermission();
+      setGeofence(data);
+      onGeofenceUpdate?.(data);
+    } catch (error) {
+      console.error('Failed to save geofence:', error);
+    } finally {
+      setLoading(false);
     }
   };
-
-  useEffect(() => {
-    requestNotificationPermission();
-  }, []);
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-        <h3 className="text-xl sm:text-2xl font-semibold flex items-center text-green-300">
-          <Shield className="w-5 h-5 mr-2" />
-          Geofence Manager
-        </h3>
-        <div className="flex items-center space-x-2 w-full sm:w-auto">
-          <span className="text-sm text-green-200/70">
-            GPS Tracking
-          </span>
-          <Switch
-            checked={isTracking}
-            onCheckedChange={setIsTracking}
-          />
-        </div>
-      </div>
-
-      {/* Current location status */}
-      <div className="p-3 sm:p-4 bg-black/40 border border-green-500/25 rounded-lg">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
-          <div className="flex items-center space-x-2">
-            <MapPin
-              className={`w-4 h-4 ${
-                currentLocation
-                  ? 'text-green-500'
-                  : 'text-gray-400'
-              }`}
-            />
-            <span className="text-sm font-medium text-green-300">
-              Current Location
-            </span>
-          </div>
-          <div
-            className={`px-2 py-1 rounded-full text-xs ${
-              currentLocation
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-100 text-gray-500'
-            }`}
-          >
-            {currentLocation ? 'Active' : 'Inactive'}
-          </div>
-        </div>
-        {currentLocation && (
-          <div className="text-xs text-green-200/70 mt-2">
-            {currentLocation.lat.toFixed(6)},{' '}
-            {currentLocation.lng.toFixed(6)}
-          </div>
-        )}
-      </div>
-
-      {/* Geofence zones */}
-      <div className="space-y-3 sm:space-y-4">
-        <h4 className="font-medium text-green-300">
-          Active Geofences
-        </h4>
-
-        {geofences.length === 0 ? (
-          <div className="text-center py-6 sm:py-8 text-green-300/50">
-            <Shield className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">
-              No active job sites for geofencing
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="w-5 h-5" />
+            Geofence Configuration
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Geofence Radius (meters)</Label>
+            <div className="flex gap-2 mt-2">
+              <Input
+                type="number"
+                value={radius}
+                onChange={(e) => setRadius(parseInt(e.target.value))}
+                min={10}
+                max={500}
+              />
+              <Button onClick={handleSaveGeofence} disabled={loading}>
+                {geofence ? 'Update' : 'Create'}
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Recommended: 50-100 meters for accurate detection
             </p>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {geofences.map((geofence) => {
-              const isCheckedIn = checkedInJobs.has(
-                geofence.jobId
-              );
-              const distance =
-                currentLocation &&
-                geofence.latitude != null &&
-                geofence.longitude != null
-                  ? calculateDistance(currentLocation, {
-                      lat: geofence.latitude,
-                      lng: geofence.longitude
-                    })
-                  : null;
 
-              return (
+          {geofence && (
+            <div className="p-3 bg-green-50 rounded-lg">
+              <div className="flex items-center gap-2 text-green-700">
+                <CheckCircle className="w-4 h-4" />
+                <span className="font-medium">Geofence Active</span>
+              </div>
+              <p className="text-sm text-green-600 mt-1">
+                Radius: {geofence.radius_meters}m | Auto-tracking enabled
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="w-5 h-5" />
+            Entry/Exit History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {events.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No events recorded yet</p>
+          ) : (
+            <div className="space-y-2">
+              {events.map((event) => (
                 <div
-                  key={geofence.id}
-                  className="border border-green-500/25 rounded-lg p-3 sm:p-4 bg-black/40"
+                  key={event.id}
+                  className="flex items-center justify-between p-3 border rounded-lg"
                 >
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 mb-3">
-                    <div className="flex items-center min-w-0 flex-1">
-                      {isCheckedIn ? (
-                        <CheckCircle className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
-                      ) : (
-                        <AlertCircle className="w-4 h-4 text-orange-500 mr-2 flex-shrink-0" />
-                      )}
-                      <span className="font-medium text-sm text-green-300 truncate">
-                        {geofence.jobTitle}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={geofence.isActive}
-                        onCheckedChange={() =>
-                          toggleGeofence(geofence.id)
-                        }
-                        size="sm"
-                      />
+                  <div className="flex items-center gap-3">
+                    {event.event_type === 'entry' ? (
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-orange-600" />
+                    )}
+                    <div>
+                      <p className="font-medium">
+                        {event.event_type === 'entry' ? 'Arrived' : 'Departed'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {event.job_status_before} → {event.job_status_after}
+                      </p>
                     </div>
                   </div>
-
-                  <div className="text-xs text-green-200/70 space-y-1 mb-3">
-                    <div>Radius: {geofence.radius}m</div>
-                    {geofence.latitude != null &&
-                      geofence.longitude != null && (
-                        <div>
-                          Location:{' '}
-                          {geofence.latitude.toFixed(4)},{' '}
-                          {geofence.longitude.toFixed(4)}
-                        </div>
-                      )}
-                    {distance != null && (
-                      <div
-                        className={`font-medium ${
-                          distance <= geofence.radius
-                            ? 'text-green-400'
-                            : 'text-green-200/70'
-                        }`}
-                      >
-                        Distance:{' '}
-                        {Math.round(distance)}m{' '}
-                        {distance <= geofence.radius
-                          ? '(Inside zone)'
-                          : '(Outside zone)'}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={geofence.autoCheckin}
-                        onCheckedChange={() =>
-                          toggleAutoCheckin(geofence.id)
-                        }
-                        size="sm"
-                      />
-                      <span className="text-xs text-green-200/70">
-                        Auto check-in
-                      </span>
+                  <div className="text-right">
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Clock className="w-4 h-4" />
+                      {new Date(event.created_at).toLocaleString()}
                     </div>
-                    {isCheckedIn && (
-                      <div className="flex items-center text-xs text-green-400">
-                        <Clock className="w-3 h-3 mr-1" />
-                        Checked in
-                      </div>
-                    )}
+                    <Badge variant="outline" className="mt-1">
+                      {event.distance_from_center?.toFixed(0)}m from center
+                    </Badge>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {!isTracking && (
-        <div className="p-3 sm:p-4 bg-yellow-50/10 border border-yellow-500/25 rounded-lg">
-          <div className="flex items-center text-yellow-300">
-            <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" />
-            <span className="text-sm">
-              Enable GPS tracking to use geofencing features
-            </span>
-          </div>
-        </div>
-      )}
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
-};
-
-export default GeofenceManager;
+}

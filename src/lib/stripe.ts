@@ -1,69 +1,91 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { logger } from '../utils/logger';
 
-// Environment validation with production logging
-console.log('Supabase URL loaded:', import.meta.env.VITE_SUPABASE_URL);
-console.log('Stripe key present:', !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-logger.debug(
-  'Stripe environment check',
-  {
-    NODE_ENV: import.meta.env.MODE,
-    hasStripeKey: !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
-  },
-  'StripeConfig'
-);
+// [STRIPE_CONFIG] Environment validation with production logging
+console.log('[STRIPE_CONFIG] Supabase URL loaded:', !!import.meta.env.VITE_SUPABASE_URL);
+console.log('[STRIPE_CONFIG] Stripe key present:', !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+logger.debug('Stripe environment check', {
+  NODE_ENV: import.meta.env.NODE_ENV,
+  hasStripeKey: !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+}, 'StripeConfig');
 
-// ✅ Get Stripe publishable key from environment variable with fallback
-const stripePublishableKey =
-  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
-  'pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK';
+// Get Stripe publishable key from environment variable - NO FALLBACK
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
-// 🧩 Validate presence and format
-if (!stripePublishableKey || stripePublishableKey === 'undefined') {
-  const errorMsg = `CRITICAL: VITE_STRIPE_PUBLISHABLE_KEY is ${
-    !stripePublishableKey ? 'missing' : 'undefined string'
-  } in environment variables. Using fallback key.`;
-  logger.warn(errorMsg, null, 'StripeConfig');
+// Validate Stripe configuration but DON'T throw - allow app to render
+let stripeConfigError: string | null = null;
+
+if (!stripePublishableKey || stripePublishableKey === 'undefined' || stripePublishableKey.includes('${')) {
+  stripeConfigError = `[STRIPE_CONFIG] WARNING: VITE_STRIPE_PUBLISHABLE_KEY is missing, undefined, or not properly configured. Stripe features will be disabled.`;
+  logger.warn(stripeConfigError, null, 'StripeConfig');
+  console.warn(stripeConfigError);
+} else if (!stripePublishableKey.startsWith('pk_')) {
+  stripeConfigError = `[STRIPE_CONFIG] WARNING: Invalid Stripe key format. Expected pk_live_ or pk_test_. Stripe features will be disabled.`;
+  logger.warn(stripeConfigError, null, 'StripeConfig');
+  console.warn(stripeConfigError);
 }
 
-if (!stripePublishableKey.startsWith('pk_')) {
-  const errorMsg = `CRITICAL: Invalid Stripe key format. Expected pk_live_ or pk_test_, got: ${stripePublishableKey.substring(
-    0,
-    10
-  )}...`;
-  logger.error(errorMsg, null, 'StripeConfig');
-  throw new Error(errorMsg);
-}
-
-// ✅ Load Stripe.js safely
 export const getStripe = async () => {
+  // If there's a configuration error, return null instead of throwing
+  if (stripeConfigError) {
+    console.warn('[STRIPE_CONFIG] Cannot load Stripe:', stripeConfigError);
+    return null;
+  }
+  
   try {
     return await loadStripe(stripePublishableKey);
   } catch (error) {
-    logger.error('Failed to load Stripe.js', error, 'StripeConfig');
-    throw new Error('Failed to load Stripe.js');
+    logger.error('[STRIPE_CONFIG] Failed to load Stripe.js', error, 'StripeConfig');
+    console.error('[STRIPE_CONFIG] Failed to load Stripe.js', error);
+    return null;
   }
 };
 
-// Singleton pattern for reusing the Stripe instance
-let stripePromise: Promise<any> | null = null;
+// Export stripePromise for use with Stripe Elements
+export const stripePromise = stripeConfigError ? Promise.resolve(null) : loadStripe(stripePublishableKey);
+
 export const stripe = () => {
-  if (!stripePromise) {
-    stripePromise = getStripe();
-  }
   return stripePromise;
 };
 
-// ✅ Stripe configuration for runtime checks
+// Stripe configuration for production
 export const stripeConfig = {
-  publishableKey: stripePublishableKey,
-  environment: stripePublishableKey.startsWith('pk_live_') ? 'live' : 'test',
+  publishableKey: stripePublishableKey || 'NOT_CONFIGURED',
+  environment: stripePublishableKey?.startsWith('pk_live_') ? 'live' : 'test',
   currency: 'usd',
-  country: 'US'
+  country: 'US',
+  isConfigured: !stripeConfigError
 };
 
-// Helper for determining mode
-export const isLiveMode = () => stripePublishableKey.startsWith('pk_live_');
+// Export STRIPE_CONFIG as alias for compatibility
+export const STRIPE_CONFIG = {
+  ...stripeConfig,
+  appearance: {
+    theme: 'stripe' as const,
+    variables: {
+      colorPrimary: '#10b981',
+      colorBackground: '#ffffff',
+      colorText: '#1f2937',
+      colorDanger: '#ef4444',
+      fontFamily: 'Inter, system-ui, sans-serif',
+      borderRadius: '8px',
+    },
+  },
+};
 
-// Export key for external use
-export { stripePublishableKey };
+// Validate that we're using live keys
+export const isLiveMode = () => {
+  return stripePublishableKey?.startsWith('pk_live_') || false;
+};
+
+// Check if Stripe is properly configured
+export const isStripeConfigured = () => {
+  return !stripeConfigError && !!stripePublishableKey;
+};
+
+// DO NOT export the key itself - only use internally
+if (stripeConfigError) {
+  console.warn('[STRIPE_CONFIG] Stripe NOT configured - payment features will be disabled');
+} else {
+  console.log('[STRIPE_CONFIG] Stripe initialized in', stripeConfig.environment, 'mode');
+}

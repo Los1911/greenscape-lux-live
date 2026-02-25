@@ -1,6 +1,0 @@
-### TypeScript Diagnostics
-Need to install the following packages:
-tsc@2.0.4
-Ok to proceed? (y) 
-npm error canceled
-npm error A complete log of this run can be found in: /Users/carlosmatthews/.npm/_logs/2025-10-20T06_30_26_025Z-debug-0.log

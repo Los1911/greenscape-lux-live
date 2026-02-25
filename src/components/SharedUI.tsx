@@ -20,11 +20,11 @@ export function StatusChip({ status }: { status: string }) {
   const s = String(status).toLowerCase()
   let color = "bg-gray-500/20 text-gray-300"
   if (s === "scheduled") color = "bg-emerald-500/20 text-emerald-300"
-  else if (s === "in_progress" || s === "in progress") color = "bg-yellow-500/20 text-yellow-300"
+  else if (s === "active" || s === "in progress") color = "bg-yellow-500/20 text-yellow-300"
   
   return (
     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${color}`}>
-      {s === "in_progress" ? "In Progress" : s.charAt(0).toUpperCase() + s.slice(1)}
+      {s === "active" ? "In Progress" : s.charAt(0).toUpperCase() + s.slice(1)}
     </span>
   )
 }

@@ -4,13 +4,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Activity, Database, TrendingUp, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { Activity, Database, TrendingUp, AlertTriangle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { QueryPerformanceChart } from './QueryPerformanceChart';
 import { ConnectionPoolStatus } from './ConnectionPoolStatus';
 import { SlowQueryAnalyzer } from './SlowQueryAnalyzer';
 import { IndexUsageStats } from './IndexUsageStats';
 import { DatabaseHealthIndicators } from './DatabaseHealthIndicators';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface DatabaseMetrics {
   connectionCount: number;
@@ -32,6 +33,7 @@ interface PerformanceAlert {
 }
 
 export const DatabaseMonitoringDashboard: React.FC = () => {
+  const { user, loading: authLoading } = useAuth();
   const [metrics, setMetrics] = useState<DatabaseMetrics>({
     connectionCount: 0,
     activeQueries: 0,
@@ -76,7 +78,7 @@ export const DatabaseMonitoringDashboard: React.FC = () => {
   const checkPerformanceAlerts = (dbStats: any, queryStats: any) => {
     const newAlerts: PerformanceAlert[] = [];
     
-    if (queryStats.avg_execution_time > 1000) {
+    if (queryStats?.avg_execution_time > 1000) {
       newAlerts.push({
         id: `slow-query-${Date.now()}`,
         type: 'warning',
@@ -86,7 +88,7 @@ export const DatabaseMonitoringDashboard: React.FC = () => {
       });
     }
     
-    if (dbStats.connection_count > 80) {
+    if (dbStats?.connection_count > 80) {
       newAlerts.push({
         id: `high-connections-${Date.now()}`,
         type: 'error',
@@ -96,7 +98,7 @@ export const DatabaseMonitoringDashboard: React.FC = () => {
       });
     }
     
-    if (dbStats.cache_hit_rate < 0.95) {
+    if (dbStats?.cache_hit_rate < 0.95) {
       newAlerts.push({
         id: `low-cache-${Date.now()}`,
         type: 'warning',
@@ -110,6 +112,9 @@ export const DatabaseMonitoringDashboard: React.FC = () => {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+    
     fetchMetrics();
     
     let interval: NodeJS.Timeout;
@@ -120,7 +125,7 @@ export const DatabaseMonitoringDashboard: React.FC = () => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [autoRefresh]);
+  }, [authLoading, user, autoRefresh]);
 
   const getHealthStatus = () => {
     if (metrics.avgQueryTime > 1000 || metrics.connectionCount > 80) return 'error';
@@ -130,7 +135,16 @@ export const DatabaseMonitoringDashboard: React.FC = () => {
 
   const healthStatus = getHealthStatus();
 
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
+
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>

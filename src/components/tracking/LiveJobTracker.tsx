@@ -1,147 +1,196 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { useWebSocket } from './WebSocketManager';
-import { Job as CanonicalJob } from '@/types/job';
-
-// Extended Job type for live tracking with additional runtime fields
-interface TrackedJob extends Pick<CanonicalJob, 'id' | 'service_name' | 'service_address' | 'status'> {
-  landscaper: string;
-  client: string;
-  location: { lat: number; lng: number };
-  estimatedArrival?: string;
-  startTime?: string;
-  completionTime?: string;
-}
+import { supabase } from '@/lib/supabase';
+import { MapPin, Navigation, Clock, TrendingUp } from 'lucide-react';
+import { calculateDistance, calculateETA } from '@/utils/gpsTracking';
 
 interface LiveJobTrackerProps {
-  jobs: TrackedJob[];
-  onJobUpdate?: (job: TrackedJob) => void;
+  jobId: string;
+  jobLat: number;
+  jobLng: number;
 }
 
-export const LiveJobTracker: React.FC<LiveJobTrackerProps> = ({ jobs, onJobUpdate }) => {
-  const [trackedJobs, setTrackedJobs] = useState<TrackedJob[]>(jobs);
-  const { isConnected, subscribe } = useWebSocket();
+interface LocationData {
+  latitude: number;
+  longitude: number;
+  speed: number | null;
+  timestamp: string;
+}
+
+export function LiveJobTracker({ jobId, jobLat, jobLng }: LiveJobTrackerProps) {
+  const [location, setLocation] = useState<LocationData | null>(null);
+  const [distance, setDistance] = useState<number>(0);
+  const [eta, setEta] = useState<Date | null>(null);
+  const [routeHistory, setRouteHistory] = useState<LocationData[]>([]);
+
+  // CRITICAL: Early guard - do not proceed if jobId is missing
+  console.log('[LiveJobTracker] Mounted with jobId:', jobId);
+  
+  // Early return if no jobId - prevents queries with job_id=undefined
+  if (!jobId) {
+    console.warn('[LiveJobTracker] No jobId provided, not rendering');
+    return (
+      <Card className="p-6">
+        <div className="text-center text-gray-500">No job selected for tracking</div>
+      </Card>
+    );
+  }
 
   useEffect(() => {
-    const unsubscribe = subscribe('job_status_update', (data) => {
-      setTrackedJobs(prev => prev.map(job => 
-        job.id === data.jobId 
-          ? { 
-              ...job, 
-              status: data.status,
-              location: data.location,
-              ...(data.status === 'arrived' && { estimatedArrival: data.timestamp }),
-              ...(data.status === 'in_progress' && { startTime: data.timestamp }),
-              ...(data.status === 'completed' && { completionTime: data.timestamp })
-            }
-          : job
-      ));
-    });
+    // Double-check jobId before any operations
+    if (!jobId) {
+      console.warn('[LiveJobTracker] useEffect skipped - no jobId');
+      return;
+    }
 
-    return unsubscribe;
-  }, [subscribe]);
+    console.log('[LiveJobTracker] Setting up tracking for jobId:', jobId);
+    
+    // Fetch initial location
+    fetchCurrentLocation();
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'assigned': return 'bg-blue-500';
-      case 'en_route': return 'bg-yellow-500';
-      case 'arrived': return 'bg-orange-500';
-      case 'in_progress': return 'bg-green-500';
-      case 'completed': return 'bg-gray-500';
-      default: return 'bg-gray-400';
+    // Subscribe to real-time updates - only if jobId is valid
+    const channel = supabase
+      .channel(`job-tracking-${jobId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'gps_tracking',
+          filter: `job_id=eq.${jobId}`,
+        },
+        (payload) => {
+          console.log('[LiveJobTracker] Received GPS update for jobId:', jobId);
+          const newLocation = payload.new as any;
+          updateLocation(newLocation);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('[LiveJobTracker] Cleaning up subscription for jobId:', jobId);
+      supabase.removeChannel(channel);
+    };
+  }, [jobId]);
+
+  const fetchCurrentLocation = async () => {
+    // Guard against undefined jobId
+    if (!jobId) {
+      console.warn('[LiveJobTracker] fetchCurrentLocation skipped - no jobId');
+      return;
+    }
+
+    console.log('[LiveJobTracker] Fetching current location for jobId:', jobId);
+    
+    const { data, error } = await supabase
+      .from('gps_tracking')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('timestamp', { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.error('[LiveJobTracker] Error fetching location:', error);
+      return;
+    }
+
+    if (data && data.length > 0) {
+      console.log('[LiveJobTracker] Found', data.length, 'location records for jobId:', jobId);
+      updateLocation(data[0]);
+      setRouteHistory(data.reverse());
+    } else {
+      console.log('[LiveJobTracker] No location data found for jobId:', jobId);
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'assigned': return 'Assigned';
-      case 'en_route': return 'En Route';
-      case 'arrived': return 'Arrived';
-      case 'in_progress': return 'In Progress';
-      case 'completed': return 'Completed';
-      default: return status;
-    }
+  const updateLocation = (loc: any) => {
+    if (!loc) return;
+    
+    const newLocation: LocationData = {
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      speed: loc.speed,
+      timestamp: loc.timestamp,
+    };
+
+    setLocation(newLocation);
+
+    const dist = calculateDistance(loc.latitude, loc.longitude, jobLat, jobLng);
+    setDistance(dist);
+
+    const estimatedEta = calculateETA(loc.latitude, loc.longitude, jobLat, jobLng, loc.speed || 30);
+    setEta(estimatedEta);
   };
 
-  const calculateETA = (job: TrackedJob) => {
-    if (job.status === 'arrived' || job.status === 'in_progress' || job.status === 'completed') {
-      return null;
-    }
-    const eta = new Date();
-    eta.setMinutes(eta.getMinutes() + Math.floor(Math.random() * 30) + 10);
-    return eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  if (!location) {
+    return (
+      <Card className="p-6">
+        <div className="text-center text-gray-500">Waiting for GPS signal...</div>
+      </Card>
+    );
+  }
+
+  const minutesAway = eta ? Math.round((eta.getTime() - Date.now()) / 60000) : 0;
 
   return (
-    <Card className="bg-black/60 backdrop-blur border border-green-500/25 rounded-2xl p-6">
+    <Card className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-semibold text-white">Live Job Tracking</h3>
-        <div className="flex items-center space-x-2">
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-          <span className="text-sm text-gray-400">
-            {isConnected ? 'Connected' : 'Disconnected'}
-          </span>
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <Navigation className="h-5 w-5 text-blue-600" />
+          Live Tracking
+        </h3>
+        <div className="flex items-center gap-2 text-green-600">
+          <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse" />
+          <span className="text-sm font-medium">Active</span>
         </div>
       </div>
 
-      <div className="space-y-4">
-        {trackedJobs.map((job) => (
-          <div key={job.id} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-semibold text-white">{job.service_name}</h4>
-              <Badge className={`${getStatusColor(job.status)} text-white`}>
-                {getStatusText(job.status)}
-              </Badge>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-gray-400">Landscaper</p>
-                <p className="text-white">{job.landscaper}</p>
-              </div>
-              <div>
-                <p className="text-gray-400">Client</p>
-                <p className="text-white">{job.client}</p>
-              </div>
-              <div>
-                <p className="text-gray-400">Address</p>
-                <p className="text-white text-xs">{job.service_address}</p>
-              </div>
-              <div>
-                <p className="text-gray-400">
-                  {job.status === 'completed' ? 'Completed' : 'ETA'}
-                </p>
-                <p className="text-white">
-                  {job.completionTime 
-                    ? new Date(job.completionTime).toLocaleTimeString()
-                    : calculateETA(job) || 'On Site'
-                  }
-                </p>
-              </div>
-            </div>
-
-            {job.status === 'in_progress' && job.startTime && (
-              <div className="mt-3 pt-3 border-t border-gray-600">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-400">
-                    Started: {new Date(job.startTime).toLocaleTimeString()}
-                  </span>
-                  <div className="flex space-x-2">
-                    <Button size="sm" variant="outline" className="text-xs">
-                      View Live Location
-                    </Button>
-                    <Button size="sm" variant="outline" className="text-xs">
-                      Contact
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-1 text-gray-500 mb-1">
+            <MapPin className="h-4 w-4" />
+            <span className="text-xs">Distance</span>
           </div>
-        ))}
+          <div className="text-2xl font-bold text-blue-600">{distance.toFixed(1)}</div>
+          <div className="text-xs text-gray-500">miles away</div>
+        </div>
+
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-1 text-gray-500 mb-1">
+            <Clock className="h-4 w-4" />
+            <span className="text-xs">ETA</span>
+          </div>
+          <div className="text-2xl font-bold text-green-600">{minutesAway}</div>
+          <div className="text-xs text-gray-500">minutes</div>
+        </div>
+
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-1 text-gray-500 mb-1">
+            <TrendingUp className="h-4 w-4" />
+            <span className="text-xs">Speed</span>
+          </div>
+          <div className="text-2xl font-bold text-purple-600">
+            {location.speed ? location.speed.toFixed(0) : '—'}
+          </div>
+          <div className="text-xs text-gray-500">mph</div>
+        </div>
+      </div>
+
+      {minutesAway <= 15 && minutesAway > 0 && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center gap-2 text-green-800">
+            <Clock className="h-5 w-5" />
+            <span className="font-semibold">Arriving Soon!</span>
+          </div>
+          <p className="text-sm text-green-700 mt-1">
+            Your landscaper will arrive in approximately {minutesAway} minutes.
+          </p>
+        </div>
+      )}
+
+      <div className="text-xs text-gray-500">
+        Last updated: {new Date(location.timestamp).toLocaleTimeString()}
       </div>
     </Card>
   );
-};
+}

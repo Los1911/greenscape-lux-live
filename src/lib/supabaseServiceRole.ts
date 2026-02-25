@@ -60,30 +60,19 @@ export async function ensureUserRecord(authUser: { id: string; email: string; us
       return true; // User already exists
     }
     
-<<<<<<< HEAD
     // Upsert user record (insert or update if exists)
     const { error } = await supabaseServiceRole
       .from('users')
       .upsert({
-=======
-    // Create user record
-    const { error } = await supabaseServiceRole
-      .from('users')
-      .insert({
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
         id: authUser.id,
         email: authUser.email,
         role: authUser.user_metadata?.role || 'client', // Default to client
         first_name: authUser.user_metadata?.first_name || null,
         last_name: authUser.user_metadata?.last_name || null
-<<<<<<< HEAD
       }, {
         onConflict: 'id'
       });
 
-=======
-      });
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
     
     if (error) {
       console.error('Error creating user record:', error);

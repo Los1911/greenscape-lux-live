@@ -5,7 +5,8 @@ import { useToast } from '@/components/SharedUI/Toast';
 
 type JobRow = {
   id: string;
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | string;
+  status: 'scheduled' | 'active' | 'completed' | 'cancelled' | string;
+
   earnings: number | null;
   created_at: string | null;
   completed_at: string | null;
@@ -58,7 +59,8 @@ export default function LandscaperUpcomingJobs({ className, onChanged }: Props) 
           .from('jobs')
           .select('id, status, earnings, created_at, completed_at, customer_name, client_email, landscaper_id, assigned_email')
           .or(`landscaper_id.eq.${lRows.id},assigned_email.eq.${userData.user.email}`)
-          .in('status', ['scheduled', 'in_progress'])
+          .in('status', ['scheduled', 'active'])
+
           .order('created_at', { ascending: true });
 
         if (myErr) throw myErr;
@@ -101,7 +103,8 @@ export default function LandscaperUpcomingJobs({ className, onChanged }: Props) 
     setJobLoading(job.id, true);
     try {
       const { error } = await supabase.from('jobs')
-        .update({ status: 'in_progress' })
+        .update({ status: 'active' })
+
         .eq('id', job.id);
 
       if (error) {
@@ -114,7 +117,8 @@ export default function LandscaperUpcomingJobs({ className, onChanged }: Props) 
       onChanged?.();
       
       // Update local state
-      setMine(prev => prev.map(j => j.id === job.id ? { ...j, status: 'in_progress' } : j));
+      setMine(prev => prev.map(j => j.id === job.id ? { ...j, status: 'active' } : j));
+
     } finally {
       setJobLoading(job.id, false);
     }
@@ -227,7 +231,8 @@ export default function LandscaperUpcomingJobs({ className, onChanged }: Props) 
                       onClick={() => handleStart(job)}
                       className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30 transition disabled:opacity-50"
                     >
-                      {isLoading ? 'Starting...' : job.status === 'scheduled' ? 'Start' : job.status === 'in_progress' ? 'Resume' : 'View'}
+                       {isLoading ? 'Starting...' : job.status === 'scheduled' ? 'Start' : job.status === 'active' ? 'Resume' : 'View'}
+
                     </button>
                   </div>
               </li>

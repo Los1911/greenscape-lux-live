@@ -37,8 +37,8 @@ log_error() {
 check_requirements() {
     log_info "Checking requirements..."
     
-    if ! command -v vercel &> /dev/null; then
-        log_error "Vercel CLI not found. Install with: npm i -g vercel"
+    if ! command -v node &> /dev/null; then
+        log_error "Node.js not found. Please install Node.js"
         exit 1
     fi
     
@@ -48,6 +48,7 @@ check_requirements() {
     
     log_success "Requirements check complete"
 }
+
 
 # Fix client-side configuration (security fix)
 fix_client_config() {
@@ -96,25 +97,19 @@ EOF
     log_success "Created secure client configuration"
 }
 
-# Configure Vercel environment variables
-configure_vercel_env() {
-    log_info "Configuring Vercel environment variables..."
+# Configure hosting environment variables
+configure_hosting_env() {
+    log_info "Configuring hosting environment variables..."
     
-    # Only set client-safe environment variables in Vercel
-    log_info "Setting VITE_STRIPE_PUBLISHABLE_KEY in Vercel..."
+    log_info "Add VITE_STRIPE_PUBLISHABLE_KEY to your hosting provider:"
+    echo ""
+    echo "Environment Variable:"
+    echo "  Name: VITE_STRIPE_PUBLISHABLE_KEY"
+    echo "  Value: pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK"
+    echo ""
+    log_info "For Famous/DeployPad: Set in deployment environment settings"
     
-    # Check if already exists
-    if vercel env ls | grep -q "VITE_STRIPE_PUBLISHABLE_KEY"; then
-        log_warning "VITE_STRIPE_PUBLISHABLE_KEY already exists in Vercel"
-        log_info "To update: vercel env rm VITE_STRIPE_PUBLISHABLE_KEY production"
-        log_info "Then: vercel env add VITE_STRIPE_PUBLISHABLE_KEY production"
-    else
-        log_info "Add VITE_STRIPE_PUBLISHABLE_KEY to Vercel:"
-        log_info "Run: vercel env add VITE_STRIPE_PUBLISHABLE_KEY production"
-        log_info "Value: pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK"
-    fi
-    
-    log_success "Vercel environment configuration instructions provided"
+    log_success "Hosting environment configuration instructions provided"
 }
 
 # Configure Supabase Vault (server-side secrets)
@@ -138,17 +133,12 @@ configure_supabase_vault() {
 trigger_redeploy() {
     log_info "Triggering production redeploy..."
     
-    # Force complete rebuild
-    log_info "Running: vercel --prod --force"
+    log_info "Please redeploy your application through your hosting provider"
+    log_info "For Famous/DeployPad: Push changes to trigger automatic deployment"
     
-    if vercel --prod --force; then
-        log_success "Production deployment triggered successfully"
-        log_info "Monitor deployment at: https://vercel.com/dashboard"
-    else
-        log_error "Deployment failed. Check Vercel dashboard for details."
-        return 1
-    fi
+    log_success "Redeploy instructions provided"
 }
+
 
 # Validate environment after deployment
 validate_environment() {
@@ -178,14 +168,14 @@ main() {
     fix_client_config
     echo ""
     
-    configure_vercel_env
+    configure_hosting_env
     echo ""
     
     configure_supabase_vault
     echo ""
     
     log_info "Manual steps required:"
-    echo "1. Add VITE_STRIPE_PUBLISHABLE_KEY to Vercel (production)"
+    echo "1. Add VITE_STRIPE_PUBLISHABLE_KEY to your hosting provider (production)"
     echo "2. Add STRIPE_SECRET_KEY to Supabase Vault"
     echo "3. Add STRIPE_WEBHOOK_SECRET to Supabase Vault"
     echo ""
@@ -205,6 +195,7 @@ main() {
         exit 1
     fi
 }
+
 
 # Run main function
 main "$@"

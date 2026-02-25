@@ -107,7 +107,7 @@ Delete ALL functions with these patterns:
 2. ✅ **unified-email** - Email system  
 3. ✅ **create-payment-intent** - Payment processing
 4. ✅ **create-stripe-customer** - Customer management
-5. ✅ **create-stripe-connect-account** - Landscaper payouts
+5. ✅ **stripe-connect-onboarding** - Landscaper payouts (NEW - replaces create-stripe-connect-account)
 6. ✅ **create-billing-portal-session** - Billing management
 7. ✅ **create-subscription** - Subscription handling
 8. ✅ **process-payout** - Automated payouts
@@ -122,6 +122,13 @@ Delete ALL functions with these patterns:
 17. ✅ **list-payment-methods** - Payment methods
 18. ✅ **set-default-payment-method** - Payment defaults
 19. ✅ **delete-payment-method** - Payment cleanup
+
+## 🗑️ DEPRECATED FUNCTIONS TO DELETE
+
+**DELETE this function - it has stuck JWT metadata:**
+
+- ❌ **create-stripe-connect-account** - DEPRECATED, replaced by stripe-connect-onboarding
+
 
 ## 🎯 SUCCESS CRITERIA
 

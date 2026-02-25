@@ -18,8 +18,9 @@ export function PWAInstallBanner() {
     }
   }
 
+  // Updated: bottom-4 instead of bottom-20 since mobile bottom nav is removed
   return (
-    <Card className="fixed bottom-20 left-4 right-4 z-40 p-4 bg-black border border-emerald-500/40 text-white shadow-lg shadow-emerald-500/20">
+    <Card className="fixed bottom-4 left-4 right-4 z-40 p-4 bg-black border border-emerald-500/40 text-white shadow-lg shadow-emerald-500/20">
       <div className="flex items-center gap-3">
         <div className="flex-shrink-0">
           <Smartphone className="h-6 w-6" />

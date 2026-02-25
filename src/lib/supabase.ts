@@ -1,10 +1,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Hard validation at build time
 if (!supabaseUrl) {
   throw new Error('Missing VITE_SUPABASE_URL');
 }
@@ -13,7 +11,7 @@ if (!publishableKey) {
   throw new Error('Missing VITE_SUPABASE_PUBLISHABLE_KEY');
 }
 
-// Create Supabase client using PUBLISHABLE key only
+// Create Supabase client using publishable key ONLY
 export const supabase: SupabaseClient = createClient(
   supabaseUrl,
   publishableKey,
@@ -25,9 +23,7 @@ export const supabase: SupabaseClient = createClient(
       detectSessionInUrl: true,
       storageKey: 'greenscape-lux-auth',
       storage:
-        typeof window !== 'undefined'
-          ? window.localStorage
-          : undefined,
+        typeof window !== 'undefined' ? window.localStorage : undefined,
     },
     global: {
       headers: {
@@ -60,8 +56,8 @@ export const getCurrentUser = async () => {
   return data.user;
 };
 
-// Helper for edge-function fetch headers (publishable key)
-export const getSupabasePublishableKeyForFetch = (): string => {
+// Helper to get the publishable/anon key for direct fetch calls to edge functions
+export const getSupabaseAnonKeyForFetch = (): string => {
   const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!key) {
     throw new Error('Missing VITE_SUPABASE_PUBLISHABLE_KEY');

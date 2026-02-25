@@ -61,7 +61,7 @@ async function handleAccountUpdated(account: Stripe.Account) {
   const { data: landscaper } = await supabase
     .from('landscapers')
     .select('id, user_id, stripe_charges_enabled, stripe_payouts_enabled')
-    .eq('stripe_account_id', account.id)
+    .eq('stripe_connect_id', account.id)
     .single()
   
   if (!landscaper) return
@@ -75,16 +75,17 @@ async function handleAccountUpdated(account: Stripe.Account) {
     stripe_details_submitted: account.details_submitted || false,
     stripe_onboarding_complete: isNowActive,
     updated_at: new Date().toISOString()
-  }).eq('stripe_account_id', account.id)
+  }).eq('stripe_connect_id', account.id)
 
   await supabase.from('stripe_connect_notifications').insert({
     landscaper_id: landscaper.id,
     event_type: 'account.updated',
-    stripe_account_id: account.id,
+    stripe_connect_id: account.id,
     charges_enabled: account.charges_enabled || false,
     payouts_enabled: account.payouts_enabled || false,
     requirements: account.requirements || {}
   })
+
 
   const { data: user } = await supabase
     .from('users')
@@ -110,7 +111,7 @@ async function handleCapabilityUpdated(capability: any) {
   const { data: landscaper } = await supabase
     .from('landscapers')
     .select('id, user_id')
-    .eq('stripe_account_id', capability.account)
+    .eq('stripe_connect_id', capability.account)
     .single()
   
   if (!landscaper) return
@@ -118,11 +119,12 @@ async function handleCapabilityUpdated(capability: any) {
   await supabase.from('stripe_connect_notifications').insert({
     landscaper_id: landscaper.id,
     event_type: 'capability.updated',
-    stripe_account_id: capability.account,
+    stripe_connect_id: capability.account,
     charges_enabled: capability.id === 'card_payments' && capability.status === 'active',
     payouts_enabled: capability.id === 'transfers' && capability.status === 'active',
     requirements: capability.requirements || {}
   })
+
 
   if (capability.status === 'active') {
     const capName = capability.id === 'card_payments' ? 'Card Payments' : 

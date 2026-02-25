@@ -9,7 +9,7 @@ export function getBrowserEnv(key: string): string | undefined {
       return value.trim();
     }
   }
-
+  
   // Fallback for edge cases where import.meta is not available
   if (typeof window !== 'undefined' && (window as any).import?.meta?.env) {
     const value = (window as any).import.meta.env[key];
@@ -17,7 +17,7 @@ export function getBrowserEnv(key: string): string | undefined {
       return value.trim();
     }
   }
-
+  
   // Return undefined if no valid value found
   return undefined;
 }
@@ -36,28 +36,28 @@ export function debugEnvironmentVariables(): void {
     console.warn('🚫 Environment debug only available in development mode');
     return;
   }
-
+  
   console.group('🔧 Environment Variables Debug');
-  console.log(
-    'Environment Mode:',
-    isDevelopment() ? 'Development' : isProduction() ? 'Production' : 'Unknown'
-  );
-
+  console.log('Environment Mode:', isDevelopment() ? 'Development' : isProduction() ? 'Production' : 'Unknown');
+  
   const envVars = [
     'VITE_SUPABASE_URL',
-    'VITE_SUPABASE_PUBLISHABLE_KEY',
+    'VITE_SUPABASE_PUBLISHABLE_KEY', 
     'VITE_STRIPE_PUBLISHABLE_KEY',
     'VITE_GOOGLE_MAPS_API_KEY',
     'VITE_RESEND_API_KEY'
   ];
 
-  envVars.forEach((key) => {
+
+
+  
+  envVars.forEach(key => {
     const value = getBrowserEnv(key);
     console.log(`${key}:`, value ? '✅ Set' : '❌ Missing');
     if (value && isDevelopment()) {
       console.log(`  Value: ${value.substring(0, 20)}...`);
     }
   });
-
+  
   console.groupEnd();
 }

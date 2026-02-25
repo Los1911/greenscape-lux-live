@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import './styles/mobile-optimizations.css';
+@import './styles/coverage-animations.css';
+
 
 /* Glowing text effect */
 .glow-text {
@@ -40,19 +42,230 @@
   --border: 217 33% 17%;
   --input: 217 33% 17%;
   --ring: 142 76% 36%;
+  --ring-offset: 0 0% 0%;
   --radius: 0.75rem;
+  
+  /* GreenScape Lux Focus Ring Colors */
+  --focus-ring-color: rgba(52, 211, 153, 0.6);
+  --focus-ring-offset-color: #000000;
 }
+
+/* ==========================================================================
+   GLOBAL FOCUS & TAP STYLES - GreenScape Lux Branded
+   
+   Purpose: Replace browser default white focus outlines and iOS tap highlights
+   with branded emerald focus rings that match the dark luxury theme.
+   
+   Strategy:
+   - Remove default browser outline on all interactive elements
+   - Suppress iOS Safari tap highlight (white flash on tap)
+   - Apply emerald glow focus ring using :focus-visible (keyboard only)
+   - Ensure :active states don't show white backgrounds
+   - Preserve accessibility for keyboard navigation
+   ========================================================================== */
+
+/* Remove default browser focus outline globally */
+*:focus {
+  outline: none;
+}
+
+/* ==========================================================================
+   iOS TAP HIGHLIGHT SUPPRESSION (CRITICAL)
+   
+   iOS Safari shows a translucent gray/white overlay when tapping interactive
+   elements. This must be suppressed on dark themes.
+   
+   We use multiple approaches for maximum compatibility:
+   1. -webkit-tap-highlight-color: transparent - Primary suppression
+   2. -webkit-touch-callout: none - Prevents callout on long press
+   3. user-select: none on buttons - Prevents text selection flash
+   ========================================================================== */
+
+/* Universal tap highlight removal for all interactive elements */
+button,
+a,
+input,
+select,
+textarea,
+label,
+[role="button"],
+[role="link"],
+[role="tab"],
+[role="menuitem"],
+[role="option"],
+[tabindex],
+[onclick],
+.cursor-pointer {
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none;
+  tap-highlight-color: transparent;
+}
+
+/* Buttons specifically should not show text selection on tap */
+button,
+[role="button"] {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ==========================================================================
+   ACTIVE STATE NORMALIZATION
+   
+   Ensure :active states don't show white/light backgrounds on dark theme.
+   This prevents the "white box" flash when tapping buttons on iOS.
+   ========================================================================== */
+
+/* Reset active states to prevent white backgrounds */
+button:active,
+a:active,
+[role="button"]:active,
+[role="link"]:active,
+[role="tab"]:active {
+  background-color: inherit;
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+/* Text link buttons (like "Forgot password?", "Edit", "Add") - no background on active */
+button.text-emerald-400:active,
+button.text-emerald-300:active,
+button.text-blue-400:active,
+button.text-blue-300:active,
+button.text-slate-500:active,
+a.text-emerald-400:active,
+a.text-emerald-300:active {
+  background-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+
+
+/* ==========================================================================
+   FOCUS-VISIBLE STYLES (Keyboard Accessibility)
+   
+   Apply branded emerald focus ring only for keyboard navigation.
+   Mouse/touch clicks won't show focus ring (better UX).
+   ========================================================================== */
+
+/* Apply branded focus ring only for keyboard navigation (accessibility) */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: 
+    0 0 0 2px var(--focus-ring-offset-color),
+    0 0 0 4px var(--focus-ring-color),
+    0 0 12px var(--focus-ring-color);
+}
+
+/* Specific styling for inline text buttons/links (like "Forgot password?") */
+button.text-emerald-400:focus-visible,
+button.text-emerald-300:focus-visible,
+button.text-blue-400:focus-visible,
+button.text-blue-300:focus-visible,
+a.text-emerald-400:focus-visible,
+a.text-emerald-300:focus-visible {
+  border-radius: 4px;
+  box-shadow: 
+    0 0 0 2px var(--focus-ring-offset-color),
+    0 0 0 4px var(--focus-ring-color);
+}
+
+/* Override for elements using Tailwind's ring utilities */
+.ring-offset-background {
+  --tw-ring-offset-color: #000000;
+}
+
+/* Ensure focus-visible ring uses emerald colors */
+.focus-visible\:ring-ring:focus-visible {
+  --tw-ring-color: rgba(52, 211, 153, 0.6);
+}
+
 
 html, body, #root {
   height: 100%;
   font-family: 'Inter', sans-serif;
 }
+
 body {
   background: #000 !important;
   color: #e5e7eb;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent iOS Safari from auto-adjusting text size */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
+
+
+/* iOS Safari viewport height fix - Mobile Auth Alignment Canon */
+@supports (height: 100dvh) {
+  .min-h-screen-safe {
+    min-height: 100dvh;
+  }
+  .h-screen-safe {
+    height: 100dvh;
+  }
+}
+
+/* Fallback for browsers that don't support dvh */
+@supports not (height: 100dvh) {
+  .min-h-screen-safe {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+  .h-screen-safe {
+    height: 100vh;
+    height: -webkit-fill-available;
+  }
+}
+
+/* Safe area inset utilities for iOS notch/dynamic island */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-area-left {
+  padding-left: env(safe-area-inset-left);
+}
+.safe-area-right {
+  padding-right: env(safe-area-inset-right);
+}
+.safe-area-all {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+
+
+/* Prevent iOS auto-zoom on input focus */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Lock container width on mobile to prevent iOS reflow */
+@media screen and (max-width: 640px) {
+  .mobile-lock-width {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+}
+
+
 
 /* Global safeguard for public routes */
 .public-route {
@@ -213,8 +426,17 @@ a:hover {
   .gap-responsive {
     @apply gap-3 sm:gap-4 md:gap-6 lg:gap-8;
   }
-  
   .gap-responsive-sm {
     @apply gap-2 sm:gap-3 md:gap-4;
+  }
+  
+  /* Animation for notification auto-dismiss progress bar */
+  @keyframes shrink-width {
+    from { width: 100%; }
+    to { width: 0%; }
+  }
+  
+  .animate-shrink-width {
+    animation: shrink-width linear forwards;
   }
 }

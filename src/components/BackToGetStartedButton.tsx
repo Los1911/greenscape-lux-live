@@ -1,7 +1,8 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { navigateBack } from '@/utils/navigationHelpers';
+import { useAuth } from '@/contexts/AuthContext';
+import { getDashboardRoute, isPublicRoute } from '@/utils/navigationHelpers';
 
 interface BackToGetStartedButtonProps {
   className?: string;
@@ -14,12 +15,29 @@ export default function BackToGetStartedButton({
 }: BackToGetStartedButtonProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, role } = useAuth();
+  
+  const isAuthenticated = !!user;
 
   const handleBack = () => {
+    // For authenticated users, never go to public routes like /get-started
+    if (isAuthenticated) {
+      // If fallbackPath is a public route, go to dashboard instead
+      if (fallbackPath && isPublicRoute(fallbackPath)) {
+        navigate(getDashboardRoute(role));
+      } else if (fallbackPath) {
+        navigate(fallbackPath);
+      } else {
+        navigate(getDashboardRoute(role));
+      }
+      return;
+    }
+    
+    // For unauthenticated users, use the fallback path
     if (fallbackPath) {
       navigate(fallbackPath);
     } else {
-      navigateBack(navigate, location.pathname);
+      navigate('/get-started');
     }
   };
 

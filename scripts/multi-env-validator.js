@@ -15,9 +15,9 @@ function detectEnvironment() {
   if (process.env.NODE_ENV === 'staging') return 'staging';
   if (process.env.NODE_ENV === 'development') return 'development';
 
-  // Check for Vercel environment
-  if (process.env.VERCEL_ENV === 'production') return 'production';
-  if (process.env.VERCEL_ENV === 'preview') return 'staging';
+  // Check for deployment environment variable
+  if (process.env.VITE_DEPLOY_ENV === 'production') return 'production';
+  if (process.env.VITE_DEPLOY_ENV === 'preview') return 'staging';
 
   // Check for other CI/CD indicators
   if (process.env.CI && (process.env.GITHUB_REF === 'refs/heads/main' || process.env.GITHUB_REF === 'refs/heads/master')) {
@@ -30,6 +30,7 @@ function detectEnvironment() {
   // Default to development
   return 'development';
 }
+
 
 // Environment-specific configurations
 const ENVIRONMENT_CONFIGS = {

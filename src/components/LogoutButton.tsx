@@ -1,14 +1,12 @@
 import React, { useState } from "react";
-import { useSupabaseClient } from "@/lib/ConfigContext";
-import { signOutAndRedirect } from "@/lib/logout";
+import { globalLogout } from "@/utils/globalLogout";
 
 interface LogoutButtonProps {
   to?: string;
   className?: string;
 }
 
-export default function LogoutButton({ to = "/", className = "" }: LogoutButtonProps) {
-  const supabase = useSupabaseClient();
+export default function LogoutButton({ to = "/portal-login", className = "" }: LogoutButtonProps) {
   const [busy, setBusy] = useState(false);
   
   return (
@@ -16,8 +14,8 @@ export default function LogoutButton({ to = "/", className = "" }: LogoutButtonP
       onClick={async () => { 
         if (busy) return; 
         setBusy(true); 
-        await signOutAndRedirect(supabase, to); 
-        setBusy(false); 
+        await globalLogout(to); 
+        // No need to set busy to false - page will redirect
       }}
       disabled={busy}
       className={`rounded-full bg-red-500 text-black px-3 py-1 font-semibold hover:bg-red-400 disabled:opacity-60 ${className}`}

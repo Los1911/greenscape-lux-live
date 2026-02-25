@@ -117,15 +117,245 @@
     padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
   }
   
-  .fixed-top, [class*="top-nav"] {
-    padding-top: calc(0.5rem + env(safe-area-inset-top));
+  .fixed-top, [class*="top-nav"], header, .site-header, .dashboard-header {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  /* Safe area utility class for explicit use */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-all {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Notification dropdown mobile fix */
+@media (max-width: 480px) {
+  .notification-dropdown {
+    position: fixed !important;
+    left: 0.5rem !important;
+    right: 0.5rem !important;
+    width: auto !important;
+    max-width: calc(100vw - 1rem) !important;
   }
 }
 
 /* Accessibility - Focus Indicators */
 @media (max-width: 768px) {
+  /* Use box-shadow for focus-visible instead of outline for better control */
   *:focus-visible {
-    outline: 3px solid var(--emerald-primary);
-    outline-offset: 2px;
+    outline: none !important;
+    box-shadow: 
+      0 0 0 2px #000000,
+      0 0 0 4px rgba(52, 211, 153, 0.6) !important;
   }
+  
+  /* CRITICAL: Suppress iOS tap highlight on ALL interactive elements */
+  /* This prevents the white rounded box that appears on tap */
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  label,
+  [role="button"],
+  [role="link"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  [tabindex],
+  [onclick],
+  .cursor-pointer,
+  .clickable {
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-touch-callout: none !important;
+    tap-highlight-color: transparent !important;
+  }
+  
+  /* Ensure active states don't show white backgrounds on dark UI */
+  button:active,
+  a:active,
+  [role="button"]:active,
+  [role="tab"]:active {
+    background-color: inherit !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* Text link buttons specifically (Edit, Add, Forgot password, etc.) */
+  button[class*="text-emerald"]:active,
+  button[class*="text-blue"]:active,
+  button[class*="text-slate"]:active,
+  a[class*="text-emerald"]:active,
+  a[class*="text-blue"]:active {
+    background-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+  }
+}
+
+
+
+
+
+/* ============================================
+   CROSS-PLATFORM INPUT & TAB ALIGNMENT FIXES
+   ============================================
+   These styles ensure consistent alignment across:
+   - iOS Safari
+   - Android Chrome
+   - Tablet browsers (portrait + landscape)
+   ============================================ */
+
+/* Input Text Vertical Centering Fix */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+input[type="search"],
+input[type="url"] {
+  /* Reset browser defaults that cause inconsistent centering */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  
+  /* Explicit box model for consistent sizing */
+  box-sizing: border-box;
+  
+  /* Remove iOS inner shadow */
+  -webkit-box-shadow: none;
+  box-shadow: none;
+  
+  /* Prevent text size adjustment on orientation change */
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Tab/Toggle Button Alignment Fix */
+[role="tablist"] button,
+[role="tablist"] [role="tab"],
+[data-radix-collection-item] {
+  /* Ensure consistent height regardless of content */
+  box-sizing: border-box;
+  
+  /* Flexbox centering for perfect alignment */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* Prevent text wrapping that could affect height */
+  white-space: nowrap;
+  
+  /* Remove any browser-specific button styling */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  
+  /* Consistent font rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* iOS Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  /* Fix for iOS input text positioning */
+  input {
+    /* iOS needs explicit line-height for proper centering */
+    line-height: normal;
+  }
+  
+  /* Fix for iOS button/tab alignment */
+  button, [role="tab"] {
+    /* Ensure proper vertical alignment on iOS */
+    vertical-align: middle;
+  }
+}
+
+/* Android Chrome specific fixes */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  input {
+    /* Android Chrome text centering */
+    text-indent: 0;
+  }
+}
+
+/* Tablet Breakpoints */
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* Tablet-specific input sizing */
+  input {
+    font-size: 16px; /* Prevent zoom on focus */
+  }
+  
+  /* Tab sizing for tablets */
+  [role="tablist"] {
+    min-height: 44px;
+  }
+  
+  [role="tab"] {
+    min-height: 40px;
+    padding: 0 1rem;
+  }
+}
+
+/* Portrait tablet orientation */
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+  [role="tablist"] {
+    gap: 0.25rem;
+  }
+}
+
+/* Landscape tablet orientation */
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
+  [role="tablist"] {
+    gap: 0.5rem;
+  }
+}
+
+/* High DPI / Retina display fixes */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Sharper borders on high DPI screens - only for inputs with explicit borders */
+  input[class*="border"], [role="tab"][class*="border"] {
+    border-width: 0.5px;
+  }
+  
+  /* Ensure buttons don't get unwanted borders on high DPI */
+  button {
+    border-color: transparent;
+  }
+}
+
+/* ==========================================================================
+   GLOBAL BUTTON BORDER RESET
+   
+   Ensures all buttons have transparent borders by default to prevent
+   white/light borders appearing on dark backgrounds, especially on iOS.
+   ========================================================================== */
+
+button {
+  border-color: transparent;
+}
+
+/* Text link buttons (Edit, Add, etc.) - ensure no visible borders */
+button[class*="text-emerald"],
+button[class*="text-blue"],
+button[class*="text-slate"],
+button[class*="text-amber"] {
+  border: none;
+  border-color: transparent;
+  background-color: transparent;
+}
+
+/* Icon-only buttons */
+button:has(> svg:only-child),
+button[aria-label] {
+  border: none;
+  border-color: transparent;
 }

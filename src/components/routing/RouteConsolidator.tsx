@@ -9,8 +9,20 @@ export const QuoteRouteConsolidator: React.FC = () => {
 
 // Smart dashboard router based on user role
 export const DashboardRouter: React.FC = () => {
-  const { user, role: userRole } = useAuth();
+  const { user, role: userRole, loading } = useAuth();
   const location = useLocation();
+
+  // Auth loading guard - show loading UI while auth is initializing
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // If not authenticated, redirect to role selection
   if (!user) {
@@ -36,9 +48,10 @@ export const RoleSelector: React.FC = () => {
   const from = location.state?.from?.pathname || '/';
 
   const handleRoleSelection = (role: 'client' | 'landscaper') => {
-    const loginPath = role === 'client' ? '/client-login' : '/pro-login';
+    const loginPath = '/portal-login';
     window.location.href = `${loginPath}?redirect=${encodeURIComponent(from)}`;
   };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center p-4">

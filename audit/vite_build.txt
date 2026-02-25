@@ -1,6 +1,0 @@
-### Build Logs
-
-> vite_react_shadcn_ts@0.0.0 build
-> vite build
-
-sh: vite: command not found

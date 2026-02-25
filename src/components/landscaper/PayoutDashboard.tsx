@@ -91,13 +91,15 @@ export default function PayoutDashboard() {
       // Calculate pending earnings
       const { data: jobs } = await supabase
         .from('jobs')
-        .select('total_amount')
+        .select('price')
         .eq('landscaper_id', landscaper.id)
         .eq('status', 'completed')
-        .eq('payment_status', 'paid')
+        .gte('completed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
         .is('payout_id', null);
 
-      const pending = jobs?.reduce((sum, job) => sum + (job.total_amount * 0.9), 0) || 0;
+      const pending = jobs?.reduce((sum, job) => sum + ((job.price || 0) * 0.9), 0) || 0;
+      setPendingEarnings(pending);
+
       setPendingEarnings(pending);
 
     } catch (error) {

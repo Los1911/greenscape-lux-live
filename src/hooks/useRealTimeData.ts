@@ -23,6 +23,13 @@ export function useRealTimeData<T = any>({
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
+    // CRITICAL: Skip if filter value is empty/null/undefined
+    if (filter && (!filter.value || filter.value === '')) {
+      setLoading(false);
+      setData([]);
+      return;
+    }
+
     fetchInitialData();
     setupRealtimeSubscription();
 
@@ -34,6 +41,12 @@ export function useRealTimeData<T = any>({
   }, [table, filter?.column, filter?.value]);
 
   const fetchInitialData = async () => {
+    if (filter && (!filter.value || filter.value === '')) {
+      setLoading(false);
+      setData([]);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -54,9 +67,7 @@ export function useRealTimeData<T = any>({
 
       const { data: result, error: queryError } = await query;
 
-      if (queryError) {
-        throw queryError;
-      }
+      if (queryError) throw queryError;
 
       setData(result || []);
     } catch (err) {
@@ -68,22 +79,20 @@ export function useRealTimeData<T = any>({
   };
 
   const setupRealtimeSubscription = () => {
+    if (filter && (!filter.value || filter.value === '')) return;
+    
     const channelName = `realtime-${table}-${filter?.column || 'all'}-${filter?.value || 'all'}`;
     
     channelRef.current = supabase
       .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: table,
-          ...(filter && { filter: `${filter.column}=eq.${filter.value}` })
-        },
-        (payload) => {
-          handleRealtimeChange(payload);
-        }
-      )
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: table,
+        ...(filter && { filter: `${filter.column}=eq.${filter.value}` })
+      }, (payload) => {
+        handleRealtimeChange(payload);
+      })
       .subscribe();
   };
 
@@ -93,41 +102,23 @@ export function useRealTimeData<T = any>({
     setData(currentData => {
       switch (eventType) {
         case 'INSERT':
-          // Check if record matches our filter
-          if (filter && newRecord[filter.column] !== filter.value) {
-            return currentData;
-          }
+          if (filter && newRecord[filter.column] !== filter.value) return currentData;
           return [newRecord, ...currentData];
-
         case 'UPDATE':
-          return currentData.map(item => 
-            (item as any).id === newRecord.id ? newRecord : item
-          );
-
+          return currentData.map(item => (item as any).id === newRecord.id ? newRecord : item);
         case 'DELETE':
-          return currentData.filter(item => 
-            (item as any).id !== oldRecord.id
-          );
-
+          return currentData.filter(item => (item as any).id !== oldRecord.id);
         default:
           return currentData;
       }
     });
   };
 
-  const refetch = () => {
-    fetchInitialData();
-  };
+  const refetch = () => fetchInitialData();
 
-  return {
-    data,
-    loading,
-    error,
-    refetch
-  };
+  return { data, loading, error, refetch };
 }
 
-// Specialized hook for user notifications
 export function useNotifications(userId: string) {
   return useRealTimeData({
     table: 'notifications',
@@ -138,25 +129,25 @@ export function useNotifications(userId: string) {
   });
 }
 
-// Specialized hook for job updates
 export function useJobUpdates(userId: string, userRole: 'client' | 'landscaper') {
-  const filterColumn = userRole === 'client' ? 'client_id' : 'landscaper_id';
+  // For clients, we query by user_id OR client_email
+  // For landscapers, query by landscaper_id
+  // Note: The RLS policy handles the OR logic, but we use user_id as the primary filter
+  // The component should handle the OR logic for client_email separately if needed
+  const filterColumn = userRole === 'client' ? 'user_id' : 'landscaper_id';
   
   return useRealTimeData({
     table: 'jobs',
     filter: { column: filterColumn, value: userId },
-    select: `
-      id, service_name, service_type, service_address, status, created_at, preferred_date, price
-    `,
-
-
+    select: 'id, service_name, service_type, service_address, status, created_at, preferred_date, price, client_email, user_id',
     orderBy: { column: 'created_at', ascending: false },
     limit: 10
   });
+
 }
 
 
-// Specialized hook for earnings data
+
 export function useEarningsData(landscaperId: string) {
   return useRealTimeData({
     table: 'payments',

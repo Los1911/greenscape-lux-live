@@ -1,8 +1,9 @@
 import { supabase } from '@/lib/supabase';
 
 /**
- * Enhanced password reset handler that uses our unified-email pipeline
- * This ensures all emails go through Resend and are logged properly
+ * Unified password reset handler that uses Supabase's built-in auth
+ * Previously tried to use a custom edge function that doesn't exist
+ * Now uses the native resetPasswordForEmail method which works correctly
  */
 
 export interface PasswordResetResult {
@@ -14,40 +15,37 @@ export interface PasswordResetResult {
 }
 
 /**
- * Handle password reset using our unified email pipeline
- * This generates the token via Supabase admin API and sends email via Resend
+ * Handle password reset using Supabase's built-in auth method
+ * This properly handles 204 No Content responses (success case)
  */
 export async function handleUnifiedPasswordReset(
   email: string, 
   redirectTo: string = 'https://greenscapelux.com/reset-password'
 ): Promise<PasswordResetResult> {
   try {
-    console.log('Initiating unified password reset for:', email);
+    console.log('Initiating password reset for:', email);
     console.log('Redirect URL:', redirectTo);
 
-    // Call our custom edge function that handles token generation + email sending
-    console.log('Calling password-reset-with-unified-email function...');
-    const response = await supabase.functions.invoke('password-reset-with-unified-email', {
-      body: { 
-        email,
-        redirectTo 
-      }
+    // Use Supabase's built-in resetPasswordForEmail method
+    // This returns 204 No Content on success (not an error)
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo
     });
-    console.log('Function response received:', response);
 
-    if (response.error) {
-      console.error('Unified password reset error:', response.error);
+    // Check for explicit errors
+    if (error) {
+      console.error('Password reset error:', error);
       
       // Check for common error types
-      if (response.error.message?.includes('rate limit')) {
+      if (error.message?.includes('rate limit') || error.message?.includes('Rate limit')) {
         return {
           success: false,
-          error: 'Too many requests. Please wait before trying again.',
+          error: 'Too many requests. Please wait a minute before trying again.',
           isRateLimited: true
         };
       }
       
-      if (response.error.message?.includes('redirect')) {
+      if (error.message?.includes('redirect') || error.message?.includes('Redirect')) {
         return {
           success: false,
           error: 'Invalid redirect URL. Please contact support.',
@@ -55,21 +53,31 @@ export async function handleUnifiedPasswordReset(
         };
       }
 
+      // Handle "User not found" gracefully - don't reveal if email exists
+      if (error.message?.includes('User not found') || error.message?.includes('not found')) {
+        // For security, still return success to prevent email enumeration
+        console.log('User not found, but returning success for security');
+        return {
+          success: true,
+          statusCode: 200
+        };
+      }
+
       return {
         success: false,
-        error: response.error.message || 'Failed to send reset email'
+        error: error.message || 'Failed to send reset email'
       };
     }
 
-    // Success case
-    console.log('Unified password reset successful:', response.data);
+    // Success case - Supabase returns { data: {}, error: null } for 204 responses
+    console.log('Password reset request successful');
     return {
       success: true,
       statusCode: 200
     };
 
   } catch (error: any) {
-    console.error('Unified password reset handler error:', error);
+    console.error('Password reset handler error:', error);
     
     // Handle network/connection errors
     if (error.name === 'TypeError' && error.message?.includes('fetch')) {
@@ -95,11 +103,14 @@ export function validateRedirectUrl(url: string): boolean {
     const allowedDomains = [
       'greenscapelux.com',
       'www.greenscapelux.com',
-      'localhost'
+      'localhost',
+      'deploypad.app' // Allow preview deployments
     ];
     
     return allowedDomains.some(domain => 
-      parsed.hostname === domain || parsed.hostname.endsWith(`.${domain}`)
+      parsed.hostname === domain || 
+      parsed.hostname.endsWith(`.${domain}`) ||
+      parsed.hostname.includes('deploypad.app')
     );
   } catch {
     return false;
@@ -110,9 +121,15 @@ export function validateRedirectUrl(url: string): boolean {
  * Get the appropriate reset URL based on environment
  */
 export function getPasswordResetUrl(): string {
-  const baseUrl = import.meta.env.PROD 
-    ? 'https://greenscapelux.com'
-    : window.location.origin;
-    
-  return `${baseUrl}/reset-password`;
+  // In production, use the main domain
+  if (import.meta.env.PROD) {
+    // Check if we're on a preview deployment
+    if (window.location.hostname.includes('deploypad.app')) {
+      return `${window.location.origin}/reset-password`;
+    }
+    return 'https://greenscapelux.com/reset-password';
+  }
+  
+  // In development, use current origin
+  return `${window.location.origin}/reset-password`;
 }

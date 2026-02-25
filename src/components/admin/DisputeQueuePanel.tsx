@@ -3,8 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DisputeReviewModal } from './DisputeReviewModal';
+import { RefreshCw, AlertTriangle } from 'lucide-react';
 
 interface Dispute {
   id: string;
@@ -20,32 +22,45 @@ interface Dispute {
 }
 
 export function DisputeQueuePanel() {
+  const { user, loading: authLoading } = useAuth();
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
   const [filter, setFilter] = useState('pending');
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+    
     loadDisputes();
-  }, [filter]);
+  }, [authLoading, user, filter]);
 
   const loadDisputes = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('payout_disputes')
-      .select(`
-        *,
-        landscaper:landscapers(business_name, email),
-        payout:payouts(amount, stripe_payout_id)
-      `)
-      .eq('status', filter)
-      .order('created_at', { ascending: false });
+    setError(null);
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('payout_disputes')
+        .select(`
+          *,
+          landscaper:landscapers(business_name, email),
+          payout:payouts(amount, stripe_payout_id)
+        `)
+        .eq('status', filter)
+        .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setDisputes(data);
+      if (fetchError) throw fetchError;
+      setDisputes(data || []);
+    } catch (err) {
+      console.error('Error loading disputes:', err);
+      setError('Failed to load disputes');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
+
+
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -57,9 +72,28 @@ export function DisputeQueuePanel() {
     return colors[status] || 'bg-gray-500';
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error && !loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <AlertTriangle className="h-12 w-12 text-red-500" />
+        <p className="text-red-600">{error}</p>
+        <Button onClick={loadDisputes}>Retry</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <Card>
+
         <CardHeader>
           <CardTitle>Payout Dispute Queue</CardTitle>
         </CardHeader>

@@ -1,14 +1,42 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { 
+  shouldEnforcePasswordReset, 
+  getPasswordResetRedirectUrl 
+} from '@/utils/passwordResetGuard';
+
+// Admin email allowlist - users with these emails get admin access
+const ADMIN_EMAILS = [
+  'admin.1@greenscapelux.com',
+  'bgreen@greenscapelux.com'
+];
 
 interface AdminProtectedRouteProps {
   children: React.ReactNode;
 }
 
 export default function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, session } = useAuth();
+  const location = useLocation();
+  const [passwordResetRequired, setPasswordResetRequired] = useState(false);
+
+  // Check for password reset enforcement
+  useEffect(() => {
+    if (!loading && session) {
+      const needsPasswordReset = shouldEnforcePasswordReset(session);
+      
+      if (needsPasswordReset) {
+        console.log('[AdminProtectedRoute] Password reset required - blocking access');
+        setPasswordResetRequired(true);
+      } else {
+        setPasswordResetRequired(false);
+      }
+    }
+  }, [loading, session]);
+
+  const isAdminEmail = user?.email && ADMIN_EMAILS.includes(user.email);
 
   if (import.meta.env.DEV) {
     console.log('=== ADMIN PROTECTED ROUTE DEBUG ===');
@@ -16,9 +44,11 @@ export default function AdminProtectedRoute({ children }: AdminProtectedRoutePro
     console.log('🎭 Role:', role);
     console.log('⏳ Loading:', loading);
     console.log('🔐 Is Admin?', role === 'admin');
-    console.log('✨ Is admin.1@greenscapelux.com?', user?.email === 'admin.1@greenscapelux.com');
+    console.log('✨ Is Admin Email?', isAdminEmail);
+    console.log('🔒 Password Reset Required:', passwordResetRequired);
     console.log('=====================================');
   }
+
 
   // Show loading spinner while auth is loading OR role is not resolved yet
   if (loading || (user && role === null)) {
@@ -40,13 +70,22 @@ export default function AdminProtectedRoute({ children }: AdminProtectedRoutePro
     return <Navigate to="/admin-login" replace />;
   }
 
-  // TEMPORARY ADMIN OVERRIDE - Safe unblock for admin.1@greenscapelux.com
-  if (user.email === 'admin.1@greenscapelux.com') {
+  // PASSWORD RESET ENFORCEMENT: Block access if recovery session is active
+  if (passwordResetRequired) {
     if (import.meta.env.DEV) {
-      console.log('🔐 ADMIN_PROTECTED_ROUTE OVERRIDE: Granting access for admin.1@greenscapelux.com');
+      console.log('🔒 AdminProtectedRoute: Password reset required, redirecting to /reset-password');
+    }
+    return <Navigate to={getPasswordResetRedirectUrl()} replace state={{ from: location }} />;
+  }
+
+  // ADMIN EMAIL OVERRIDE - Grant access for allowlisted admin emails
+  if (isAdminEmail) {
+    if (import.meta.env.DEV) {
+      console.log('🔐 ADMIN_PROTECTED_ROUTE OVERRIDE: Granting access for', user.email);
     }
     return <>{children}</>;
   }
+
 
   // Check role after loading is complete
   if (role !== 'admin') {

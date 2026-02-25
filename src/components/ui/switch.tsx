@@ -9,7 +9,17 @@ const Switch = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SwitchPrimitives.Root
     className={cn(
-      "peer inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
+      "peer inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full border border-transparent",
+      // Focus states - GreenScape Lux branded emerald glow with dark offset
+      "focus-visible:outline-none",
+      "focus-visible:ring-2 focus-visible:ring-emerald-400/60",
+      "focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+      // States
+      "disabled:cursor-not-allowed disabled:opacity-50",
+      "data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
+      // Transitions & touch optimization
+      "transition-all",
+      "[-webkit-tap-highlight-color:transparent]",
       className
     )}
     {...props}

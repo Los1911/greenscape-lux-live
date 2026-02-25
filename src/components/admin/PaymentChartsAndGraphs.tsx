@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { RefreshCw, AlertCircle } from 'lucide-react';
 
 interface PaymentChartsProps {
   detailed?: boolean;
@@ -14,20 +17,23 @@ interface ChartData {
 }
 
 export const PaymentChartsAndGraphs: React.FC<PaymentChartsProps> = ({ detailed = false }) => {
+  const { user, loading: authLoading } = useAuth();
   const [revenueData, setRevenueData] = useState<ChartData[]>([]);
   const [statusData, setStatusData] = useState<ChartData[]>([]);
   const [trendData, setTrendData] = useState<ChartData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     fetchChartData();
-  }, []);
+  }, [authLoading, user]);
 
   const fetchChartData = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       
-      // Fetch payment data for the last 7 days
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const { data: payments } = await supabase
         .from('payments')
@@ -35,7 +41,6 @@ export const PaymentChartsAndGraphs: React.FC<PaymentChartsProps> = ({ detailed 
         .gte('created_at', sevenDaysAgo.toISOString());
 
       if (payments) {
-        // Revenue by day
         const revenueByDay = payments.reduce((acc: any, payment) => {
           const date = new Date(payment.created_at).toLocaleDateString();
           if (!acc[date]) {
@@ -50,9 +55,8 @@ export const PaymentChartsAndGraphs: React.FC<PaymentChartsProps> = ({ detailed 
 
         setRevenueData(Object.values(revenueByDay));
 
-        // Payment status distribution
         const statusCounts = payments.reduce((acc: any, payment) => {
-          acc[payment.status] = (acc[payment.status] || 0) + 1;
+          acc[payment.status || 'unknown'] = (acc[payment.status || 'unknown'] || 0) + 1;
           return acc;
         }, {});
 
@@ -63,7 +67,6 @@ export const PaymentChartsAndGraphs: React.FC<PaymentChartsProps> = ({ detailed 
 
         setStatusData(statusChartData);
 
-        // Trend data (hourly for today)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
@@ -84,9 +87,9 @@ export const PaymentChartsAndGraphs: React.FC<PaymentChartsProps> = ({ detailed 
 
         setTrendData(hourlyData);
       }
-
-    } catch (error) {
-      console.error('Error fetching chart data:', error);
+    } catch (err) {
+      console.error('Error fetching chart data:', err);
+      setError('Failed to load chart data');
     } finally {
       setIsLoading(false);
     }
@@ -98,20 +101,40 @@ export const PaymentChartsAndGraphs: React.FC<PaymentChartsProps> = ({ detailed 
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
-    }).format(value / 100);
+    }).format((value || 0) / 100);
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex justify-center py-8">
+        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 gap-4">
+        <AlertCircle className="h-8 w-8 text-red-500" />
+        <p className="text-red-600">{error}</p>
+        <Button onClick={fetchChartData} variant="outline">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Revenue Chart */}
       <Card>
         <CardHeader>
           <CardTitle>Daily Revenue (Last 7 Days)</CardTitle>
@@ -131,7 +154,6 @@ export const PaymentChartsAndGraphs: React.FC<PaymentChartsProps> = ({ detailed 
 
       {detailed && (
         <>
-          {/* Payment Status Distribution */}
           <Card>
             <CardHeader>
               <CardTitle>Payment Status Distribution</CardTitle>
@@ -159,7 +181,6 @@ export const PaymentChartsAndGraphs: React.FC<PaymentChartsProps> = ({ detailed 
             </CardContent>
           </Card>
 
-          {/* Hourly Trend */}
           <Card>
             <CardHeader>
               <CardTitle>Today's Payment Trend (Hourly)</CardTitle>

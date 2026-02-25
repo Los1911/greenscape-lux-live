@@ -76,13 +76,14 @@ Deno.serve(async (req) => {
       await supabase.from('stripe_connect_notifications').insert({
         landscaper_id: landscaper.id,
         event_type: 'account.updated',
-        stripe_account_id: account.id,
+        stripe_connect_id: account.id,
         charges_enabled: account.charges_enabled || false,
         payouts_enabled: account.payouts_enabled || false,
         requirements: account.requirements || {},
         notification_sent: false,
         created_at: new Date().toISOString()
       });
+
 
       // Get user for notifications
       const { data: user } = await supabase

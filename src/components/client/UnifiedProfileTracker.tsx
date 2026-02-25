@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle, Circle, User, MapPin, CreditCard } from 'lucide-react';
+import { CheckCircle, Circle, User, MapPin, CreditCard, RefreshCw } from 'lucide-react';
 import { StandardizedButton } from '@/components/ui/standardized-button';
 import { useProfileCompletion } from '@/hooks/useProfileCompletion';
 
@@ -16,10 +16,44 @@ export const UnifiedProfileTracker: React.FC<UnifiedProfileTrackerProps> = ({
   onAddAddress,
   onAddPayment
 }) => {
-  const { percentage, items, completedCount, totalCount, loading } = useProfileCompletion();
-  
-  // Force loading to false to show content immediately
-  const actualLoading = false;
+  const { percentage, items, completedCount, totalCount, loading, refresh, markPaymentMethodAdded } = useProfileCompletion();
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+
+  // Listen for payment method events
+  useEffect(() => {
+    const handlePaymentMethodAdded = () => {
+      console.log('[UNIFIED_PROFILE_TRACKER] Received paymentMethodAdded event');
+      markPaymentMethodAdded?.();
+      setIsRefreshing(true);
+      setTimeout(() => {
+        refresh();
+        setIsRefreshing(false);
+      }, 1500);
+    };
+
+    const handleProfileUpdated = () => {
+      console.log('[UNIFIED_PROFILE_TRACKER] Received profileUpdated event');
+      setIsRefreshing(true);
+      setTimeout(() => {
+        refresh();
+        setIsRefreshing(false);
+      }, 1000);
+    };
+
+    window.addEventListener('paymentMethodAdded', handlePaymentMethodAdded);
+    window.addEventListener('profileUpdated', handleProfileUpdated);
+    
+    return () => {
+      window.removeEventListener('paymentMethodAdded', handlePaymentMethodAdded);
+      window.removeEventListener('profileUpdated', handleProfileUpdated);
+    };
+  }, [refresh, markPaymentMethodAdded]);
+
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    refresh();
+    setTimeout(() => setIsRefreshing(false), 2000);
+  }, [refresh]);
 
   const getActionIcon = (actionId: string) => {
     switch (actionId) {
@@ -38,7 +72,7 @@ export const UnifiedProfileTracker: React.FC<UnifiedProfileTrackerProps> = ({
     }
   };
 
-  if (actualLoading) {
+  if (loading && !isRefreshing) {
     return (
       <Card className="bg-gray-900/50 border-gray-800">
         <CardContent className="p-4">
@@ -50,14 +84,26 @@ export const UnifiedProfileTracker: React.FC<UnifiedProfileTrackerProps> = ({
       </Card>
     );
   }
+
   return (
     <Card className="bg-gray-900/50 border-gray-800">
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm text-white flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
-            <User className="h-3 w-3 text-emerald-400" />
+        <CardTitle className="text-sm text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <User className="h-3 w-3 text-emerald-400" />
+            </div>
+            My Profile
           </div>
-          My Profile
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="text-gray-400 hover:text-emerald-400 transition-colors p-1 rounded focus:outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-50"
+            aria-label="Refresh profile"
+            title="Refresh"
+          >
+            <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -87,6 +133,17 @@ export const UnifiedProfileTracker: React.FC<UnifiedProfileTrackerProps> = ({
           <CheckCircle className="h-3 w-3" />
           Account Verified
         </div>
+
+        {/* Show completion status */}
+        {percentage === 100 ? (
+          <div className="text-xs text-emerald-400 bg-emerald-500/10 rounded-lg p-2 text-center">
+            Profile complete! Enjoy all premium benefits.
+          </div>
+        ) : (
+          <div className="text-xs text-gray-400">
+            {completedCount} of {totalCount} steps completed
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -3,8 +3,8 @@ import { supabase } from "@/lib/supabase";
 
 export default function DocumentsCompliance() {
   const [documents, setDocuments] = useState({
-    insurance_file: null,
-    license_file: null
+    insurance_verified: false,
+    profile_complete: false
   });
 
   useEffect(() => {
@@ -12,13 +12,24 @@ export default function DocumentsCompliance() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { data } = await supabase
+          // NOTE: insurance_file and license_file columns may not exist in landscapers table
+          // Use insurance_verified which is a known column
+          const { data, error } = await supabase
             .from('landscapers')
-            .select('insurance_file, license_file')
-            .eq('id', user.id)
-            .single();
+            .select('insurance_verified, profile_complete')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          if (error) {
+            console.error('[DocumentsCompliance] Error fetching documents:', error);
+            return;
+          }
+          
           if (data) {
-            setDocuments(data);
+            setDocuments({
+              insurance_verified: data.insurance_verified || false,
+              profile_complete: data.profile_complete || false
+            });
           }
         }
       } catch (error) {
@@ -44,34 +55,28 @@ export default function DocumentsCompliance() {
       
       <div className="space-y-4">
         <div>
-          <div className="text-sm text-green-200 mb-2">Insurance Document</div>
+          <div className="text-sm text-green-200 mb-2">Insurance Verification</div>
           <div className="flex items-center gap-3">
             <button className={`rounded-full px-3 py-1 text-xs ${
-              documents.insurance_file 
+              documents.insurance_verified 
                 ? 'bg-green-500/15 text-green-300' 
-                : 'bg-red-500/15 text-red-300'
+                : 'bg-yellow-500/15 text-yellow-300'
             }`}>
-              {documents.insurance_file ? 'Uploaded' : 'Missing'}
+              {documents.insurance_verified ? 'Verified' : 'Pending'}
             </button>
-            {documents.insurance_file && (
-              <button className="text-xs text-green-300 underline hover:text-green-200">View File</button>
-            )}
           </div>
         </div>
         
         <div>
-          <div className="text-sm text-green-200 mb-2">License and Certification</div>
+          <div className="text-sm text-green-200 mb-2">Profile Status</div>
           <div className="flex items-center gap-3">
             <button className={`rounded-full px-3 py-1 text-xs ${
-              documents.license_file 
+              documents.profile_complete 
                 ? 'bg-green-500/15 text-green-300' 
-                : 'bg-red-500/15 text-red-300'
+                : 'bg-yellow-500/15 text-yellow-300'
             }`}>
-              {documents.license_file ? 'Uploaded' : 'Missing'}
+              {documents.profile_complete ? 'Complete' : 'Incomplete'}
             </button>
-            {documents.license_file && (
-              <button className="text-xs text-green-300 underline hover:text-green-200">View File</button>
-            )}
           </div>
         </div>
       </div>

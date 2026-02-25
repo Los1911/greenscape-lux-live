@@ -47,22 +47,23 @@ export const AIQuoteDashboard: React.FC = () => {
               </p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Zap className="h-5 w-5 text-purple-600" />
-                Instant Quotes
+                Internal Estimates
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-purple-600 mb-1">Real-time</div>
+              <div className="text-2xl font-bold text-purple-600 mb-1">Admin Review</div>
               <p className="text-sm text-gray-600">
-                Generate accurate quotes in seconds
+                Generate internal estimates for team review
               </p>
             </CardContent>
           </Card>
         </div>
+
+
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           <div>

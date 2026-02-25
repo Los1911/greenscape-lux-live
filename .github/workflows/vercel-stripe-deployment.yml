@@ -1,0 +1,38 @@
+name: Update Vercel Stripe Key and Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      stripe_public_key:
+        description: 'Stripe Public Key'
+        required: true
+        default: 'pk_live_YOUR_STRIPE_PUBLISHABLE_KEY_HERE'
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Remove old Stripe variable
+        continue-on-error: true
+        run: |
+          vercel env rm VITE_STRIPE_PUBLISHABLE_KEY production --token=${{ secrets.VERCEL_TOKEN }} --yes || true
+
+      - name: Add new Stripe variable
+        run: |
+          echo "${{ github.event.inputs.stripe_key }}" | vercel env add VITE_STRIPE_PUBLIC_KEY production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel
+        run: |
+          vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+
+      - name: Deployment Complete
+        run: |
+          echo "✅ Stripe key updated and deployed!"
+          echo "🔍 Verify in DevTools Console: VITE_STRIPE_PUBLIC_KEY should be configured"
+

@@ -86,13 +86,14 @@ function validateStripeKeyConsistency() {
   }
 
   // Check for test keys in production
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VITE_DEPLOY_ENV === 'production';
   if (isProduction && pubIsTest && secretIsTest) {
     return {
       valid: false,
       error: 'Production builds must use live Stripe keys (pk_live_... and sk_live_...)'
     };
   }
+
 
   return { valid: true };
 }

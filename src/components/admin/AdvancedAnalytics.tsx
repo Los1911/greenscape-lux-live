@@ -274,7 +274,8 @@ export default function AdvancedAnalytics() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {['completed', 'in_progress', 'scheduled', 'pending'].map(status => {
+                  {['completed', 'active', 'scheduled', 'pending'].map(status => {
+
                     const count = data.jobs
                       .filter(job => job.status === status)
                       .reduce((sum, job) => sum + job.count, 0);

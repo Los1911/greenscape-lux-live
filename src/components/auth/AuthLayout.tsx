@@ -1,7 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Home } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import GlobalNavigation from '@/components/navigation/GlobalNavigation';
 
 interface AuthLayoutProps {
@@ -20,9 +18,26 @@ export default function AuthLayout({
   backLink = '/get-started' 
 }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-gray-900 to-black">
+    <div 
+      className="bg-gradient-to-br from-emerald-900 via-gray-900 to-black flex flex-col"
+      style={{
+        minHeight: '100dvh',
+        /* Fallback for browsers that don't support dvh */
+        minHeight: '100svh',
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)'
+      }}
+    >
       {/* Mobile Layout */}
-      <div className="md:hidden min-h-screen flex items-center justify-center p-4">
+      <div 
+        className="md:hidden flex-1 flex flex-col items-center justify-center px-4 py-6"
+        style={{
+          paddingTop: 'max(1.5rem, env(safe-area-inset-top))',
+          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))'
+        }}
+      >
         <div className="w-full max-w-md">
           {/* Navigation */}
           <div className="mb-6">
@@ -72,7 +87,13 @@ export default function AuthLayout({
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden md:flex min-h-screen">
+      <div 
+        className="hidden md:flex flex-1"
+        style={{
+          minHeight: '100dvh',
+          minHeight: '100svh'
+        }}
+      >
         {/* Left Side - Branding */}
         <div className="flex-1 flex items-center justify-center p-8 lg:p-12">
           <div className="max-w-lg text-center lg:text-left">

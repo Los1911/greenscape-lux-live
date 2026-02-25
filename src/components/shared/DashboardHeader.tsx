@@ -27,14 +27,15 @@ export default function DashboardHeader({
   const handleLogout = async () => {
     try {
       console.log("Dashboard logout initiated");
-      const redirectPath = type === 'client' ? '/client-login' : '/';
+      const redirectPath = type === 'client' ? '/portal-login' : '/';
       await signOutAndRedirect(supabase, redirectPath);
     } catch (error) {
       console.error("Dashboard logout error:", error);
       // Force redirect even if logout fails
-      window.location.href = type === 'client' ? '/client-login' : '/';
+      window.location.href = type === 'client' ? '/portal-login' : '/';
     }
   };
+
 
   const handleBack = () => {
     // Use explicit navigation instead of navigate(-1)

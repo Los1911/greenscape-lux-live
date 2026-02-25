@@ -55,16 +55,17 @@ console.log('\n🌐 Production Environment Analysis:');
 console.log('===================================');
 
 const nodeEnv = process.env.NODE_ENV || 'development';
-const vercelEnv = process.env.VERCEL_ENV || 'development';
+const deployEnv = process.env.VITE_DEPLOY_ENV || 'development';
 
 console.log(`📍 NODE_ENV: ${nodeEnv}`);
-console.log(`📍 VERCEL_ENV: ${vercelEnv}`);
+console.log(`📍 DEPLOY_ENV: ${deployEnv}`);
 
-if (vercelEnv === 'production') {
+if (deployEnv === 'production') {
   console.log('✅ Running in production environment');
 } else {
   console.log('⚠️  Not running in production environment');
 }
+
 
 // Security validation
 console.log('\n🔒 Security Validation:');
@@ -93,13 +94,10 @@ console.log('======================');
 if (hasIssues) {
   console.log('❌ ISSUES DETECTED - Production environment needs configuration');
   console.log('\n🔧 REQUIRED ACTIONS:');
-  console.log('1. Set missing environment variables in Vercel dashboard');
+  console.log('1. Set missing environment variables in your deployment platform');
   console.log('2. Ensure variables are configured for PRODUCTION environment');
-  console.log('3. Redeploy with: vercel --prod --force --no-cache');
-  console.log('4. Monitor browser console for fallback system warnings');
-  
-  console.log('\n💡 QUICK FIX:');
-  console.log('Run: ./scripts/vercel-env-production-fix.sh');
+  console.log('3. Redeploy application with updated environment variables');
+  console.log('4. Monitor browser console for any configuration warnings');
   
   process.exit(1);
 } else {

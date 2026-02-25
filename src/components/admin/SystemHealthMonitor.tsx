@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/lib/supabase';
-import { Activity, Server, Database, Zap, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Activity, Server, Database, Zap, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
 
 interface SystemHealth {
   database: 'healthy' | 'warning' | 'critical';
@@ -24,6 +25,7 @@ interface WebhookStatus {
 }
 
 export const SystemHealthMonitor: React.FC = () => {
+  const { user, loading: authLoading } = useAuth();
   const [systemHealth, setSystemHealth] = useState<SystemHealth>({
     database: 'healthy',
     webhooks: 'healthy',
@@ -38,10 +40,15 @@ export const SystemHealthMonitor: React.FC = () => {
   const [lastCheck, setLastCheck] = useState<Date>(new Date());
 
   useEffect(() => {
+    // Wait for auth to resolve before starting health checks
+    if (authLoading) return;
+    if (!user) return;
+
     checkSystemHealth();
     const interval = setInterval(checkSystemHealth, 60000); // Check every minute
     return () => clearInterval(interval);
-  }, []);
+  }, [authLoading, user]);
+
 
   const checkSystemHealth = async () => {
     try {
@@ -124,8 +131,18 @@ export const SystemHealthMonitor: React.FC = () => {
     }
   };
 
+  // Auth loading guard
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <RefreshCw className="h-6 w-6 text-emerald-400 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+
       {/* System Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>

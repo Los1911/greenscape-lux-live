@@ -1,17 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <base href="/" />
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>GreenScape Lux - Premium Landscaping Services | Professional Lawn Care & Design</title>
     <meta name="description" content="Transform your outdoor space with GreenScape Lux premium landscaping services. Professional lawn care, garden design, and landscape maintenance in NC & FL. Get your free quote today." />
     <meta name="keywords" content="landscaping, lawn care, garden design, outdoor spaces, landscape maintenance, premium landscaping, professional landscapers, Charlotte landscaping, North Carolina landscaping, Florida landscaping, luxury lawn care" />
     <meta name="author" content="GreenScape Lux" />
     <meta name="robots" content="index, follow" />
     <meta name="theme-color" content="#10b981" />
-    <meta name="version" content="DEPLOY_VERSION" />
+    
+    <!-- Cache-busting version identifier -->
+    <meta name="version" content="admin-jobs-fix-final-20260126" />
+    <meta name="build-date" content="2026-01-26T07:30:00Z" />
+    <meta name="query-source" content="jobs" />
+    <meta name="cache-version" content="v4" />
 
-    <link rel="icon" type="image/webp" href="https://d64gsuwffb70l.cloudfront.net/68875f8ee1bf860dd7a01934_1756260118181_b688d544.webp" />
+
+    <link rel="icon" type="image/png" href="https://d64gsuwffb70l.cloudfront.net/68366206d4e44998c9b3046b_1764851147877_202b24fd.png" />
+    <link rel="apple-touch-icon" href="https://d64gsuwffb70l.cloudfront.net/68366206d4e44998c9b3046b_1764851147877_202b24fd.png" />
     <link rel="canonical" href="https://greenscapelux.com/" />
 
     <!-- Open Graph / Facebook -->
@@ -19,13 +28,80 @@
     <meta property="og:url" content="https://greenscapelux.com/" />
     <meta property="og:title" content="GreenScape Lux - Premium Landscaping Services | Charlotte NC & FL" />
     <meta property="og:description" content="Transform your outdoor space with professional landscaping services. Expert lawn care, garden design, and landscape maintenance in North Carolina and Florida." />
-    <meta property="og:image" content="https://greenscapelux.com/og-image.jpg" />
+    <meta property="og:image" content="https://d64gsuwffb70l.cloudfront.net/68366206d4e44998c9b3046b_1764851147877_202b24fd.png" />
+
     <meta property="og:site_name" content="GreenScape Lux" />
 
     <!-- Google Maps API - Loaded dynamically via googleMaps.ts service -->
     <!-- API Key: VITE_GOOGLE_MAPS_API_KEY from environment variables -->
     <!-- Libraries: places, geometry -->
+    
+    <!-- Inline script to detect stale cache and force reload -->
+    <script>
+      (function() {
+        var EXPECTED_VERSION = 'admin-jobs-fix-final-20260126';
+        var CACHE_VERSION = 'v4';
+        var storedVersion = localStorage.getItem('html_version');
+        var storedCacheVersion = localStorage.getItem('html_cache_version');
+        
+        // Log version info
+        console.log('[HTML] Expected version:', EXPECTED_VERSION);
+        console.log('[HTML] Expected cache version:', CACHE_VERSION);
+        console.log('[HTML] Stored version:', storedVersion);
+        console.log('[HTML] Stored cache version:', storedCacheVersion);
+        
+        // If version mismatch, clear caches and reload
+        var versionMismatch = storedVersion && storedVersion !== EXPECTED_VERSION;
+        var cacheVersionMismatch = storedCacheVersion && storedCacheVersion !== CACHE_VERSION;
+        
+        if (versionMismatch || cacheVersionMismatch) {
+          console.log('[HTML] Version mismatch detected! Clearing cache...');
+          console.log('[HTML] - Version mismatch:', versionMismatch);
+          console.log('[HTML] - Cache version mismatch:', cacheVersionMismatch);
+          
+          localStorage.setItem('html_version', EXPECTED_VERSION);
+          localStorage.setItem('html_cache_version', CACHE_VERSION);
+          
+          // Clear ALL localStorage version keys to force fresh state
+          localStorage.removeItem('app_version');
+          localStorage.removeItem('app_cache_version');
+          
+          // Clear service worker caches
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              console.log('[HTML] Clearing', names.length, 'caches');
+              names.forEach(function(name) {
+                caches.delete(name);
+              });
+            });
+          }
+          
+          // Unregister service workers
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+              console.log('[HTML] Unregistering', registrations.length, 'service workers');
+              registrations.forEach(function(registration) {
+                registration.unregister();
+              });
+            });
+          }
+          
+          // Force reload with cache bypass after a brief delay
+          setTimeout(function() {
+            console.log('[HTML] Forcing hard reload...');
+            window.location.reload(true);
+          }, 200);
+        } else if (!storedVersion) {
+          console.log('[HTML] First visit - storing version');
+          localStorage.setItem('html_version', EXPECTED_VERSION);
+          localStorage.setItem('html_cache_version', CACHE_VERSION);
+        } else {
+          console.log('[HTML] Version up to date');
+        }
+      })();
+    </script>
   </head>
+
 
   <body>
     <div id="root"></div>

@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Shield, AlertTriangle } from 'lucide-react';
+import { getDashboardRoute } from '@/utils/navigationHelpers';
 
 interface AdminSecurityGateProps {
   children: React.ReactNode;
@@ -15,6 +16,7 @@ export default function AdminSecurityGate({
   requireSuperAdmin = false 
 }: AdminSecurityGateProps) {
   const { user, role, loading } = useAuth();
+  const navigate = useNavigate();
   const [verifying, setVerifying] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -63,6 +65,12 @@ export default function AdminSecurityGate({
     verifyAdminAccess();
   }, [user, role]);
 
+  // Auth-aware back navigation for admin users
+  const handleGoBack = () => {
+    // Admin users should go to admin dashboard, not public pages
+    navigate(getDashboardRoute(role));
+  };
+
   if (loading || verifying) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
@@ -91,7 +99,7 @@ export default function AdminSecurityGate({
             This area requires super admin privileges. Please contact a system administrator.
           </p>
           <button
-            onClick={() => window.history.back()}
+            onClick={handleGoBack}
             className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded"
           >
             Go Back

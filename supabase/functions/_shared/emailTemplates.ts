@@ -238,7 +238,7 @@ export function landscaperWelcomeTemplate({ name, email, confirmationNumber }: {
           </div>
           <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;"><strong>Next Steps:</strong></p>
           <ul style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
-            <li>Complete your profile verification</li>
+            <li>Set up your business details in the Professional Setup wizard</li>
             <li>Upload required documentation</li>
             <li>Wait for admin approval</li>
             <li>Start receiving premium landscaping jobs</li>

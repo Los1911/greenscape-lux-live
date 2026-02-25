@@ -1,16 +1,56 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signOutAndRedirect } from '@/lib/logout';
-import { useAuth } from '@/contexts/AuthContext';
+import { globalLogout } from '@/utils/globalLogout';
 import { supabase } from '@/lib/supabase';
 
 export default function AuthMenu() {
   const [open, setOpen] = useState(false);
   const [hasClient, setHasClient] = useState(false);
   const [hasPro, setHasPro] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [role, setRole] = useState<string | null>(null);
   const navigate = useNavigate();
   const menuRef = useRef<HTMLDivElement>(null);
-  const { user, role } = useAuth();
+
+  // Listen to auth state changes globally
+  useEffect(() => {
+    const fetchSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        // Get role from user metadata or database
+        const userRole = session.user.user_metadata?.role;
+        if (userRole) {
+          setRole(userRole);
+        } else {
+          // Fallback to database lookup
+          const { data: userData } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+          setRole(userData?.role || 'client');
+        }
+      } else {
+        setRole(null);
+      }
+    };
+
+    fetchSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        const userRole = session.user.user_metadata?.role;
+        setRole(userRole || 'client');
+      } else {
+        setRole(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (user && role) {
@@ -41,8 +81,9 @@ export default function AuthMenu() {
 
   const logout = async () => {
     setOpen(false);
-    await signOutAndRedirect(supabase, '/client-login');
+    await globalLogout('/portal-login');
   };
+
 
   // Don't render if not authenticated
   if (!user?.email) {

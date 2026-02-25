@@ -34,7 +34,7 @@ npm run verify:env
 ### Check Browser Console
 After deployment, open DevTools console and run:
 ```javascript
-console.log('VITE_STRIPE_PUBLISHABLE_KEY:', import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+console.log('VITE_STRIPE_PUBLIC_KEY:', import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 console.log('VITE_GOOGLE_MAPS_API_KEY:', import.meta.env.VITE_GOOGLE_MAPS_API_KEY);
 ```
 
@@ -43,7 +43,7 @@ Both should show actual values, not `undefined`.
 ## GitHub Actions Configuration
 
 Ensure GitHub Secrets are set:
-- `VITE_STRIPE_PUBLISHABLE_KEY`
+- `VITE_STRIPE_PUBLIC_KEY`
 - `VITE_GOOGLE_MAPS_API_KEY`
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`

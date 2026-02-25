@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Vercel Stripe Key Setup Guide
 
 ## Critical Issue
@@ -14,7 +13,7 @@ The Stripe public key is showing as "UNDEFINED" in production because the enviro
 4. Add or update the following variable:
 
 ```
-Name: VITE_STRIPE_PUBLISHABLE_KEY
+Name: VITE_STRIPE_PUBLIC_KEY
 Value: pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK
 Environment: Production, Preview, Development (select all)
 ```
@@ -43,7 +42,7 @@ git push origin main
 3. Open browser DevTools (F12)
 4. Go to **Console** tab
 5. Look for environment variable logs
-6. Verify `VITE_STRIPE_PUBLISHABLE_KEY` shows: `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
+6. Verify `VITE_STRIPE_PUBLIC_KEY` shows: `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
 
 ### Step 4: Test Stripe Integration
 
@@ -62,7 +61,7 @@ If using GitHub Pages instead of Vercel:
 2. Click **New repository secret**
 3. Add:
 ```
-Name: VITE_STRIPE_PUBLISHABLE_KEY
+Name: VITE_STRIPE_PUBLIC_KEY
 Value: pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK
 ```
 
@@ -72,7 +71,7 @@ The workflow file `.github/workflows/github-pages-deploy.yml` already includes:
 
 ```yaml
 env:
-  VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
+  VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
 ```
 
 ### Trigger Deployment
@@ -146,43 +145,3 @@ After successful deployment, you should see:
 **Status:** Ready for deployment
 **Priority:** CRITICAL
 **Estimated Time:** 5-10 minutes
-=======
-# VERCEL STRIPE KEY SETUP - IMMEDIATE FIX
-
-## CRITICAL ISSUE
-`VITE_STRIPE_PUBLISHABLE_KEY` is missing from Vercel environment variables, causing Stripe initialization to fail.
-
-## IMMEDIATE SOLUTION
-
-### Step 1: Add Environment Variable to Vercel
-1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
-2. Select your project
-3. Go to **Settings** → **Environment Variables**
-4. Click **Add New**
-5. Set:
-   - **Name**: `VITE_STRIPE_PUBLISHABLE_KEY`
-   - **Value**: `pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK`
-   - **Environment**: Production (and Preview if needed)
-
-### Step 2: Redeploy
-1. Go to **Deployments** tab
-2. Click **Redeploy** on the latest deployment
-3. Or push a new commit to trigger deployment
-
-## ALTERNATIVE QUICK FIX
-If you can't access Vercel dashboard immediately, add a temporary fallback in the code:
-
-```typescript
-const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_live_51S1Ht0K6kWkUsxtpuhNk69fjZuVrP85DNMYpexFeFMH5bCHdZjbtltPYXMcU5luEbz0SlB3ImUDAbifJspjtom0L00q27vIPCK';
-```
-
-## VERIFICATION
-After deployment, check browser console for:
-```
-Environment check: {
-  NODE_ENV: "production",
-  VITE_STRIPE_PUBLISHABLE_KEY: "SET",
-  actualKey: "pk_live_..."
-}
-```
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706

@@ -4,7 +4,22 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] touch-manipulation",
+  // Base styles with GreenScape Lux branded focus ring
+  // Note: Global CSS handles focus-visible styling, but we keep Tailwind classes for specificity
+  [
+    "inline-flex items-center justify-center whitespace-nowrap rounded-full",
+    "text-sm font-medium transition-all duration-200",
+    // Focus states - emerald glow ring with dark offset for dark theme
+    "focus-visible:outline-none",
+    "focus-visible:ring-2 focus-visible:ring-emerald-400/60",
+    "focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+    // Disabled state
+    "disabled:pointer-events-none disabled:opacity-50",
+    // Hover/active micro-interactions
+    "hover:scale-[1.02] active:scale-[0.98]",
+    // Mobile touch optimization - removes iOS tap highlight
+    "touch-manipulation [-webkit-tap-highlight-color:transparent]",
+  ].join(" "),
   {
     variants: {
       variant: {

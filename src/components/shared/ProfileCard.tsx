@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Phone, Building2, Shield, CheckCircle2, Edit3, MapPin } from 'lucide-react';
+import { User, Mail, Phone, Building2, Shield, CheckCircle2, Edit3, MapPin, Award } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -7,6 +7,7 @@ import { StandardizedButton } from '@/components/ui/standardized-button';
 import { supabase } from '@/lib/supabase';
 import { isUUID } from '@/lib/isUUID';
 import { useProfileCompletion } from '@/hooks/useProfileCompletion';
+import { BadgesSection } from '@/components/landscaper/BadgesSection';
 
 interface ClientProfileData {
   clientName: string;
@@ -22,6 +23,7 @@ interface LandscaperProfileData {
   serviceArea: string;
   insuranceStatus: "verified" | "pending" | "expired";
   type: 'landscaper';
+  landscaperId?: string;
 }
 
 type ProfileData = ClientProfileData | LandscaperProfileData;
@@ -29,10 +31,12 @@ type ProfileData = ClientProfileData | LandscaperProfileData;
 interface ProfileCardProps {
   profile: ProfileData;
   loading?: boolean;
+  showBadges?: boolean;
 }
 
-export default function ProfileCard({ profile, loading = false }: ProfileCardProps) {
+export default function ProfileCard({ profile, loading = false, showBadges = true }: ProfileCardProps) {
   const [verificationStatus, setVerificationStatus] = useState<"verified" | "pending" | "expired">("pending");
+  const [landscaperId, setLandscaperId] = useState<string | null>(null);
 
   useEffect(() => {
     if (profile.type === 'landscaper') {
@@ -50,6 +54,10 @@ export default function ProfileCard({ profile, loading = false }: ProfileCardPro
         .select('id, insurance_status, insurance_expiry')
         .eq('id', user.id)
         .single();
+
+      if (landscaper?.id) {
+        setLandscaperId(landscaper.id);
+      }
 
       if (landscaper?.insurance_status) {
         if (landscaper.insurance_expiry && new Date(landscaper.insurance_expiry) < new Date()) {
@@ -140,6 +148,9 @@ export default function ProfileCard({ profile, loading = false }: ProfileCardPro
     );
   };
 
+  // Get landscaper ID from profile or state
+  const effectiveLandscaperId = (profile as LandscaperProfileData).landscaperId || landscaperId;
+
   return (
     <Card className="bg-black border-green-500 shadow-lg shadow-green-500/20">
       <CardHeader>
@@ -177,6 +188,13 @@ export default function ProfileCard({ profile, loading = false }: ProfileCardPro
           <p className="text-sm text-gray-300 mb-2">{profile.bio}</p>
           <p className="text-sm text-green-400">Service Area: {profile.serviceArea}</p>
         </div>
+        
+        {/* Compact Badges Display */}
+        {showBadges && effectiveLandscaperId && (
+          <div className="pt-3 border-t border-green-500/20">
+            <BadgesSection landscaperId={effectiveLandscaperId} compact={true} />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

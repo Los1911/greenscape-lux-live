@@ -7,6 +7,18 @@ import { VersionChecker } from './components/VersionChecker';
 import { supabase } from './lib/supabase';
 
 // =============================================================================
+// LOADING FALLBACK
+// =============================================================================
+const LoadingFallback = () => (
+  <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black flex items-center justify-center">
+    <div className="text-center space-y-4">
+      <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto" />
+      <p className="text-gray-400 text-sm">Loading...</p>
+    </div>
+  </div>
+);
+
+// =============================================================================
 // MARKETING PAGES
 // =============================================================================
 import AboutUs from './pages/AboutUs';
@@ -42,6 +54,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import LandscaperJobs from './pages/LandscaperJobs';
 import NewRequests from './pages/NewRequests';
 import JobComplete from './pages/JobComplete';
+import LandscaperProfile from './pages/LandscaperProfile';
 
 // =============================================================================
 // ADMIN TOOLS
@@ -50,6 +63,7 @@ import AdminPanel from './pages/AdminPanel';
 import BusinessAutomation from './pages/BusinessAutomation';
 import NotificationDashboard from './pages/NotificationDashboard';
 import AIQuoteDashboard from './pages/AIQuoteDashboard';
+import PriceAnalyticsDashboard from './pages/analytics/PriceAnalyticsDashboard';
 
 // =============================================================================
 // CLIENT
@@ -64,18 +78,30 @@ import Chat from './pages/Chat';
 // PAYMENTS
 // =============================================================================
 import PaymentOverview from './pages/payments/PaymentOverview';
+import PaymentMethods from './pages/payments/PaymentMethods';
+import PaymentSubscriptions from './pages/payments/PaymentSubscriptions';
+import PaymentSecurity from './pages/payments/PaymentSecurity';
 
 // =============================================================================
 // MISC
 // =============================================================================
 import SearchPage from './pages/SearchPage';
 import NotFound from './pages/NotFound';
+import EnvironmentStatus from './pages/EnvironmentStatus';
 
 // =============================================================================
 // ROUTING HELPERS
 // =============================================================================
 import SimpleProtectedRoute from './components/auth/SimpleProtectedRoute';
+import { FeatureGatedRoute } from './components/routing/FeatureGatedRoute';
 import RoleRouter from './router/RoleRouter';
+
+// =============================================================================
+// SETUP
+// =============================================================================
+import { SetupWizard } from './components/setup/SetupWizard';
+import { ProductionStatus } from './components/setup/ProductionStatus';
+import { ClientOnboardingRedirect } from './components/onboarding/ClientOnboardingRedirect';
 
 // =============================================================================
 // APP
@@ -117,7 +143,9 @@ const App: React.FC = () => {
               path="/client-quote"
               element={
                 <SimpleProtectedRoute requiredRole="client">
-                  <ClientQuoteForm />
+                  <ClientOnboardingRedirect>
+                    <ClientQuoteForm />
+                  </ClientOnboardingRedirect>
                 </SimpleProtectedRoute>
               }
             />
@@ -151,12 +179,17 @@ const App: React.FC = () => {
               }
             />
 
-            {/* ADMIN */}
+            {/* ADMIN LEGACY */}
             <Route
               path="/admin"
               element={
                 <SimpleProtectedRoute requiredRole="admin">
-                  <AdminPanel />
+                  <FeatureGatedRoute
+                    featureFlag="FEATURE_ADMIN_CONTACT_PANEL"
+                    fallbackPath="/admin-dashboard"
+                  >
+                    <AdminPanel />
+                  </FeatureGatedRoute>
                 </SimpleProtectedRoute>
               }
             />
@@ -212,13 +245,23 @@ const App: React.FC = () => {
                 </SimpleProtectedRoute>
               }
             />
+            <Route
+              path="/analytics/pricing"
+              element={
+                <SimpleProtectedRoute requiredRole="admin">
+                  <PriceAnalyticsDashboard />
+                </SimpleProtectedRoute>
+              }
+            />
 
             {/* CLIENT */}
             <Route
               path="/profile"
               element={
                 <SimpleProtectedRoute requiredRole="client">
-                  <ClientProfile />
+                  <ClientOnboardingRedirect>
+                    <ClientProfile />
+                  </ClientOnboardingRedirect>
                 </SimpleProtectedRoute>
               }
             />
@@ -226,7 +269,9 @@ const App: React.FC = () => {
               path="/client-history"
               element={
                 <SimpleProtectedRoute requiredRole="client">
-                  <ClientHistory />
+                  <ClientOnboardingRedirect>
+                    <ClientHistory />
+                  </ClientOnboardingRedirect>
                 </SimpleProtectedRoute>
               }
             />
@@ -234,7 +279,9 @@ const App: React.FC = () => {
               path="/billing/history"
               element={
                 <SimpleProtectedRoute requiredRole="client">
-                  <BillingHistory />
+                  <ClientOnboardingRedirect>
+                    <BillingHistory />
+                  </ClientOnboardingRedirect>
                 </SimpleProtectedRoute>
               }
             />
@@ -242,7 +289,9 @@ const App: React.FC = () => {
               path="/subscriptions"
               element={
                 <SimpleProtectedRoute requiredRole="client">
-                  <SubscriptionDashboard />
+                  <ClientOnboardingRedirect>
+                    <SubscriptionDashboard />
+                  </ClientOnboardingRedirect>
                 </SimpleProtectedRoute>
               }
             />
@@ -250,7 +299,9 @@ const App: React.FC = () => {
               path="/chat"
               element={
                 <SimpleProtectedRoute requiredRole="client">
-                  <Chat />
+                  <ClientOnboardingRedirect>
+                    <Chat />
+                  </ClientOnboardingRedirect>
                 </SimpleProtectedRoute>
               }
             />
@@ -260,7 +311,21 @@ const App: React.FC = () => {
               path="/payments/overview"
               element={
                 <SimpleProtectedRoute requiredRole="client">
-                  <PaymentOverview />
+                  <ClientOnboardingRedirect>
+                    <PaymentOverview />
+                  </ClientOnboardingRedirect>
+                </SimpleProtectedRoute>
+              }
+            />
+
+            {/* SETUP / DEBUG */}
+            <Route path="/setup" element={<SetupWizard onComplete={() => (window.location.href = '/')} />} />
+            <Route path="/status" element={<ProductionStatus />} />
+            <Route
+              path="/admin/environment-status"
+              element={
+                <SimpleProtectedRoute requiredRole="admin">
+                  <EnvironmentStatus />
                 </SimpleProtectedRoute>
               }
             />

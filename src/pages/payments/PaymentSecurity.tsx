@@ -1,9 +1,25 @@
 import React from 'react';
 import PaymentLayout from '@/components/layouts/PaymentLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield } from 'lucide-react';
+import { Shield, RefreshCw } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+
 
 export default function PaymentSecurity() {
+  const { loading: authLoading } = useAuth();
+
+
+  // Auth loading guard - prevents white screen on refresh
+  if (authLoading) {
+    return (
+      <PaymentLayout activeTab="security">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <RefreshCw className="h-8 w-8 text-emerald-400 animate-spin" />
+        </div>
+      </PaymentLayout>
+    );
+  }
+
   return (
     <PaymentLayout activeTab="security">
       <Card className="bg-slate-800 border-slate-700">

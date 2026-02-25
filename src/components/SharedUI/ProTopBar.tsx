@@ -3,6 +3,7 @@ import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { signOutAndRedirect } from "@/lib/logout";
 import { supabase } from "@/lib/supabase";
+import { getDashboardRoute } from "@/utils/navigationHelpers";
 
 function BackIcon() {
   return (
@@ -20,7 +21,7 @@ function LogoutIcon() {
 }
 
 export default function ProTopBar() {
-  const { user } = useAuth(); // Use AuthContext instead of direct supabase call
+  const { user, role } = useAuth(); // Use AuthContext instead of direct supabase call
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -30,12 +31,19 @@ export default function ProTopBar() {
   if (!mounted) return null;
 
   const email = user?.email || null; // Get email from AuthContext
-
-
+  const isAuthenticated = !!user;
 
   const handleBack = () => {
     if (typeof window !== "undefined") {
-      // Use explicit navigation instead of window.history.back()
+      // For authenticated users, always go to their dashboard
+      // Never go to public pages like '/' or '/professionals'
+      if (isAuthenticated) {
+        const dashboardPath = getDashboardRoute(role);
+        window.location.assign(dashboardPath);
+        return;
+      }
+      
+      // For unauthenticated users, use the original logic
       const currentPath = window.location.pathname;
       const backPath = currentPath.includes('/professionals') ? '/professionals' : '/';
       window.location.assign(backPath);
@@ -43,7 +51,21 @@ export default function ProTopBar() {
   };
 
   const handleLogout = async () => {
-    await signOutAndRedirect(supabase, '/professional-login');
+    await signOutAndRedirect(supabase, '/portal-login');
+  };
+
+  // Get profile path based on role
+  const getProfilePath = () => {
+    switch (role) {
+      case 'landscaper':
+        return '/landscaper-profile';
+      case 'admin':
+        return '/admin-dashboard';
+      case 'client':
+        return '/profile';
+      default:
+        return '/profile';
+    }
   };
 
   return (
@@ -61,7 +83,7 @@ export default function ProTopBar() {
         <button
           className="max-w-[60%] sm:max-w-[70%] truncate text-emerald-200/90 text-sm text-center"
           title={email || ""}
-          onClick={() => (typeof window !== "undefined") && window.location.assign("/professionals/profile")}
+          onClick={() => (typeof window !== "undefined") && window.location.assign(getProfilePath())}
         >
           {email || "Professional"}
         </button>

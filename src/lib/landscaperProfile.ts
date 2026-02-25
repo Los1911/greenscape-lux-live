@@ -43,16 +43,16 @@ export async function ensureLandscaperProfile(profileData: LandscaperProfileData
 
     console.log('✅ Users record created/updated');
 
-    // 2. Create landscaper profile
+    // 2. Create landscaper profile - CRITICAL: Set both id AND user_id
+    // NOTE: email, first_name, last_name, phone, status columns may NOT exist in landscapers table
+    // Only include columns that are known to exist in the actual database schema
     const { data: landscaper, error: landscaperError } = await supabase
       .from('landscapers')
       .upsert({
         id: user.id,
-        email: profileData.email,
-        first_name: profileData.first_name,
-        last_name: profileData.last_name,
-        phone: profileData.phone || null,
-        status: 'pending',
+        user_id: user.id,  // CRITICAL: This field is used for lookups
+        business_name: `${profileData.first_name} ${profileData.last_name}`.trim() || null,
+        approved: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }, { 
@@ -61,6 +61,7 @@ export async function ensureLandscaperProfile(profileData: LandscaperProfileData
       })
       .select()
       .single();
+
 
     if (landscaperError) {
       console.error('❌ Error creating landscaper profile:', landscaperError);
@@ -76,21 +77,43 @@ export async function ensureLandscaperProfile(profileData: LandscaperProfileData
   }
 }
 
-export async function fetchLandscaperProfile(emailOrUserId: string) {
+export async function fetchLandscaperProfile(emailOrUserId?: string) {
   try {
-    // Try by ID first (UUID format)
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(emailOrUserId);
+    console.log('🔍 fetchLandscaperProfile: Starting with:', emailOrUserId);
     
-    const { data, error } = await supabase
+    // Get current user if no emailOrUserId provided
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error('❌ No authenticated user found:', userError);
+      return null;
+    }
+    
+    console.log('👤 User Auth ID:', user.id);
+    console.log('📧 User Email:', user.email);
+    
+    // Query by user_id - use maybeSingle() to prevent PGRST116 errors
+    // NOTE: email column does NOT exist in landscapers table - only query by user_id
+    const { data: landscaperByUserId, error: userIdError } = await supabase
       .from('landscapers')
       .select('*')
-      .eq(isUUID ? 'id' : 'email', emailOrUserId)
-      .single();
+      .eq('user_id', user.id)
+      .maybeSingle();
     
-    if (error) throw error;
-    return data;
+    if (userIdError) {
+      console.error('❌ Error fetching landscaper by user_id:', userIdError);
+    }
+    
+    if (landscaperByUserId) {
+      console.log('✅ Landscaper found by user_id:', landscaperByUserId);
+      return landscaperByUserId;
+    }
+    
+    // NOTE: email column does NOT exist in landscapers table
+    // Cannot search by email - only user_id works
+    console.warn('⚠️ No landscaper profile found for user_id:', user.id);
+    return null;
   } catch (error) {
-    console.error('Error fetching landscaper profile:', error);
-    throw error;
+    console.error('❌ Error fetching landscaper profile:', error);
+    return null;
   }
 }

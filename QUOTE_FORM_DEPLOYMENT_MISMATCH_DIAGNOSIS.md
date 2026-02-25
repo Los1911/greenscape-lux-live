@@ -1,127 +1,185 @@
-# Quote Form Deployment Mismatch - Critical Diagnosis
+# Admin Dashboard Deployment Mismatch Diagnosis & Fix
 
-## 🚨 ROOT CAUSE IDENTIFIED
+## Problem Summary
 
-The live site at https://www.greenscapelux.com/get-quote is **NOT running the current codebase**. The console logs prove this conclusively.
+The Admin Dashboard shows "Failed to load jobs" due to a Supabase 400 error. The browser is loading **stale JavaScript** that still queries the `quotes` table with invalid filters, even though all source code has been corrected to query the `jobs` table.
+
+## Root Cause
+
+**This is NOT a code issue.** The code is correct. The problem is:
+
+1. **Stale Deployment**: The production domain (`greenscapelux.com`) is serving an old JavaScript bundle
+2. **Vercel Project Mismatch**: Multiple Vercel projects exist, and the domain may be pointing to a stale/deleted deployment
+3. **Aggressive CDN Caching**: Vercel's CDN is serving cached JavaScript files
 
 ## Evidence
 
-### Console Log from Live Site (Screenshot):
+### Failing Request (from browser console)
 ```
-Attempting to save quote to database... {name: "Carlos Matthews", email: "carlosmatthews@gmail.com", phone: null, ...}
-```
-
-### Current Codebase Logs:
-
-**GetQuoteEnhanced.tsx (line 168):**
-```typescript
-console.log('📝 Submitting quote to database...', {...});
+GET /rest/v1/quotes?
+  select=*
+  &assigned_landscaper_id=is.null
+  &status=eq.pending
+  &order=created_at.desc
+→ 400 Bad Request
 ```
 
-**ClientQuoteForm.tsx (line 126):**
-```typescript
-console.log('🎯 STEP 4: Inserting quote to database...');
+### Current Code (CORRECT)
+All admin components now query `jobs` table:
+- `AdminJobsPanel.tsx` → `from('jobs')`
+- `AdminJobPricingPanel.tsx` → `from('jobs')`
+- `AdminJobPhotoReview.tsx` → `from('job_photos')` → `from('jobs')`
+- `JobMatchingDashboard.tsx` → `from('jobs')`
+
+### The Query Pattern `assigned_landscaper_id=is.null` Does NOT Exist in Current Code
+This proves the browser is loading old JavaScript.
+
+## Fix Applied
+
+### 1. Cache-Busting Headers (vercel.json)
+```json
+{
+  "source": "/index.html",
+  "headers": [
+    { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+    { "key": "Pragma", "value": "no-cache" },
+    { "key": "Expires", "value": "0" }
+  ]
+}
 ```
 
-**NEITHER matches the live site log!**
+### 2. Version Tracking (public/version.json)
+```json
+{
+  "commitHash": "admin-jobs-fix-v3-20260126",
+  "buildId": "jobs-table-query-fix-final",
+  "querySource": "jobs",
+  "legacyQuotesRemoved": true
+}
+```
 
-## Current Code Verification ✅
+### 3. Enhanced VersionChecker Component
+- Detects version mismatches
+- Clears service worker caches
+- Forces hard reload on stale detection
 
-The current ClientQuoteForm.tsx code is **CORRECT**:
+### 4. Inline Cache Detection (index.html)
+- JavaScript runs before React loads
+- Detects stale HTML and forces reload
+- Clears all caches on version mismatch
 
-1. ✅ **Form binding** (line 329): `<form onSubmit={handleSubmit}>`
-2. ✅ **Submit button** (line 412): `type="submit"`
-3. ✅ **preventDefault** (line 87): `e.preventDefault()` at start of handleSubmit
-4. ✅ **Diagnostic logs** (lines 15, 88, 287-289): All present
-5. ✅ **Finally block** (lines 275-282): Properly resets loading state
+### 5. Build Version Logging (main.tsx)
+- Logs build version on startup
+- Validates cache against server version
+- Helps identify stale deployments
 
-## Why No Logs Appear
+## Verification Steps
 
-The live site shows OLD code without our diagnostic logs. This means:
+### Step 1: Check Current Deployment Version
+Open browser console on production site and look for:
+```
+═══════════════════════════════════════════════════════════════
+🚀 GreenScape Lux Starting...
+📦 Build Version: admin-jobs-fix-v3-20260126
+🔍 Query Source: jobs (admin queries use jobs table)
+═══════════════════════════════════════════════════════════════
+```
 
-1. **Deployment didn't complete** - Code wasn't pushed to production
-2. **Cache not cleared** - CDN/browser serving stale assets
-3. **Wrong component rendered** - But App.tsx shows correct routing
+If you see a different version or "quotes" as query source, the deployment is stale.
 
-## Immediate Action Required
-
-### Step 1: Verify Deployment
+### Step 2: Check Version Endpoint
 ```bash
-# Check latest deployment on Vercel
-vercel ls greenscapelux
-
-# Check if latest commit is deployed
-git log -1 --oneline
+curl -H "Cache-Control: no-cache" "https://greenscapelux.com/version.json?t=$(date +%s)"
 ```
 
-### Step 2: Force New Deployment
+Expected response:
+```json
+{
+  "commitHash": "admin-jobs-fix-v3-20260126",
+  "querySource": "jobs"
+}
+```
+
+### Step 3: Force Cache Clear (User)
+1. Open DevTools (F12)
+2. Right-click the refresh button
+3. Select "Empty Cache and Hard Reload"
+4. Or: DevTools → Application → Storage → Clear site data
+
+### Step 4: Verify Admin Dashboard
+1. Navigate to `/admin-dashboard`
+2. Open Network tab
+3. Look for Supabase requests
+4. Verify requests go to `jobs` table, NOT `quotes`
+
+## Vercel Deployment Checklist
+
+### Identify Active Project
+Run in Vercel CLI:
 ```bash
-# Trigger new deployment with cache bust
-npm run build
+vercel list
+vercel domains ls
+```
+
+Look for which project owns `greenscapelux.com`.
+
+### Force Redeploy
+```bash
+# Option 1: Via CLI
 vercel --prod --force
+
+# Option 2: Via Dashboard
+# Go to Vercel → Project → Deployments → Redeploy (with cache clear)
 ```
 
-### Step 3: Clear All Caches
-1. **Browser**: Hard refresh (Cmd+Shift+R / Ctrl+Shift+F5)
-2. **Incognito**: Test in private window
-3. **Vercel**: Purge CDN cache in dashboard
-
-### Step 4: Verify Logs Appear
-After deployment, submit form and confirm you see:
-```
-🏁 ClientQuoteForm component mounted/rendered
-🔍 RENDER CHECK: handleSubmit function exists: true
-🎯 STEP 1: Form submit event fired - preventDefault() called
-🎯 STEP 2: Loading state set to TRUE
-...
+### Verify Domain Alias
+```bash
+vercel domains inspect greenscapelux.com
 ```
 
-## Route Configuration Check
+Ensure the domain points to the correct project and latest deployment.
 
-**App.tsx (line 115):**
-```typescript
-<Route path="/get-quote" element={<GetQuoteEnhanced />} />
-```
+## If Still Failing
 
-**Issue**: Route points to GetQuoteEnhanced, but user mentioned ClientQuoteForm.
+### Nuclear Option: Clear All Caches
+1. **Vercel Dashboard**: Project → Settings → Advanced → Clear Build Cache
+2. **Cloudflare (if used)**: Purge Everything
+3. **Browser**: Clear all site data for greenscapelux.com
+4. **Redeploy**: `vercel --prod --force`
 
-**Question**: Should /get-quote use ClientQuoteForm instead?
+### Check for Orphaned Deployments
+Multiple Vercel projects may exist:
+- greenscapelux
+- greenscapelux-v1 / v2 / v3
+- greenscape-lux-live
+- greenscape-lux-app
+- greenscape-lux-platform
 
-## Next Steps
+Only ONE should own the production domain. Delete or unlink others.
 
-1. **Confirm which component should handle /get-quote**
-   - GetQuoteEnhanced (public, no auth required)
-   - ClientQuoteForm (protected, requires client login)
+## Success Criteria
 
-2. **Force deployment with cache busting**
+After fix is deployed:
+1. ✅ Console shows `Build Version: admin-jobs-fix-v3-20260126`
+2. ✅ Console shows `Query Source: jobs`
+3. ✅ No 400 errors from Supabase
+4. ✅ Admin Dashboard loads jobs correctly
+5. ✅ Network requests go to `jobs` table, not `quotes`
 
-3. **Test in incognito mode** to bypass all caches
+## Files Modified
 
-4. **Verify console logs match current codebase**
+| File | Change |
+|------|--------|
+| `vercel.json` | Added cache-busting headers for HTML and version.json |
+| `public/version.json` | Updated with new build ID and querySource marker |
+| `src/components/VersionChecker.tsx` | Enhanced with aggressive cache detection and clearing |
+| `index.html` | Added inline cache detection script |
+| `src/main.tsx` | Added build version logging and cache validation |
 
-## Expected Console Output (After Fix)
+## Contact
 
-```
-🏁 ClientQuoteForm component mounted/rendered
-🔍 RENDER CHECK: handleSubmit function exists: true
-🔍 RENDER CHECK: loading state: false
-🖱️ BUTTON CLICKED - Direct onClick handler fired
-🎯 STEP 1: Form submit event fired - preventDefault() called
-🎯 STEP 2: Loading state set to TRUE
-🎯 STEP 3: Validation passed - starting submission
-🎯 STEP 4: Inserting quote to database...
-🎯 STEP 5: Database operation completed in XXXms
-✅ STEP 5 SUCCESS: Quote saved with ID: [uuid]
-🎯 STEP 6: Checking environment variables for email...
-🎯 STEP 7: Preparing to send email via unified-email...
-🚀 STEP 8: Executing fetch() call to unified-email...
-✅ STEP 8 SUCCESS: fetch() completed in XXXms
-✅ STEP 9: Email sent successfully
-✅ STEP 10: Failsafe timeout cleared
-🎯 STEP 11: Navigating to /thank-you page...
-✅ FINALLY BLOCK FIRED: Loading state reset complete.
-```
-
-## Conclusion
-
-The code is correct. The deployment is stale. Force a new deployment and clear all caches.
+If the issue persists after all steps:
+1. Check Vercel deployment logs for build errors
+2. Verify GitHub Actions workflow completed successfully
+3. Confirm the correct branch is being deployed
+4. Check for any Vercel build cache issues

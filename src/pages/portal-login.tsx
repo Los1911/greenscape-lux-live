@@ -1,15 +1,16 @@
 import React from "react";
 import UnifiedPortalAuth from "@/components/auth/UnifiedPortalAuth";
 
+/**
+ * GreenScape Lux Portal Login Page
+ * 
+ * Consolidated single entry point for all user authentication.
+ * This page renders the UnifiedPortalAuth component which handles
+ * both client and landscaper login/signup flows with proper
+ * redirect behavior using React Router navigate.
+ */
 const PortalLogin: React.FC = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-black text-emerald-400">
-      <div className="w-full max-w-md p-6 text-center">
-        <h1 className="text-3xl font-bold mb-6">GreenScape Lux Portal Login</h1>
-        <UnifiedPortalAuth />
-      </div>
-    </div>
-  );
+  return <UnifiedPortalAuth />;
 };
 
 export default PortalLogin;

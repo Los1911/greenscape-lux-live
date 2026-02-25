@@ -1,13 +1,25 @@
 {
-<<<<<<< HEAD
-  "commitHash": "dev-local",
-  "buildId": "dev-build",
-  "timestamp": 1704067200000,
-=======
-  "commitHash": "PLACEHOLDER",
-  "buildId": "PLACEHOLDER",
-  "timestamp": 0,
->>>>>>> 42066f228f3cc066c557f896ed5be2dbfa77c706
-  "environment": "development",
-  "deployedAt": "2025-01-01T00:00:00Z"
+  "commitHash": "admin-jobs-fix-final-20260126",
+  "buildId": "jobs-table-query-fix-production",
+  "timestamp": 1737879000000,
+  "environment": "production",
+  "deployedAt": "2026-01-26T07:30:00Z",
+  "cacheVersion": "v4",
+  "fixes": [
+    "admin-jobs-panel-queries-jobs-table",
+    "admin-job-pricing-queries-jobs-table",
+    "job-matching-dashboard-queries-jobs-table",
+    "no-quotes-table-queries-in-admin",
+    "cache-busting-headers-added",
+    "version-checker-enhanced",
+    "service-worker-cache-purge",
+    "html-inline-cache-detection"
+  ],
+  "querySource": "jobs",
+  "legacyQuotesRemoved": true,
+  "cacheInvalidation": {
+    "serviceWorkerVersion": "v4.0.0-final-20260126",
+    "htmlVersion": "admin-jobs-fix-final-20260126",
+    "forceReload": true
+  }
 }

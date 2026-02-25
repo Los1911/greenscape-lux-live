@@ -3,9 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
-import { subscribeToConnectNotifications } from '@/utils/stripeConnectNotifications';
-import { CheckCircle2, AlertCircle, Clock, ExternalLink, RefreshCw, Mail } from 'lucide-react';
-
+import { CheckCircle2, AlertCircle, Clock, ExternalLink, RefreshCw, Building2, Loader2 } from 'lucide-react';
 
 interface ConnectStatus {
   stripe_connect_id: string | null;
@@ -15,15 +13,17 @@ interface ConnectStatus {
   stripe_details_submitted: boolean;
 }
 
+type VerificationState = 'not_started' | 'pending_verification' | 'verified';
+
 export function ConnectAccountStatus({ landscaperId }: { landscaperId: string }) {
   const [status, setStatus] = useState<ConnectStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
 
   useEffect(() => {
     loadStatus();
-    
-    // Set up real-time subscription for status updates
+
     const statusChannel = supabase
       .channel('landscaper-connect-status')
       .on(
@@ -34,24 +34,14 @@ export function ConnectAccountStatus({ landscaperId }: { landscaperId: string })
           table: 'landscapers',
           filter: `id=eq.${landscaperId}`
         },
-        (payload) => {
-          console.log('Connect status updated:', payload);
-          loadStatus();
-        }
+        () => { loadStatus(); }
       )
       .subscribe();
 
-    // Subscribe to notification queue to trigger email processing
-    const notificationChannel = subscribeToConnectNotifications((payload) => {
-      console.log('Notification queued, email will be sent:', payload);
-    });
-
     return () => {
       supabase.removeChannel(statusChannel);
-      supabase.removeChannel(notificationChannel);
     };
   }, [landscaperId]);
-
 
   const loadStatus = async () => {
     const { data } = await supabase
@@ -70,27 +60,80 @@ export function ConnectAccountStatus({ landscaperId }: { landscaperId: string })
     await loadStatus();
   };
 
-  const openDashboard = () => {
-    window.open('https://dashboard.stripe.com/express', '_blank');
+  const startOnboarding = async () => {
+    setOnboardingLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase.functions.invoke('create-connect-account-link', {
+        body: { userId: user.id, email: user.email || '' }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.onboardingUrl) {
+        window.location.href = data.onboardingUrl;
+      }
+    } catch (err: any) {
+      console.error('[ConnectAccountStatus] Onboarding error:', err);
+    } finally {
+      setOnboardingLoading(false);
+    }
   };
 
-  if (loading) return <div>Loading...</div>;
-  if (!status?.stripe_connect_id) return null;
+  if (loading) return <div className="text-sm text-gray-500">Loading payout status...</div>;
 
-  const isActive = status.stripe_charges_enabled && status.stripe_payouts_enabled;
-  const isPending = status.stripe_details_submitted && !isActive;
+  // Derive verification state
+  const getVerificationState = (): VerificationState => {
+    if (!status?.stripe_connect_id) return 'not_started';
+    if (status.stripe_charges_enabled && status.stripe_payouts_enabled) return 'verified';
+    return 'pending_verification';
+  };
+
+  const verificationState = getVerificationState();
+
+  const stateConfig = {
+    not_started: {
+      badge: 'Not Started',
+      badgeVariant: 'destructive' as const,
+      icon: <AlertCircle className="h-5 w-5 text-red-500" />,
+      message: 'Complete Stripe onboarding to connect your bank account and receive payouts.',
+      showOnboardButton: true,
+    },
+    pending_verification: {
+      badge: 'Pending Verification',
+      badgeVariant: 'secondary' as const,
+      icon: <Clock className="h-5 w-5 text-yellow-500" />,
+      message: 'Stripe is reviewing your information. This typically takes 1-2 business days.',
+      showOnboardButton: true,
+    },
+    verified: {
+      badge: 'Verified',
+      badgeVariant: 'default' as const,
+      icon: <CheckCircle2 className="h-5 w-5 text-green-500" />,
+      message: 'Your bank account is connected and payouts are enabled.',
+      showOnboardButton: false,
+    },
+  };
+
+  const config = stateConfig[verificationState];
 
   return (
     <Card className="p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Payment Account Status</h3>
         <div className="flex items-center gap-2">
-          <Badge variant={isActive ? 'default' : isPending ? 'secondary' : 'outline'}>
-            {isActive ? 'Active' : isPending ? 'Under Review' : 'Setup Required'}
+          <Building2 className="h-5 w-5 text-gray-600" />
+          <h3 className="text-lg font-semibold">Payout Account</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant={config.badgeVariant}>
+            {config.badge}
           </Badge>
-          <Button 
-            size="sm" 
-            variant="ghost" 
+          <Button
+            size="sm"
+            variant="ghost"
             onClick={refreshStatus}
             disabled={refreshing}
           >
@@ -99,43 +142,71 @@ export function ConnectAccountStatus({ landscaperId }: { landscaperId: string })
         </div>
       </div>
 
+      {/* Status details */}
       <div className="space-y-3 mb-4">
-        <StatusItem 
-          label="Charges Enabled" 
-          enabled={status.stripe_charges_enabled}
-          description="Can accept payments from clients"
+        <StatusItem
+          label="Bank Account Connected"
+          enabled={status?.stripe_payouts_enabled || false}
+          description="Receive payouts to your bank account"
         />
-        <StatusItem 
-          label="Payouts Enabled" 
-          enabled={status.stripe_payouts_enabled}
-          description="Can receive payouts to bank account"
+        <StatusItem
+          label="Identity Verified"
+          enabled={status?.stripe_details_submitted || false}
+          description="Identity and business info submitted to Stripe"
         />
-        <StatusItem 
-          label="Details Submitted" 
-          enabled={status.stripe_details_submitted}
-          description="Identity and business info verified"
+        <StatusItem
+          label="Payouts Enabled"
+          enabled={status?.stripe_payouts_enabled || false}
+          description="Ready to receive earnings from completed jobs"
         />
       </div>
 
-      {!isActive && (
-        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="flex items-start gap-2">
-            <Mail className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-yellow-800">
-              {!status.stripe_details_submitted 
-                ? 'Complete your account setup to start receiving payments. You\'ll receive email updates on your progress.'
-                : 'Your account is under review. This typically takes 1-2 business days. We\'ll email you when it\'s ready.'}
-            </p>
-          </div>
-        </div>
+      {/* Status message */}
+      <div className={`mb-4 p-3 rounded-lg flex items-start gap-2 ${
+        verificationState === 'verified'
+          ? 'bg-green-50 border border-green-200'
+          : verificationState === 'pending_verification'
+          ? 'bg-yellow-50 border border-yellow-200'
+          : 'bg-red-50 border border-red-200'
+      }`}>
+        {config.icon}
+        <p className={`text-sm ${
+          verificationState === 'verified' ? 'text-green-800' :
+          verificationState === 'pending_verification' ? 'text-yellow-800' :
+          'text-red-800'
+        }`}>
+          {config.message}
+        </p>
+      </div>
+
+      {/* Action button */}
+      {config.showOnboardButton && (
+        <Button
+          onClick={startOnboarding}
+          disabled={onboardingLoading}
+          className="w-full"
+        >
+          {onboardingLoading ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Redirecting to Stripe...</>
+          ) : (
+            <><ExternalLink className="mr-2 h-4 w-4" />
+              {verificationState === 'not_started' ? 'Complete Stripe Onboarding' : 'Continue Onboarding'}
+            </>
+          )}
+        </Button>
       )}
 
-      <Button onClick={openDashboard} variant="outline" className="w-full">
-        <ExternalLink className="mr-2 h-4 w-4" />
-        Open Stripe Dashboard
-      </Button>
+      {verificationState === 'verified' && (
+        <Button
+          onClick={() => window.open('https://dashboard.stripe.com/express', '_blank')}
+          variant="outline"
+          className="w-full"
+        >
+          <ExternalLink className="mr-2 h-4 w-4" />
+          Open Stripe Dashboard
+        </Button>
+      )}
     </Card>
-
   );
 }
 
@@ -154,4 +225,3 @@ function StatusItem({ label, enabled, description }: { label: string; enabled: b
     </div>
   );
 }
-

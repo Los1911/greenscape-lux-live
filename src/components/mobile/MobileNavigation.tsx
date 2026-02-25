@@ -21,7 +21,8 @@ export function MobileNavigation({ userRole, notificationCount = 0 }: MobileNavi
   const getNavItems = () => {
     const baseItems = [
       { href: '/', label: 'Home', icon: Home },
-      { href: '/get-quote', label: 'Get Quote', icon: Briefcase },
+      { href: '/get-quote', label: 'Request Estimate', icon: Briefcase },
+
     ]
 
     if (userRole === 'admin') {
