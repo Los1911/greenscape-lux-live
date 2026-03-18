@@ -1,6 +1,12 @@
 /**
  * BadgeManagementPanel Component
  * Admin panel for viewing and managing landscaper badges
+ *
+ * MOBILE-FIRST LAYOUT:
+ * - Card: flex-col on mobile, lg:flex-row on desktop
+ * - Evaluate / Grant buttons: w-full stacked on mobile, inline-flex right on lg+
+ * - Badge stats grid: grid-cols-1 on mobile, sm:grid-cols-3 on sm+
+ * - No horizontal overflow at any breakpoint
  */
 
 import React, { useState, useEffect } from 'react';
@@ -278,7 +284,7 @@ export function BadgeManagementPanel() {
               <Award className="w-5 h-5 text-amber-500" />
               Badge Management
             </CardTitle>
-            <Button variant="outline" size="sm" onClick={loadData}>
+            <Button variant="outline" size="sm" onClick={loadData} className="h-10">
               <RefreshCw className="w-4 h-4 mr-2" />
               Refresh
             </Button>
@@ -292,66 +298,81 @@ export function BadgeManagementPanel() {
               placeholder="Search landscapers..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 h-10"
             />
           </div>
 
-          {/* Badge Stats */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="bg-amber-50 rounded-lg p-4 text-center">
+          {/* ── Badge Stats ─────────────────────────────────────
+               Mobile: single column stacked
+               sm+:    3-column grid
+               No fixed widths – no clipping                     */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 mb-6">
+            <div className="bg-amber-50 rounded-lg p-4 text-center min-w-0">
               <Trophy className="w-6 h-6 text-amber-600 mx-auto mb-2" />
               <div className="text-2xl font-bold text-amber-700">
                 {allBadges.filter(b => b.category === 'milestone').length}
               </div>
-              <div className="text-sm text-amber-600">Milestone Badges</div>
+              <div className="text-sm text-amber-600 truncate">Milestone Badges</div>
             </div>
-            <div className="bg-emerald-50 rounded-lg p-4 text-center">
+            <div className="bg-emerald-50 rounded-lg p-4 text-center min-w-0">
               <Sparkles className="w-6 h-6 text-emerald-600 mx-auto mb-2" />
               <div className="text-2xl font-bold text-emerald-700">
                 {allBadges.filter(b => b.category === 'quality').length}
               </div>
-              <div className="text-sm text-emerald-600">Quality Badges</div>
+              <div className="text-sm text-emerald-600 truncate">Quality Badges</div>
             </div>
-            <div className="bg-blue-50 rounded-lg p-4 text-center">
+            <div className="bg-blue-50 rounded-lg p-4 text-center min-w-0">
               <Zap className="w-6 h-6 text-blue-600 mx-auto mb-2" />
               <div className="text-2xl font-bold text-blue-700">
                 {allBadges.filter(b => b.category === 'engagement').length}
               </div>
-              <div className="text-sm text-blue-600">Engagement Badges</div>
+              <div className="text-sm text-blue-600 truncate">Engagement Badges</div>
             </div>
           </div>
 
-          {/* Landscaper List */}
+          {/* ── Landscaper List ─────────────────────────────── */}
           <div className="space-y-3">
             {filteredLandscapers.map(landscaper => (
               <div
                 key={landscaper.id}
-                className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                className="border rounded-lg p-4 hover:bg-gray-50 transition-colors overflow-hidden"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                {/* ── Card body ──────────────────────────────
+                     Mobile (<lg): flex-col, stacked
+                     Desktop (lg+): flex-row, items-center, justify-between */}
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+
+                  {/* ── Left: Avatar + info ────────────────── */}
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="w-10 h-10 shrink-0 rounded-full bg-emerald-100 flex items-center justify-center">
                       <User className="w-5 h-5 text-emerald-600" />
                     </div>
-                    <div>
-                      <h4 className="font-medium">
+                    <div className="min-w-0">
+                      <h4 className="font-medium truncate">
                         {landscaper.first_name} {landscaper.last_name}
                       </h4>
-                      <p className="text-sm text-gray-500">{landscaper.email}</p>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                      <p className="text-sm text-gray-500 truncate">{landscaper.email}</p>
+
+                      {/* ── Stats: stacked on mobile, inline on lg+ ── */}
+                      <div className="flex flex-col gap-0.5 mt-1 text-xs text-gray-500 lg:flex-row lg:items-center lg:gap-3">
                         <span>{landscaper.completed_jobs_count || 0} jobs</span>
-                        <span>•</span>
+                        <span className="hidden lg:inline">•</span>
                         <span>{(landscaper.average_rating || 0).toFixed(1)} rating</span>
-                        <span>•</span>
+                        <span className="hidden lg:inline">•</span>
                         <span className="capitalize">{landscaper.tier || 'starter'} tier</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  {/* ── Right: Action buttons ──────────────────
+                       Mobile (<lg): w-full, stacked vertically
+                       Desktop (lg+): inline row, aligned right
+                       NO absolute positioning                     */}
+                  <div className="flex flex-col gap-2 mt-3 lg:mt-0 lg:flex-row lg:items-center lg:gap-2 lg:shrink-0">
                     <Button
                       variant="outline"
                       size="sm"
+                      className="w-full lg:w-auto h-10"
                       onClick={() => handleEvaluateBadges(landscaper.id)}
                       disabled={processing}
                     >
@@ -361,6 +382,7 @@ export function BadgeManagementPanel() {
                     <Button
                       variant="outline"
                       size="sm"
+                      className="w-full lg:w-auto h-10"
                       onClick={() => {
                         setSelectedLandscaper(landscaper);
                         setShowGrantModal(true);
@@ -372,7 +394,7 @@ export function BadgeManagementPanel() {
                   </div>
                 </div>
 
-                {/* Earned Badges */}
+                {/* ── Earned Badges ─────────────────────────── */}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {landscaper.badges.length > 0 ? (
                     landscaper.badges.map(badge => (
@@ -385,13 +407,13 @@ export function BadgeManagementPanel() {
                         `}
                       >
                         <BadgeIcon icon={badge.icon || 'award'} size="sm" />
-                        <span>{badge.name}</span>
+                        <span className="truncate max-w-[120px]">{badge.name}</span>
                         <button
                           onClick={() => {
                             setBadgeToRevoke(badge);
                             setShowRevokeModal(true);
                           }}
-                          className="ml-1 hover:text-red-600 transition-colors"
+                          className="ml-1 hover:text-red-600 transition-colors shrink-0 h-10 w-6 flex items-center justify-center"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -462,13 +484,14 @@ export function BadgeManagementPanel() {
             </div>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowGrantModal(false)}>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row">
+            <Button variant="outline" onClick={() => setShowGrantModal(false)} className="w-full sm:w-auto h-10">
               Cancel
             </Button>
             <Button
               onClick={handleGrantBadge}
               disabled={!selectedBadge || processing}
+              className="w-full sm:w-auto h-10"
             >
               {processing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Grant Badge
@@ -508,14 +531,15 @@ export function BadgeManagementPanel() {
             </div>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRevokeModal(false)}>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row">
+            <Button variant="outline" onClick={() => setShowRevokeModal(false)} className="w-full sm:w-auto h-10">
               Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={handleRevokeBadge}
               disabled={processing}
+              className="w-full sm:w-auto h-10"
             >
               {processing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Revoke Badge

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useGeofencing } from '@/hooks/useGeofencing';
-import { MapPin, Activity, Radio, CheckCircle, Clock, Navigation } from 'lucide-react';
+import { MapPin, Activity, Radio, CheckCircle, Clock, Navigation, AlertTriangle, Loader2, MapPinOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 interface GeofenceTrackerProps {
@@ -11,6 +11,7 @@ interface GeofenceTrackerProps {
   jobStatus?: string;
   onJobStarted?: () => void;
   onGpsStatusChange?: (available: boolean) => void;
+  onGeofenceStatusChange?: (isInside: boolean) => void;
 }
 
 
@@ -21,9 +22,11 @@ export function GeofenceTracker({
   jobId, 
   landscaperId, 
   jobStatus = 'assigned',
-  onJobStarted 
+  onJobStarted,
+  onGpsStatusChange,
+  onGeofenceStatusChange,
 }: GeofenceTrackerProps) {
-  // CRITICAL: Early guard - do not render if jobId is missing
+
   console.log('[GeofenceTracker] Mounted with jobId:', jobId, 'landscaperId:', landscaperId, 'status:', jobStatus);
   
   const [jobDetails, setJobDetails] = useState<any>(null);
@@ -31,7 +34,7 @@ export function GeofenceTracker({
   const [jobAutoStarted, setJobAutoStarted] = useState(false);
   const [currentDwellTime, setCurrentDwellTime] = useState(0);
 
-  // Early return if no jobId - prevents any queries with undefined
+  // Early return if no jobId
   if (!jobId) {
     console.warn('[GeofenceTracker] No jobId provided, not rendering');
     return null;
@@ -46,19 +49,16 @@ export function GeofenceTracker({
   const handleDwellThresholdReached = useCallback(async (geofenceId: string) => {
     console.log('[GeofenceTracker] Dwell threshold reached for geofence:', geofenceId);
     
-    // Only auto-start if job is in "assigned" status
     if (jobStatus !== 'assigned') {
       console.log('[GeofenceTracker] Job not in assigned status, skipping auto-start. Current status:', jobStatus);
       return;
     }
 
-    // Prevent duplicate auto-starts
     if (jobAutoStarted || isStartingJob) {
       console.log('[GeofenceTracker] Job already started or starting, skipping');
       return;
     }
 
-    // Check if job already has started_at set
     if (jobDetails?.started_at) {
       console.log('[GeofenceTracker] Job already has started_at, skipping auto-start');
       return;
@@ -67,10 +67,8 @@ export function GeofenceTracker({
     await autoStartJob();
   }, [jobStatus, jobAutoStarted, isStartingJob, jobDetails]);
 
-  // Auto-enable tracking for assigned jobs
-  // Tracking is ALWAYS enabled for assigned/active jobs - no button needed
+  // Tracking is ALWAYS enabled for assigned/active jobs
   const shouldTrack = ['assigned', 'active'].includes(jobStatus);
-
 
   const { 
     geofences, 
@@ -79,6 +77,8 @@ export function GeofenceTracker({
     dwellTimes,
     error,
     isTracking,
+    geocodeStatus,
+    jobCoordinates,
     getDwellTime,
   } = useGeofencing({
     jobId,
@@ -87,6 +87,25 @@ export function GeofenceTracker({
     dwellThreshold: DWELL_THRESHOLD_SECONDS,
     onDwellThresholdReached: handleDwellThresholdReached,
   });
+
+  // Notify parent about GPS availability based on geocode status
+  useEffect(() => {
+    if (onGpsStatusChange) {
+      const available = geocodeStatus === 'ready' && geofences.length > 0;
+      onGpsStatusChange(available);
+    }
+  }, [geocodeStatus, geofences.length, onGpsStatusChange]);
+
+  // ─── Notify parent about geofence entry/exit ────────────────────────
+  // Exposes isInsideGeofence boolean to parent (JobCard) so the
+  // Start Job button can be gated on arrival verification.
+  useEffect(() => {
+    if (onGeofenceStatusChange) {
+      const isInside = insideGeofences.size > 0;
+      onGeofenceStatusChange(isInside);
+    }
+  }, [insideGeofences, onGeofenceStatusChange]);
+
 
   // Update current dwell time for display
   useEffect(() => {
@@ -116,9 +135,6 @@ export function GeofenceTracker({
     console.log('[GeofenceTracker] Loading job details for jobId:', jobId);
     
     try {
-      // Query jobs table directly without joining to clients
-      // (no FK relationship exists between jobs and clients)
-      // NOTE: 'location' column does not exist - use service_address, property_address fields instead
       const { data, error } = await supabase
         .from('jobs')
         .select('id, status, service_address, property_address, property_city, property_state, property_zip, service_type, service_name, started_at, location_lat, location_lng, client_email')
@@ -131,12 +147,10 @@ export function GeofenceTracker({
       }
       
       if (data) {
-        console.log('[GeofenceTracker] Job details loaded:', data?.id, 'status:', data?.status);
+        console.log('[GeofenceTracker] Job details loaded:', data?.id, 'status:', data?.status, 'coords:', data?.location_lat, data?.location_lng);
         setJobDetails(data);
         
-        // If job is already active, mark as auto-started
         if (data?.status === 'active') {
-
           setJobAutoStarted(true);
         }
       } else {
@@ -146,8 +160,6 @@ export function GeofenceTracker({
       console.warn('[GeofenceTracker] Failed to load job details:', err);
     }
   };
-
-
 
   const autoStartJob = async () => {
     if (!jobId || !landscaperId) {
@@ -159,16 +171,14 @@ export function GeofenceTracker({
     setIsStartingJob(true);
 
     try {
-      // Update job status to active with started_at timestamp
       const { data, error } = await supabase
         .from('jobs')
         .update({
           status: 'active',
-
           started_at: new Date().toISOString(),
         })
         .eq('id', jobId)
-        .eq('status', 'assigned') // Only update if still assigned (prevents race conditions)
+        .eq('status', 'assigned')
         .select()
         .single();
 
@@ -181,7 +191,6 @@ export function GeofenceTracker({
       setJobAutoStarted(true);
       setJobDetails(data);
 
-      // Record the auto-start event in GPS tracking
       if (currentLocation) {
         await supabase.from('gps_tracking').insert({
           job_id: jobId,
@@ -194,7 +203,6 @@ export function GeofenceTracker({
         });
       }
 
-      // Notify parent component
       onJobStarted?.();
 
     } catch (err) {
@@ -213,6 +221,28 @@ export function GeofenceTracker({
     return null;
   }
 
+  // Derive the address display string
+  const displayAddress = jobDetails?.service_address || jobDetails?.property_address || 
+    (jobDetails?.property_city && jobDetails?.property_state 
+      ? `${jobDetails.property_city}, ${jobDetails.property_state}` 
+      : null);
+
+  // ─── Coordinate check ───────────────────────────────────────────────
+  // Check BOTH the database record (jobDetails) and the hook's resolved
+  // coordinates (jobCoordinates). If either source has valid lat/lng,
+  // the job has coordinates — regardless of what geocodeStatus reports.
+  const hasCoordinates =
+    (jobDetails?.location_lat != null && jobDetails?.location_lng != null) ||
+    (jobCoordinates?.lat != null && jobCoordinates?.lng != null);
+
+  // ─── Determine which UI state to render ─────────────────────────────
+  // Priority order:
+  //   1. isTracking → show active tracking UI (GPS running silently)
+  //   2. hasCoordinates && !isTracking → "Initializing location…"
+  //   3. !hasCoordinates && terminal status → "Location data unavailable"
+  //   4. Checking / geocoding states → loading spinners
+  //   5. Idle fallback → waiting message
+
   return (
     <Card className="bg-black/40 border-emerald-500/30">
       <CardHeader className="pb-2">
@@ -223,23 +253,37 @@ export function GeofenceTracker({
           </div>
           <Badge 
             variant={isTracking ? 'default' : 'secondary'}
-            className={isTracking ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' : ''}
+            className={
+              isTracking 
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' 
+                : (!hasCoordinates && (geocodeStatus === 'failed' || geocodeStatus === 'no_address'))
+                  ? 'bg-red-500/20 text-red-300 border-red-500/50'
+                  : (geocodeStatus === 'geocoding' || geocodeStatus === 'checking' || (hasCoordinates && !isTracking))
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                    : ''
+            }
           >
-            {isTracking ? 'Active' : 'Waiting'}
+            {isTracking 
+              ? 'Active' 
+              : hasCoordinates && !isTracking
+                ? 'Initializing'
+                : geocodeStatus === 'geocoding' 
+                  ? 'Geocoding' 
+                  : geocodeStatus === 'checking'
+                    ? 'Loading'
+                    : (geocodeStatus === 'failed' || geocodeStatus === 'no_address')
+                      ? 'Unavailable'
+                      : 'Waiting'}
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Tracking Status */}
-        {!isTracking ? (
-          <div className="text-center py-4 text-emerald-300/70">
-            <Radio className="w-10 h-10 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Waiting for GPS signal...</p>
-            <p className="text-xs text-emerald-300/50 mt-1">
-              Tracking starts automatically when you arrive onsite
-            </p>
-          </div>
-        ) : (
+
+        {/* ════════════════════════════════════════════════════════════
+            STATE 1: GPS tracking is active
+            ─ Show the full active tracking UI. No status messages.
+            ════════════════════════════════════════════════════════════ */}
+        {isTracking && (
           <>
             {/* Active Tracking Indicator */}
             <div className="flex items-center justify-between p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
@@ -289,7 +333,6 @@ export function GeofenceTracker({
 
             {/* Job Auto-Started Confirmation */}
             {(jobAutoStarted || jobStatus === 'active') && (
-
               <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
                 <div className="flex items-center gap-2 text-green-300">
                   <CheckCircle className="w-5 h-5" />
@@ -320,10 +363,7 @@ export function GeofenceTracker({
                 <div className="flex items-center justify-between">
                   <span className="text-emerald-300/70">Location</span>
                   <span className="text-emerald-200 text-right max-w-[60%] truncate">
-                    {jobDetails.service_address || jobDetails.property_address || 
-                     (jobDetails.property_city && jobDetails.property_state 
-                       ? `${jobDetails.property_city}, ${jobDetails.property_state}` 
-                       : 'N/A')}
+                    {displayAddress || 'N/A'}
                   </span>
                 </div>
 
@@ -333,6 +373,16 @@ export function GeofenceTracker({
                     {jobDetails.service_type || jobDetails.service_name || 'N/A'}
                   </span>
                 </div>
+
+                {/* Show geofence coordinates when tracking */}
+                {jobCoordinates && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-emerald-300/70">Geofence</span>
+                    <span className="text-emerald-200 font-mono text-xs">
+                      {jobCoordinates.lat.toFixed(5)}, {jobCoordinates.lng.toFixed(5)}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -357,7 +407,95 @@ export function GeofenceTracker({
             )}
           </>
         )}
+
+        {/* ════════════════════════════════════════════════════════════
+            STATE 2: NOT tracking, but coordinates EXIST in the DB
+            ─ GPS is still initializing. Show a calm "Initializing" msg.
+            ─ This covers the case where geocodeStatus may be 'failed'
+              or 'no_address' but the job record already has valid
+              location_lat / location_lng.
+            ════════════════════════════════════════════════════════════ */}
+        {!isTracking && hasCoordinates && (
+          <div className="text-center py-4 text-emerald-300/70">
+            <Loader2 className="w-10 h-10 mx-auto mb-2 animate-spin opacity-60" />
+            <p className="text-sm font-medium">Initializing location&hellip;</p>
+            <p className="text-xs text-emerald-300/50 mt-1">
+              GPS coordinates found &mdash; setting up geofence tracking
+            </p>
+            {(jobDetails?.location_lat != null && jobDetails?.location_lng != null) && (
+              <div className="mt-3 p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                <p className="text-xs text-emerald-300/60">
+                  Coordinates: {Number(jobDetails.location_lat).toFixed(5)}, {Number(jobDetails.location_lng).toFixed(5)}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════
+            STATE 3: NOT tracking, NO coordinates, and geocode is
+            still in progress (checking / geocoding)
+            ─ Show a loading spinner while the system resolves.
+            ════════════════════════════════════════════════════════════ */}
+        {!isTracking && !hasCoordinates && (geocodeStatus === 'checking' || geocodeStatus === 'geocoding') && (
+          <div className="text-center py-4 text-amber-300/80">
+            <Loader2 className="w-10 h-10 mx-auto mb-2 animate-spin opacity-70" />
+            <p className="text-sm font-medium">
+              {geocodeStatus === 'checking' ? 'Loading job location...' : 'Resolving address coordinates...'}
+            </p>
+            <p className="text-xs text-amber-300/50 mt-1">
+              {geocodeStatus === 'geocoding' 
+                ? 'Converting service address to GPS coordinates' 
+                : 'Checking for existing geofence data'}
+            </p>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════
+            STATE 4: NOT tracking, NO coordinates, terminal failure
+            ─ Geocoding failed or no address exists AND the job truly
+              has no location_lat / location_lng.
+            ─ Only NOW show "Location data unavailable".
+            ════════════════════════════════════════════════════════════ */}
+        {!isTracking && !hasCoordinates && (geocodeStatus === 'no_address') && (
+          <div className="text-center py-4">
+            <MapPinOff className="w-10 h-10 mx-auto mb-2 text-red-400/60" />
+            <p className="text-sm font-medium text-red-300">Location data unavailable</p>
+            <p className="text-xs text-red-300/50 mt-1">
+              This job has no service address on file. GPS tracking cannot be activated.
+            </p>
+          </div>
+        )}
+
+        {!isTracking && !hasCoordinates && (geocodeStatus === 'failed') && (
+          <div className="text-center py-4">
+            <AlertTriangle className="w-10 h-10 mx-auto mb-2 text-red-400/60" />
+            <p className="text-sm font-medium text-red-300">Location data unavailable</p>
+            <p className="text-xs text-red-300/50 mt-1">
+              Could not resolve coordinates for this job address. GPS tracking is inactive.
+            </p>
+            {error && (
+              <p className="text-xs text-red-400/40 mt-2 italic">{error}</p>
+            )}
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════
+            STATE 5: NOT tracking, NO coordinates, idle / ready
+            ─ Fallback waiting state before geocode flow kicks in.
+            ════════════════════════════════════════════════════════════ */}
+        {!isTracking && !hasCoordinates && (geocodeStatus === 'idle' || geocodeStatus === 'ready') && (
+          <div className="text-center py-4 text-emerald-300/70">
+            <Radio className="w-10 h-10 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">Waiting for GPS signal...</p>
+            <p className="text-xs text-emerald-300/50 mt-1">
+              Tracking starts automatically when you arrive onsite
+            </p>
+          </div>
+        )}
+
       </CardContent>
     </Card>
   );
 }
+

@@ -49,6 +49,13 @@ import LandscaperDashboardV2 from './pages/LandscaperDashboardV2';
 import AdminDashboard from './pages/AdminDashboard';
 
 // =============================================================================
+// ADMIN CONSOLE (single route, state-based section rendering)
+// =============================================================================
+import { AdminLayout } from './components/admin/layout/AdminLayout';
+
+
+
+// =============================================================================
 // JOBS
 // =============================================================================
 import LandscaperJobs from './pages/LandscaperJobs';
@@ -59,11 +66,12 @@ import LandscaperProfile from './pages/LandscaperProfile';
 // =============================================================================
 // ADMIN TOOLS
 // =============================================================================
-import AdminPanel from './pages/AdminPanel';
+import AdminPanel from './pages/AdminPanel'; // preserved — not deleted
 import BusinessAutomation from './pages/BusinessAutomation';
 import NotificationDashboard from './pages/NotificationDashboard';
 import AIQuoteDashboard from './pages/AIQuoteDashboard';
 import PriceAnalyticsDashboard from './pages/analytics/PriceAnalyticsDashboard';
+
 
 // =============================================================================
 // CLIENT
@@ -179,20 +187,18 @@ const App: React.FC = () => {
               }
             />
 
-            {/* ADMIN LEGACY */}
+            {/* ADMIN CONSOLE (single route, state-based section rendering) */}
             <Route
               path="/admin"
               element={
                 <SimpleProtectedRoute requiredRole="admin">
-                  <FeatureGatedRoute
-                    featureFlag="FEATURE_ADMIN_CONTACT_PANEL"
-                    fallbackPath="/admin-dashboard"
-                  >
-                    <AdminPanel />
-                  </FeatureGatedRoute>
+                  <AdminLayout />
                 </SimpleProtectedRoute>
               }
             />
+
+
+
 
             {/* JOBS */}
             <Route
@@ -321,14 +327,7 @@ const App: React.FC = () => {
             {/* SETUP / DEBUG */}
             <Route path="/setup" element={<SetupWizard onComplete={() => (window.location.href = '/')} />} />
             <Route path="/status" element={<ProductionStatus />} />
-            <Route
-              path="/admin/environment-status"
-              element={
-                <SimpleProtectedRoute requiredRole="admin">
-                  <EnvironmentStatus />
-                </SimpleProtectedRoute>
-              }
-            />
+
 
             {/* SEARCH */}
             <Route path="/search" element={<SearchPage />} />

@@ -202,7 +202,8 @@ export default function EarningsGoalsAnalytics() {
       </div>
 
       {/* Goals List */}
-      <div className="bg-black/60 backdrop-blur border border-emerald-500/25 rounded-2xl overflow-hidden">
+      <div className="bg-black/60 backdrop-blur border border-emerald-500/25 rounded-2xl overflow-visible">
+
         <div className="p-4 border-b border-emerald-500/25">
           <h3 className="text-lg font-semibold text-emerald-300 flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />

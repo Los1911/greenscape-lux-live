@@ -196,7 +196,8 @@ class OptimizedDatabaseClient {
 
           .from('payments')
           .select(`
-            id, amount, landscaper_payout, platform_fee,
+            id, amount, landscaper_payout, platform_commission,
+
             created_at, status, job_id,
             jobs(service_name, service_type)
           `)

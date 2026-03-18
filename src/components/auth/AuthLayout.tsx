@@ -19,26 +19,31 @@ export default function AuthLayout({
 }: AuthLayoutProps) {
   return (
     <div 
-      className="bg-gradient-to-br from-emerald-900 via-gray-900 to-black flex flex-col"
+      className="bg-gradient-to-br from-emerald-900 via-gray-900 to-black flex flex-col relative overflow-hidden w-full"
       style={{
         minHeight: '100dvh',
-        /* Fallback for browsers that don't support dvh */
-        minHeight: '100svh',
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)'
       }}
     >
+      {/* Decorative background — absolute inset-0 z-0 pointer-events-none */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-emerald-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }} />
+      </div>
+
       {/* Mobile Layout */}
       <div 
-        className="md:hidden flex-1 flex flex-col items-center justify-center px-4 py-6"
+        className="md:hidden flex-1 flex flex-col items-center justify-center px-4 py-6 relative z-10"
         style={{
           paddingTop: 'max(1.5rem, env(safe-area-inset-top))',
           paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))'
         }}
       >
-        <div className="w-full max-w-md">
+        {/* Login card container — w-full max-w-md mx-auto */}
+        <div className="w-full max-w-md mx-auto">
           {/* Navigation */}
           <div className="mb-6">
             <GlobalNavigation 
@@ -65,9 +70,12 @@ export default function AuthLayout({
             )}
           </div>
 
-          {/* Content */}
-          <div className="bg-gray-800/50 backdrop-blur-sm border border-emerald-500/20 rounded-lg p-6">
-            {children}
+          {/* Content — opaque bg, relative z-10 */}
+          <div className="relative z-10 bg-gray-800 border border-emerald-500/20 rounded-lg p-6 w-full">
+            <div className="absolute inset-0 rounded-lg bg-gradient-to-b from-emerald-500/[0.03] to-transparent pointer-events-none" />
+            <div className="relative">
+              {children}
+            </div>
           </div>
           
           {/* Footer */}
@@ -88,10 +96,9 @@ export default function AuthLayout({
 
       {/* Desktop Layout */}
       <div 
-        className="hidden md:flex flex-1"
+        className="hidden md:flex flex-1 relative z-10"
         style={{
           minHeight: '100dvh',
-          minHeight: '100svh'
         }}
       >
         {/* Left Side - Branding */}
@@ -114,7 +121,8 @@ export default function AuthLayout({
 
         {/* Right Side - Form */}
         <div className="flex-1 flex items-center justify-center p-8">
-          <div className="w-full max-w-md">
+          {/* Login card container — w-full max-w-md mx-auto */}
+          <div className="w-full max-w-md mx-auto">
             {/* Navigation */}
             <div className="mb-6">
               <GlobalNavigation 
@@ -136,9 +144,12 @@ export default function AuthLayout({
               )}
             </div>
 
-            {/* Content */}
-            <div className="bg-gray-800/50 backdrop-blur-sm border border-emerald-500/20 rounded-lg p-8">
-              {children}
+            {/* Content — opaque bg, relative z-10 */}
+            <div className="relative z-10 bg-gray-800 border border-emerald-500/20 rounded-lg p-8 w-full">
+              <div className="absolute inset-0 rounded-lg bg-gradient-to-b from-emerald-500/[0.03] to-transparent pointer-events-none" />
+              <div className="relative">
+                {children}
+              </div>
             </div>
             
             {/* Footer */}

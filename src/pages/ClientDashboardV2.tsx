@@ -197,12 +197,44 @@ export const ClientDashboardV2: React.FC = () => {
   const navigate = useNavigate();
   const hasRedirectedRef = useRef(false);
 
+  // ──────────────────────────────────────────────────────────────────
+  // FIX (2026-03-02): handleOnboardingComplete is the safety-net
+  // callback for OnboardingGuard.onComplete.  The PRIMARY fix is in
+  // OnboardingGuard itself (isInitialCheckRef) which now prevents
+  // onComplete from firing for returning users who are already
+  // onboarded.  This callback only fires when a user JUST finished
+  // the onboarding form.
+  //
+  // PREVIOUS BUG: This callback hardcoded navigate('/client-dashboard')
+  // which dropped the sub-path (/jobs) and — on Stripe redirects —
+  // stripped ?payment=success&job_id=… before MyJobsSection could
+  // read them and call verify-checkout-session.
+  //
+  // SAFETY-NET FIX: If this callback fires while already on a
+  // /client-dashboard sub-route, preserve the full pathname + search.
+  // For the fresh-onboarding case, navigate to /client-dashboard/jobs
+  // (the default tab) so the user lands on the jobs view.
+  // ──────────────────────────────────────────────────────────────────
   const handleOnboardingComplete = useCallback(() => {
     if (hasRedirectedRef.current) return;
     hasRedirectedRef.current = true;
 
-    log('Onboarding complete - navigating to dashboard');
-    navigate('/client-dashboard', { replace: true });
+    const currentPath = window.location.pathname;
+    const currentSearch = window.location.search;
+
+    log('Onboarding complete callback fired');
+    log('  currentPath:   ' + currentPath);
+    log('  currentSearch: ' + currentSearch);
+
+    // Already on a client-dashboard sub-route — preserve URL entirely.
+    // This protects Stripe redirect params on /client-dashboard/jobs?payment=success&job_id=…
+    if (currentPath.startsWith('/client-dashboard')) {
+      log('Already on client-dashboard — preserving current URL (no navigate)');
+      return;
+    }
+
+    // Fresh onboarding completion from a non-dashboard route — go to jobs tab
+    navigate('/client-dashboard/jobs' + currentSearch, { replace: true });
   }, [navigate]);
 
   return (
@@ -211,5 +243,7 @@ export const ClientDashboardV2: React.FC = () => {
     </OnboardingGuard>
   );
 };
+
+
 
 export default ClientDashboardV2;

@@ -7,6 +7,8 @@ import { Shield, X, AlertCircle, Info } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { ensureClientProfile } from '@/lib/clients';
+import { ensureLandscaperProfile } from '@/lib/landscaperProfile';
+
 import { useAuth } from '@/contexts/AuthContext';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import HomeButton from '@/components/HomeButton';
@@ -33,7 +35,8 @@ const log = (area: string, msg: string, data?: any) => {
 const UnifiedPortalAuth: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { role: userRole, loading: authLoading, user } = useAuth();
+  const { role: userRole, loading: authLoading, roleResolved, user } = useAuth();
+
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [roleIntent, setRoleIntent] = useState<'client' | 'landscaper'>('client');
   const [loading, setLoading] = useState(false);
@@ -73,19 +76,32 @@ const UnifiedPortalAuth: React.FC = () => {
     clearPasswordResetFlag();
     clearRecoveryIntent();
   }, []);
-
   // Primary redirect: Monitor auth context for role changes
   useEffect(() => {
-    log('AUTH_WATCH', 'Context changed', { userRole, authLoading, hasUser: !!user });
-    
+    log('AUTH_WATCH', 'Context changed', {
+      userRole,
+      authLoading,
+      roleResolved,
+      hasUser: !!user
+    });
+
+    if (!roleResolved) return;
+
     if (userRole && !authLoading && !redirectAttemptedRef.current) {
       redirectAttemptedRef.current = true;
-      const path = userRole === 'admin' ? '/admin-dashboard' :
-                  userRole === 'landscaper' ? '/landscaper-dashboard' : '/client-dashboard';
-      log('AUTH_WATCH', '✅ Role detected, navigating to:', path);
+
+      const path =
+        userRole === 'admin'
+          ? '/admin-dashboard'
+          : userRole === 'landscaper'
+          ? '/landscaper-dashboard'
+          : '/client-dashboard';
+
+      log('AUTH_WATCH', '✅ Final role detected, navigating to:', path);
       navigate(path, { replace: true });
     }
-  }, [userRole, authLoading, user, navigate]);
+  }, [userRole, authLoading, roleResolved, user, navigate]);
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -169,7 +185,14 @@ const UnifiedPortalAuth: React.FC = () => {
       
       const { data, error } = await supabase.auth.signUp({
         email: formData.email, password: formData.password,
-        options: { data: { role: roleIntent } }
+        options: { 
+          data: { 
+            role: roleIntent,
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            phone: formData.phone
+          } 
+        }
       });
       
       if (error) {
@@ -179,12 +202,31 @@ const UnifiedPortalAuth: React.FC = () => {
         return;
       }
       
-      if (data.user && roleIntent === 'client') {
-        await ensureClientProfile({
-          first_name: formData.firstName, last_name: formData.lastName,
-          email: formData.email, phone: formData.phone
-        });
+      // Ensure profile records exist for the new user
+      if (data.user) {
+        if (roleIntent === 'client') {
+          await ensureClientProfile({
+            first_name: formData.firstName, last_name: formData.lastName,
+            email: formData.email, phone: formData.phone
+          });
+        } else if (roleIntent === 'landscaper') {
+          // Import is at top of file — create landscaper record immediately
+          // so role resolution finds it on first login
+          try {
+            await ensureLandscaperProfile({
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+              email: formData.email,
+              phone: formData.phone
+            });
+            log('SIGNUP', '✅ Landscaper profile created');
+          } catch (lpErr: any) {
+            log('SIGNUP', '⚠️ Landscaper profile creation deferred:', lpErr.message);
+            // Non-fatal: ensureUserRecords RPC will retry on first login
+          }
+        }
       }
+
       
       log('SIGNUP', '✅ SUCCESS - Check email for verification');
       setMessage('Please check your email to verify your account');
@@ -258,15 +300,13 @@ const UnifiedPortalAuth: React.FC = () => {
   // Forgot Password Modal/Form
   const renderForgotPasswordForm = () => (
     <div 
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center"
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center px-4"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
-        paddingLeft: 'max(1rem, env(safe-area-inset-left))',
-        paddingRight: 'max(1rem, env(safe-area-inset-right))'
       }}
     >
-      <div className="bg-gray-900 border border-emerald-500/30 rounded-2xl p-6 w-full max-w-md relative">
+      <div className="bg-gray-900 border border-emerald-500/30 rounded-2xl p-6 w-full max-w-md mx-auto relative">
         <button 
           onClick={() => {
             setShowForgotPassword(false);
@@ -345,37 +385,54 @@ const UnifiedPortalAuth: React.FC = () => {
 
   return (
     <div 
-      className="bg-black relative flex flex-col min-h-screen"
+      className="bg-black relative flex flex-col w-full"
       style={{
-        // Use dvh for dynamic viewport height (handles iOS Safari address bar)
-        // CSS class min-h-screen provides fallback for older browsers
+        /* 100dvh handles iOS Safari dynamic address bar; fallback to 100vh via CSS */
         minHeight: '100dvh',
-        // Safe area insets for notch/dynamic island devices
+        /* Safe area insets for notch/dynamic island devices */
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)',
-        // Smooth transition for layout recalculation after OAuth redirect
-        opacity: layoutReady ? 1 : 0.99,
-        transition: 'opacity 0.1s ease-in-out'
+        /**
+         * SAFARI COMPOSITING FIX:
+         * - `isolation: isolate` creates a stacking context WITHOUT triggering
+         *   a compositing layer (unlike opacity < 1 or will-change).
+         * - This ensures all children (background z-0, content z-10) are
+         *   composited within this single stacking context.
+         * - Removed: opacity: 0.99 + transition: opacity (was creating a
+         *   GPU compositing layer that caused Safari to mis-order child layers,
+         *   allowing the diagonal gradient to render above the card).
+         * - overflow: hidden is moved to the AnimatedBackground container only,
+         *   NOT on this root div, to avoid clip-context + stacking-context
+         *   interaction bugs in WebKit.
+         */
+        isolation: 'isolate' as any,
       }}
     >
-      <AnimatedBackground />
-      
-
+      {/* Decorative background — absolute inset-0 z-0 pointer-events-none
+          overflow-hidden is scoped HERE, not on the root div, to prevent
+          Safari clip-context/stacking-context interaction bugs */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <AnimatedBackground />
+      </div>
       
       {/* Forgot Password Modal */}
       {showForgotPassword && renderForgotPasswordForm()}
       
-      {/* Main content area - flexbox centered, no absolute positioning */}
+      {/* Main content — relative z-10, flexbox centered
+          transform: translateZ(0) forces this onto its own compositing layer
+          so Safari's GPU correctly paints it above the z-0 background */}
       <div 
         className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-6"
         style={{
           paddingTop: 'max(1.5rem, env(safe-area-inset-top))',
-          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))'
+          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
+          transform: 'translateZ(0)',
         }}
       >
-        <div className="w-full max-w-2xl">
+        {/* Login card container — w-full max-w-md mx-auto */}
+        <div className="w-full max-w-md mx-auto">
           <div className="mb-6"><HomeButton /></div>
 
           <div className="text-center mb-8">
@@ -387,10 +444,28 @@ const UnifiedPortalAuth: React.FC = () => {
             <h1 className="text-3xl font-bold text-emerald-400 mb-2">GreenScape Lux Portal</h1>
             <p className="text-gray-300">Secure access for all users</p>
           </div>
-          <Card className="bg-gray-900/80 border-emerald-500/30 backdrop-blur-sm">
-            <CardHeader className="pb-2">
+          {/* Login Card — COMPOSITING-SAFE for all iPhones:
+              - isolation: isolate → creates stacking context so internal semi-transparent
+                children (inputs bg-gray-800/50, TabsList) composite against this card's
+                opaque bg-gray-900, NOT against the global AnimatedBackground.
+              - transform: translateZ(0) → promotes to own GPU compositing layer so
+                Safari correctly paints it above the z-0 background layer.
+              - !bg-gray-900 → fully opaque (#111827), overrides bg-card from Card base.
+              - relative z-10 → ensures CSS stacking order above background.
+              No decorative overlays inside (removed in prior fix). */}
+          <Card
+            className="relative z-10 !bg-gray-900 border-emerald-500/30 shadow-lg shadow-emerald-500/5 w-full"
+            style={{
+              isolation: 'isolate' as any,
+              transform: 'translateZ(0)',
+            }}
+          >
+
+
+            <CardHeader className="relative pb-2">
               <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
-                <TabsList className="grid w-full grid-cols-2 bg-gray-800/50">
+                <TabsList className="flex flex-row w-full bg-gray-800/50">
+
                   <TabsTrigger value="login">Login</TabsTrigger>
                   <TabsTrigger value="signup">Sign Up</TabsTrigger>
                 </TabsList>
@@ -554,7 +629,7 @@ const UnifiedPortalAuth: React.FC = () => {
             
             {/* Error/Success Messages */}
             {(message || socialAuthError) && (
-              <CardContent className="pt-0">
+              <CardContent className="relative pt-0">
                 {socialAuthError && (
                   <div className="flex items-start gap-2 text-sm text-red-400 bg-red-900/20 p-3 rounded-lg mb-2">
                     <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />

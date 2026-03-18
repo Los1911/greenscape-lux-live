@@ -16,6 +16,7 @@ import {
   type AdminBucket,
   ADMIN_BUCKET_CONFIG,
 } from '@/lib/jobLifecycleContract';
+import { LandscaperAssignmentDropdown } from '@/components/admin/LandscaperAssignmentDropdown';
 
 /* ----------------------------------------
    Types
@@ -45,7 +46,9 @@ interface ColumnConfig {
 interface AdminJobsTableProps {
   jobs: Job[];
   onJobClick?: (job: Job) => void;
+  onJobUpdated?: () => void;
 }
+
 
 /* ----------------------------------------
    Lifecycle Badge
@@ -102,7 +105,8 @@ const truncate = (text?: string | null, maxLength = 20) => {
    Component
 ---------------------------------------- */
 
-export function AdminJobsTable({ jobs, onJobClick }: AdminJobsTableProps) {
+export function AdminJobsTable({ jobs, onJobClick, onJobUpdated }: AdminJobsTableProps) {
+
   const [columns, setColumns] = useState<ColumnConfig[]>([
     { id: 'service', label: 'Service', visible: true, minWidth: '180px' },
     { id: 'lifecycle', label: 'Lifecycle', visible: true, minWidth: '140px' },
@@ -134,7 +138,7 @@ export function AdminJobsTable({ jobs, onJobClick }: AdminJobsTableProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 w-full min-w-0">
       {/* Column Toggle */}
       <div className="flex justify-end relative">
         <Button
@@ -143,8 +147,8 @@ export function AdminJobsTable({ jobs, onJobClick }: AdminJobsTableProps) {
           onClick={() => setShowColumnMenu(!showColumnMenu)}
           className="text-emerald-300/70 hover:text-emerald-300 hover:bg-emerald-500/10"
         >
-          <Settings2 className="w-4 h-4 mr-2" />
-          Columns
+          <Settings2 className="w-4 h-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Columns</span>
           <ChevronDown
             className={`w-4 h-4 ml-1 transition-transform ${
               showColumnMenu ? 'rotate-180' : ''
@@ -158,7 +162,8 @@ export function AdminJobsTable({ jobs, onJobClick }: AdminJobsTableProps) {
               className="fixed inset-0 z-40"
               onClick={() => setShowColumnMenu(false)}
             />
-            <div className="absolute top-full right-0 mt-1 bg-black/95 backdrop-blur border border-emerald-500/30 rounded-lg z-50 py-2 min-w-[160px] shadow-xl">
+            <div className="absolute top-full right-0 mt-1 bg-[#0B0F14] backdrop-blur border border-emerald-500/20 rounded-lg z-50 py-2 min-w-[160px] shadow-xl max-h-64 overflow-y-auto">
+
               {columns.map(col => (
                 <button
                   key={col.id}
@@ -166,7 +171,7 @@ export function AdminJobsTable({ jobs, onJobClick }: AdminJobsTableProps) {
                   className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-emerald-500/10"
                 >
                   <span
-                    className={`w-4 h-4 rounded border flex items-center justify-center ${
+                    className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
                       col.visible
                         ? 'bg-emerald-500 border-emerald-500'
                         : 'border-emerald-500/50'
@@ -190,8 +195,54 @@ export function AdminJobsTable({ jobs, onJobClick }: AdminJobsTableProps) {
         )}
       </div>
 
-      {/* Desktop Table */}
-      <div className="hidden lg:block overflow-hidden rounded-xl border border-emerald-500/20">
+      {/* Mobile Card View — visible below lg breakpoint */}
+      <div className="lg:hidden space-y-2">
+        {jobs.map(job => (
+          <button
+            key={job.id}
+            onClick={() => onJobClick?.(job)}
+            className="w-full text-left p-3 rounded-lg border border-emerald-500/15 bg-black/40 hover:bg-emerald-500/5 hover:border-emerald-500/30 transition-colors min-w-0"
+          >
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <span className="font-medium text-white text-sm truncate flex-1 min-w-0">
+                {job.service_type || job.service_name || 'Service'}
+              </span>
+              {getLifecycleBadge(job.lifecycle)}
+            </div>
+            <div className="space-y-1">
+              {job.client_email && (
+                <p className="text-xs text-gray-400 truncate">
+                  Client: {job.client_email}
+                </p>
+              )}
+              {(job.landscaper_email || job.landscaper_id) && (
+                <p className="text-xs text-blue-300/70 truncate">
+                  <User className="w-3 h-3 inline mr-1" />
+                  {job.landscaper_email
+                    ? truncate(job.landscaper_email, 28)
+                    : job.landscaper_id
+                      ? truncate(job.landscaper_id, 12)
+                      : 'Unassigned'}
+                </p>
+              )}
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-xs text-gray-500">
+                  {formatDate(job.created_at)}
+                </span>
+                {job.price ? (
+                  <span className="text-xs text-emerald-400 font-medium">${job.price}</span>
+                ) : (
+                  <span className="text-xs text-gray-600">No price</span>
+                )}
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Desktop Table — visible at lg and above */}
+      <div className="hidden lg:block overflow-visible rounded-xl border border-emerald-500/20">
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -231,16 +282,28 @@ export function AdminJobsTable({ jobs, onJobClick }: AdminJobsTableProps) {
                       {truncate(job.client_email, 22)}
                     </td>
                   )}
-
                   {visibleColumns.some(c => c.id === 'landscaper') && (
-                    <td className="py-3 px-4 text-blue-300">
-                      {job.landscaper_email
-                        ? truncate(job.landscaper_email, 22)
-                        : job.landscaper_id
-                          ? truncate(job.landscaper_id, 12)
-                          : 'Unassigned'}
+                    <td className="py-3 px-4" onClick={job.status === 'scheduled' ? (e) => e.stopPropagation() : undefined}>
+                      {job.status === 'scheduled' ? (
+                        <LandscaperAssignmentDropdown
+                          jobId={job.id}
+                          jobStatus={job.status}
+                          currentLandscaperId={job.landscaper_id}
+                          onAssigned={onJobUpdated}
+                          compact
+                        />
+                      ) : (
+                        <span className="text-blue-300">
+                          {job.landscaper_email
+                            ? truncate(job.landscaper_email, 22)
+                            : job.landscaper_id
+                              ? truncate(job.landscaper_id, 12)
+                              : 'Unassigned'}
+                        </span>
+                      )}
                     </td>
                   )}
+
 
                   {visibleColumns.some(c => c.id === 'price') && (
                     <td className="py-3 px-4 text-emerald-400 font-medium">

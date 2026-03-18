@@ -242,13 +242,21 @@ export function LandscaperApprovalPanel() {
 
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Shield className="h-6 w-6 text-green-400" />
-        <h2 className="text-2xl font-bold text-white">Landscaper Approval System</h2>
+    <div className="space-y-4 sm:space-y-6 w-full min-w-0">
+
+      {/* Header — stacked on mobile */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-green-400 shrink-0" />
+        <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
+          Landscaper Approval System
+        </h2>
+        <span className="text-xs text-emerald-300/50">
+          {landscapers.length} landscaper{landscapers.length !== 1 ? 's' : ''}
+        </span>
       </div>
 
-      <div className="grid gap-4">
+      {/* Landscaper cards — stacked vertically */}
+      <div className="grid gap-3 sm:gap-4">
         {landscapers.map((landscaper) => (
           <LandscaperApprovalToggle
             key={landscaper.id}
@@ -260,20 +268,23 @@ export function LandscaperApprovalPanel() {
               approved: landscaper.approved,
               insurance_file: landscaper.insurance_file,
               license_file: landscaper.license_file,
-              documents_uploaded: landscaper.documents_uploaded
+              documents_uploaded: landscaper.documents_uploaded,
             }}
             onApprovalChange={handleApprovalChange}
           />
         ))}
-        
+
         {landscapers.length === 0 && (
-          <Card className="bg-black/40 border-green-500/25 p-6">
-            <div className="text-center text-gray-400">
-              No landscapers found. New signups will appear here for approval.
-            </div>
+          <Card className="bg-black/40 border-green-500/25">
+            <CardContent className="p-4 sm:p-6">
+              <div className="text-center text-gray-400 text-sm sm:text-base">
+                No landscapers found. New signups will appear here for approval.
+              </div>
+            </CardContent>
           </Card>
         )}
       </div>
     </div>
   );
 }
+

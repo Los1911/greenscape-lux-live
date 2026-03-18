@@ -45,6 +45,15 @@ const getAuthAwareFallback = (currentPath: string, role: string | null): string 
   return getDashboardRoute(role);
 };
 
+/**
+ * BackButton — Context-aware back navigation
+ *
+ * SAFARI COMPOSITING FIX:
+ * - Removed `backdrop-blur-sm` which created a backdrop-filter compositing layer.
+ *   On iOS Safari, backdrop-filter forces GPU sampling of all layers behind the
+ *   element, causing diagonal background gradients to bleed through cards.
+ * - Replaced `bg-gray-900/20` (20% opacity) with solid `bg-gray-900`.
+ */
 export default function BackButton({ className = '', fallbackPath }: BackButtonProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -106,7 +115,7 @@ export default function BackButton({ className = '', fallbackPath }: BackButtonP
         flex items-center gap-2 text-emerald-400 hover:text-emerald-300 
         hover:bg-emerald-500/10 border border-emerald-500/30 
         hover:border-emerald-400/50 transition-all duration-300
-        backdrop-blur-sm bg-gray-900/20 shadow-lg shadow-emerald-500/10
+        bg-gray-900 shadow-lg shadow-emerald-500/10
         hover:shadow-emerald-400/20 ${className}
       `}
     >

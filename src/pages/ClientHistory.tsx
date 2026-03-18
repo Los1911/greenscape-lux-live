@@ -123,7 +123,8 @@ export default function ClientHistory() {
   return (
     <AppLayout>
       <AnimatedBackground />
-      <div className="min-h-screen bg-gradient-to-br from-black via-[#020b06] to-black p-4 lg:p-8 text-white">
+      <div className="relative z-10 min-h-screen bg-gradient-to-br from-black via-[#020b06] to-black p-4 lg:p-8 text-white">
+
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-4 mb-6">
             <Button variant="ghost" onClick={() => navigate('/client-dashboard')} className="text-green-400 hover:text-green-300">

@@ -16,7 +16,8 @@ import {
   Download,
   RefreshCw,
   ChevronDown,
-  Calendar
+  Calendar,
+  ArrowLeft
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { JobPhoto, groupPhotosByType } from '@/types/jobPhoto';
@@ -63,8 +64,6 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
   const fetchJobsWithPhotos = async () => {
     setLoading(true);
     try {
-      // Fetch ALL photos first, then get job details
-      // This avoids the !inner JOIN issue that filters out jobs with certain statuses
       const { data: photosData, error: photosError } = await supabase
         .from('job_photos')
         .select('*')
@@ -78,10 +77,8 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
         return;
       }
 
-      // Get unique job IDs from photos
       const jobIds = [...new Set(photosData.map(p => p.job_id))];
 
-      // Fetch job details for all jobs that have photos
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
         .select(`
@@ -98,17 +95,15 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
 
       if (jobsError) throw jobsError;
 
-      // Create a map of jobs by ID for quick lookup
       const jobDetailsMap = new Map(
         (jobsData || []).map(job => [job.id, job])
       );
 
-      // Group photos by job and combine with job details
       const jobMap = new Map<string, JobWithPhotos>();
       
       for (const photo of photosData) {
         const jobDetails = jobDetailsMap.get(photo.job_id);
-        if (!jobDetails) continue; // Skip photos for jobs that don't exist
+        if (!jobDetails) continue;
         
         if (!jobMap.has(photo.job_id)) {
           jobMap.set(photo.job_id, {
@@ -136,7 +131,6 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
         });
       }
 
-      // Fetch landscaper names
       const landscaperIds = [...new Set([...jobMap.values()].map(j => j.landscaper_id).filter(Boolean))];
       if (landscaperIds.length > 0) {
         const { data: landscapers } = await supabase
@@ -164,10 +158,8 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
   };
 
   const filteredJobs = jobs.filter(job => {
-    // Status filter
     if (statusFilter !== 'all' && job.status !== statusFilter) return false;
     
-    // Search filter
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       return (
@@ -186,7 +178,6 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
       completed: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
       completed_pending_review: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
       active: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-
       flagged_review: 'bg-red-500/20 text-red-300 border-red-500/30',
       assigned: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
       pending: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
@@ -238,25 +229,25 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
     return (
       <Card 
         key={job.id} 
-        className={`bg-slate-900/50 border-slate-700/50 hover:border-emerald-500/30 transition-colors cursor-pointer ${
+        className={`bg-slate-900/50 border-slate-700/50 hover:border-emerald-500/30 transition-colors cursor-pointer w-full min-w-0 ${
           isFlagged ? 'ring-1 ring-red-500/30' : ''
         }`}
         onClick={() => setSelectedJob(job)}
       >
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <h3 className="font-medium text-white">{job.service_name}</h3>
-              <p className="text-sm text-slate-400">{job.customer_name}</p>
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-medium text-white truncate">{job.service_name}</h3>
+              <p className="text-sm text-slate-400 truncate">{job.customer_name}</p>
             </div>
-            <Badge className={`${getStatusBadge(job.status)} border`}>
+            <Badge className={`${getStatusBadge(job.status)} border flex-shrink-0 text-xs`}>
               {job.status === 'flagged_review' && <AlertTriangle className="w-3 h-3 mr-1" />}
-              {job.status.replace('_', ' ')}
+              <span className="truncate max-w-[80px]">{job.status.replace('_', ' ')}</span>
             </Badge>
           </div>
 
           {/* Photo Thumbnails */}
-          <div className="grid grid-cols-4 gap-2 mb-3">
+          <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-3">
             {job.photos.slice(0, 4).map((photo, index) => (
               <div 
                 key={photo.id}
@@ -273,7 +264,7 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
                 }`} />
                 {index === 3 && job.photos.length > 4 && (
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <span className="text-white font-medium">+{job.photos.length - 4}</span>
+                    <span className="text-white font-medium text-sm">+{job.photos.length - 4}</span>
                   </div>
                 )}
               </div>
@@ -284,16 +275,16 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
           <div className="flex items-center justify-between text-xs text-slate-400">
             <div className="flex gap-3">
               <span className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-amber-500" />
+                <div className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
                 {photoGroup.before.length} before
               </span>
               <span className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
                 {photoGroup.after.length} after
               </span>
             </div>
             <span className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
+              <Clock className="w-3 h-3 flex-shrink-0" />
               {formatDate(job.photos[0]?.uploaded_at)}
             </span>
           </div>
@@ -301,8 +292,8 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
           {/* Landscaper Info */}
           {job.landscaper_name && (
             <div className="mt-2 pt-2 border-t border-slate-700/50 flex items-center gap-2 text-xs text-slate-400">
-              <User className="w-3 h-3" />
-              <span>{job.landscaper_name}</span>
+              <User className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">{job.landscaper_name}</span>
             </div>
           )}
         </CardContent>
@@ -311,13 +302,13 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
   };
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`space-y-4 sm:space-y-6 w-full min-w-0 ${className}`}>
       {/* Header */}
-      <Card className="bg-slate-900/50 border-slate-700/50">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <CardTitle className="text-emerald-300 flex items-center gap-2">
-              <Camera className="w-6 h-6" />
+      <Card className="bg-slate-900/50 border-slate-700/50 w-full min-w-0">
+        <CardHeader className="px-3 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <CardTitle className="text-emerald-300 flex items-center gap-2 text-base sm:text-lg">
+              <Camera className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
               Job Photo Review
             </CardTitle>
             <Button
@@ -325,20 +316,20 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
               size="sm"
               onClick={fetchJobsWithPhotos}
               disabled={loading}
-              className="border-slate-600"
+              className="border-slate-600 self-start sm:self-auto"
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search jobs, clients, landscapers..."
+                placeholder="Search jobs, clients..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 bg-slate-800/50 border-slate-700"
@@ -347,10 +338,12 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="border-slate-600">
+                <Button variant="outline" className="border-slate-600 flex-shrink-0">
                   <Filter className="w-4 h-4 mr-2" />
-                  {statusFilter === 'all' ? 'All Status' : statusFilter.replace('_', ' ')}
-                  <ChevronDown className="w-4 h-4 ml-2" />
+                  <span className="truncate max-w-[100px] sm:max-w-none">
+                    {statusFilter === 'all' ? 'All Status' : statusFilter.replace('_', ' ')}
+                  </span>
+                  <ChevronDown className="w-4 h-4 ml-2 flex-shrink-0" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="bg-slate-900 border-slate-700">
@@ -373,7 +366,6 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
                   <Clock className="w-4 h-4 mr-2 text-amber-400" />
                   In Progress
                 </DropdownMenuItem>
-
                 <DropdownMenuItem onClick={() => setStatusFilter('assigned')}>
                   <User className="w-4 h-4 mr-2 text-blue-400" />
                   Assigned
@@ -383,35 +375,37 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
           </div>
 
 
-          {/* Stats - Include pending review count */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-4">
-            <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-white">{jobs.length}</p>
-              <p className="text-xs text-slate-400">Jobs with Photos</p>
-            </div>
-            <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-orange-400">
-                {jobs.filter(j => j.status === 'completed_pending_review').length}
-              </p>
-              <p className="text-xs text-slate-400">Pending Review</p>
-            </div>
-            <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-emerald-400">
-                {jobs.filter(j => j.status === 'completed').length}
-              </p>
-              <p className="text-xs text-slate-400">Completed</p>
-            </div>
-            <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-red-400">
-                {jobs.filter(j => j.status === 'flagged_review').length}
-              </p>
-              <p className="text-xs text-slate-400">Flagged</p>
-            </div>
-            <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-amber-400">
-                {jobs.reduce((sum, j) => sum + j.photos.length, 0)}
-              </p>
-              <p className="text-xs text-slate-400">Total Photos</p>
+          {/* Stats — scrollable on mobile, grid on larger */}
+          <div className="overflow-x-auto -mx-1 px-1 mt-4">
+            <div className="flex gap-2 sm:gap-4 min-w-max sm:min-w-0 sm:grid sm:grid-cols-3 md:grid-cols-5">
+              <div className="bg-slate-800/50 rounded-lg p-2 sm:p-3 text-center flex-shrink-0 w-24 sm:w-auto">
+                <p className="text-xl sm:text-2xl font-bold text-white">{jobs.length}</p>
+                <p className="text-[10px] sm:text-xs text-slate-400">With Photos</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-2 sm:p-3 text-center flex-shrink-0 w-24 sm:w-auto">
+                <p className="text-xl sm:text-2xl font-bold text-orange-400">
+                  {jobs.filter(j => j.status === 'completed_pending_review').length}
+                </p>
+                <p className="text-[10px] sm:text-xs text-slate-400">Pending</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-2 sm:p-3 text-center flex-shrink-0 w-24 sm:w-auto">
+                <p className="text-xl sm:text-2xl font-bold text-emerald-400">
+                  {jobs.filter(j => j.status === 'completed').length}
+                </p>
+                <p className="text-[10px] sm:text-xs text-slate-400">Completed</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-2 sm:p-3 text-center flex-shrink-0 w-24 sm:w-auto">
+                <p className="text-xl sm:text-2xl font-bold text-red-400">
+                  {jobs.filter(j => j.status === 'flagged_review').length}
+                </p>
+                <p className="text-[10px] sm:text-xs text-slate-400">Flagged</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-2 sm:p-3 text-center flex-shrink-0 w-24 sm:w-auto">
+                <p className="text-xl sm:text-2xl font-bold text-amber-400">
+                  {jobs.reduce((sum, j) => sum + j.photos.length, 0)}
+                </p>
+                <p className="text-[10px] sm:text-xs text-slate-400">Photos</p>
+              </div>
             </div>
           </div>
 
@@ -420,61 +414,68 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
 
       {/* Job Grid or Selected Job Detail */}
       {selectedJob ? (
-        <Card className="bg-slate-900/50 border-slate-700/50">
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle className="text-white flex items-center gap-2">
-                  {selectedJob.service_name}
-                  <Badge className={`${getStatusBadge(selectedJob.status)} border`}>
-                    {selectedJob.status.replace('_', ' ')}
-                  </Badge>
-                </CardTitle>
-                <div className="flex flex-wrap gap-4 mt-2 text-sm text-slate-400">
-                  <span className="flex items-center gap-1">
-                    <User className="w-4 h-4" />
-                    {selectedJob.customer_name}
-                  </span>
-                  {selectedJob.landscaper_name && (
-                    <span className="flex items-center gap-1">
-                      <User className="w-4 h-4 text-emerald-400" />
-                      {selectedJob.landscaper_name}
-                    </span>
-                  )}
-                  {selectedJob.service_address && (
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
-                      {selectedJob.service_address}
-                    </span>
-                  )}
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    {formatDate(selectedJob.preferred_date)}
-                  </span>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDownloadAll(selectedJob)}
-                  className="border-slate-600"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download All
-                </Button>
+        <Card className="bg-slate-900/50 border-slate-700/50 w-full min-w-0">
+          <CardHeader className="px-3 sm:px-6">
+            <div className="space-y-3">
+              {/* Back + Actions row */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setSelectedJob(null)}
                   className="border-slate-600"
                 >
-                  Back to List
+                  <ArrowLeft className="w-4 h-4 mr-1" />
+                  Back
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDownloadAll(selectedJob)}
+                  className="border-slate-600"
+                >
+                  <Download className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Download All</span>
+                  <span className="sm:hidden">Download</span>
+                </Button>
+              </div>
+
+              {/* Title + Badge */}
+              <div className="flex items-start gap-2 flex-wrap">
+                <CardTitle className="text-white text-base sm:text-lg">
+                  {selectedJob.service_name}
+                </CardTitle>
+                <Badge className={`${getStatusBadge(selectedJob.status)} border flex-shrink-0`}>
+                  {selectedJob.status.replace('_', ' ')}
+                </Badge>
+              </div>
+
+              {/* Meta info */}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm text-slate-400">
+                <span className="flex items-center gap-1">
+                  <User className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">{selectedJob.customer_name}</span>
+                </span>
+                {selectedJob.landscaper_name && (
+                  <span className="flex items-center gap-1">
+                    <User className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                    <span className="truncate">{selectedJob.landscaper_name}</span>
+                  </span>
+                )}
+                {selectedJob.service_address && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate max-w-[200px]">{selectedJob.service_address}</span>
+                  </span>
+                )}
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                  {formatDate(selectedJob.preferred_date)}
+                </span>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 sm:px-6">
             <BeforeAfterComparison 
               photos={selectedJob.photos}
               showTimestamps={true}
@@ -491,22 +492,21 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
                   .map(photo => (
                     <div 
                       key={photo.id}
-                      className="flex items-center gap-3 p-2 bg-slate-800/50 rounded-lg text-sm"
+                      className="flex items-center gap-2 sm:gap-3 p-2 bg-slate-800/50 rounded-lg text-xs sm:text-sm flex-wrap sm:flex-nowrap"
                     >
-                      <div className={`w-3 h-3 rounded-full ${
+                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
                         photo.type === 'before' ? 'bg-amber-500' : 'bg-emerald-500'
                       }`} />
-                      <span className="text-slate-300 capitalize">{photo.type}</span>
-                      <span className="text-slate-500">•</span>
-                      <span className="text-slate-400">
+                      <span className="text-slate-300 capitalize flex-shrink-0">{photo.type}</span>
+                      <span className="text-slate-500 hidden sm:inline flex-shrink-0">|</span>
+                      <span className="text-slate-400 truncate">
                         {new Date(photo.uploaded_at).toLocaleString()}
                       </span>
                       {photo.metadata?.gps && (
                         <>
-                          <span className="text-slate-500">•</span>
-                          <span className="text-slate-400 flex items-center gap-1">
+                          <span className="text-slate-400 flex items-center gap-1 flex-shrink-0">
                             <MapPin className="w-3 h-3" />
-                            GPS verified
+                            <span className="hidden sm:inline">GPS</span>
                           </span>
                         </>
                       )}
@@ -514,9 +514,9 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
                         variant="ghost"
                         size="sm"
                         onClick={() => openLightbox([photo], 0)}
-                        className="ml-auto text-slate-400 hover:text-white"
+                        className="ml-auto text-slate-400 hover:text-white h-7 w-7 p-0 flex-shrink-0"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   ))}
@@ -527,7 +527,7 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
       ) : (
         <>
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <Card key={i} className="bg-slate-900/50 border-slate-700/50">
                   <CardContent className="p-4">
@@ -545,7 +545,7 @@ export default function AdminJobPhotoReview({ className = '' }: AdminJobPhotoRev
               ))}
             </div>
           ) : filteredJobs.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {filteredJobs.map(renderJobCard)}
             </div>
           ) : (

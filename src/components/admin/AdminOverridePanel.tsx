@@ -8,6 +8,12 @@ import {
 } from '@/constants/jobStatus'
 import { AlertTriangle, CheckCircle, Loader2, ShieldAlert } from 'lucide-react'
 
+// ============================================================================
+// BETA TESTING MODE: Minimum price temporarily set to $1 for Stripe test validation. Revert to $25 before production launch.
+// ============================================================================
+const MINIMUM_OVERRIDE_PRICE_DOLLARS = 1.00;
+
+
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
@@ -108,11 +114,19 @@ export function AdminOverridePanel({ selectedJob, refreshJobs }: AdminOverridePa
       return
     }
 
-    // Validate price if provided
-    if (newPrice && (isNaN(parseFloat(newPrice)) || parseFloat(newPrice) < 0)) {
-      setErrorMsg('Price must be a valid positive number')
-      return
+    // Validate price if provided — enforce minimum price
+    if (newPrice) {
+      const parsedPrice = parseFloat(newPrice)
+      if (isNaN(parsedPrice) || parsedPrice < 0) {
+        setErrorMsg('Price must be a valid positive number')
+        return
+      }
+      if (parsedPrice > 0 && parsedPrice < MINIMUM_OVERRIDE_PRICE_DOLLARS) {
+        setErrorMsg(`Minimum job price is $${MINIMUM_OVERRIDE_PRICE_DOLLARS.toFixed(2)}.`)
+        return
+      }
     }
+
 
     // ── Strict cast: status must be a valid JobStatus or null ────────
     const castStatus: JobStatus | null = newStatus ? toJobStatus(newStatus) : null

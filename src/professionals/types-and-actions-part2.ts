@@ -12,18 +12,13 @@ export async function getAuthIdentity(supabase: SupaClient) {
   return { uid: data.user?.id ?? null, email: data.user?.email ?? null };
 }
 
-export function landscaperOrFilter(uid: string | null, email: string | null) {
-  const parts: string[] = []
-  if (uid) {
-    parts.push(`landscaper_id.eq.${uid}`)
-    parts.push(`assigned_to.eq.${uid}`)
-  }
-  if (email) {
-    parts.push(`landscaper_email.eq.${email}`)
-    parts.push(`assigned_email.eq.${email}`)
-  }
-  return parts.join(",")
+// OWNERSHIP MODEL: assigned_to is the ONLY authoritative ownership filter.
+// No OR logic. No landscaper_id in ownership filtering.
+export function landscaperOrFilter(uid: string | null, _email: string | null) {
+  if (!uid) return ""
+  return `assigned_to.eq.${uid}`
 }
+
 
 // Earnings last 30d from completed jobs -> DayPoint[]
 export async function fetchEarningsLast30(supabase: SupaClient): Promise<DayPoint[]> {

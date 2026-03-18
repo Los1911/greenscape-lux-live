@@ -9,26 +9,30 @@ export default function RoleSelectionLanding() {
 
   return (
     <div 
-      className="bg-gradient-to-br from-emerald-900 via-gray-900 to-black flex flex-col"
+      className="bg-gradient-to-br from-emerald-900 via-gray-900 to-black flex flex-col relative overflow-hidden w-full"
       style={{
         minHeight: '100dvh',
-        /* Fallback for browsers that don't support dvh */
-        minHeight: '100svh',
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)'
       }}
     >
-      {/* Main content - flexbox centered */}
+      {/* Decorative background — absolute inset-0 z-0 pointer-events-none */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-emerald-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }} />
+      </div>
+
+      {/* Main content — relative z-10, flexbox centered */}
       <div 
-        className="flex-1 flex items-center justify-center px-4 py-6"
+        className="relative z-10 flex-1 flex items-center justify-center px-4 py-6"
         style={{
           paddingTop: 'max(1.5rem, env(safe-area-inset-top))',
           paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))'
         }}
       >
-        <div className="max-w-4xl w-full">
+        <div className="max-w-4xl w-full mx-auto">
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
               Welcome to <span className="text-emerald-400">GreenScape Lux</span>
@@ -40,7 +44,7 @@ export default function RoleSelectionLanding() {
 
           <div className="grid md:grid-cols-2 gap-8">
             {/* Client Card */}
-            <Card className="bg-gray-800/50 border-emerald-500/20 hover:border-emerald-500/40 transition-all duration-300 cursor-pointer group"
+            <Card className="bg-gray-800/50 border-emerald-500/20 hover:border-emerald-500/40 transition-all duration-300 cursor-pointer group w-full"
                   onClick={() => navigate('/client-signup')}>
               <CardHeader className="text-center pb-4">
                 <div className="mx-auto mb-4 p-4 bg-emerald-500/10 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
@@ -64,7 +68,7 @@ export default function RoleSelectionLanding() {
             </Card>
 
             {/* Landscaper Card */}
-            <Card className="bg-gray-800/50 border-emerald-500/20 hover:border-emerald-500/40 transition-all duration-300 cursor-pointer group"
+            <Card className="bg-gray-800/50 border-emerald-500/20 hover:border-emerald-500/40 transition-all duration-300 cursor-pointer group w-full"
                   onClick={() => navigate('/landscaper-signup')}>
               <CardHeader className="text-center pb-4">
                 <div className="mx-auto mb-4 p-4 bg-emerald-500/10 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">

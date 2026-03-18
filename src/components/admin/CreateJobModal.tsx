@@ -38,10 +38,10 @@ export default function CreateJobModal({ isOpen, onClose, onJobCreated }: Props)
   }, [isOpen]);
 
   const fetchUsers = async () => {
-    // Fetch clients from profiles table
+    // Fetch clients from profiles table — include id (auth.users UUID) for client_id linkage
     const { data: clientsData } = await supabase
       .from('profiles')
-      .select('email, first_name, last_name')
+      .select('id, email, first_name, last_name')
       .order('first_name');
     
     // Fetch landscapers - need to join with profiles to get email/name
@@ -80,6 +80,7 @@ export default function CreateJobModal({ isOpen, onClose, onJobCreated }: Props)
   };
 
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -90,6 +91,17 @@ export default function CreateJobModal({ isOpen, onClose, onJobCreated }: Props)
         ? new Date(`${formData.date}T${formData.time}`).toISOString()
         : new Date(formData.date).toISOString();
 
+      // Resolve client_id from the selected client email
+      const matchedClient = clients.find(
+        (c: any) => c.email?.toLowerCase() === formData.client_email.trim().toLowerCase()
+      );
+      const resolvedClientId = matchedClient?.id || null;
+
+      // Build customer display name from profile or fall back to email prefix
+      const customerName = matchedClient
+        ? `${matchedClient.first_name || ''} ${matchedClient.last_name || ''}`.trim() || formData.client_email.split('@')[0]
+        : formData.client_email.split('@')[0];
+
       const { error } = await supabase.from('jobs').insert([{
         service_name: formData.service_name,
         service_type: formData.service_name,
@@ -99,9 +111,14 @@ export default function CreateJobModal({ isOpen, onClose, onJobCreated }: Props)
         service_address: formData.location,
         preferred_date: preferredDateTime,
         status: formData.status,
-        customer_name: formData.client_email.split('@')[0],
+        customer_name: customerName,
+        // CRITICAL: Write all three client identity columns so dashboard queries work
+        client_id: resolvedClientId,
+        client_user_id: resolvedClientId,
+        user_id: resolvedClientId,
         created_at: new Date().toISOString()
       }]);
+
 
       if (error) throw error;
 

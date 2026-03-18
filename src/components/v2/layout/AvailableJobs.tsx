@@ -75,17 +75,20 @@ export default function AvailableJobs() {
 
   const loadAvailableJobs = async () => {
     try {
-      // Query jobs where: status='available', is_available=true, assigned_to IS NULL
+      // MARKETPLACE QUERY: Both assigned_to AND landscaper_id must be null.
+      // Matches statuses: available, priced, scheduled.
       const { data, error } = await supabase
         .from('jobs')
         .select('*')
-        .eq('status', 'available')
-        .eq('is_available', true)
+        .in('status', ['available', 'priced', 'scheduled'])
         .is('assigned_to', null)
-        .order('created_at', { ascending: false });
+        .is('landscaper_id', null)
+        .eq('is_available', true)
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       setJobs(data || []);
+
     } catch (error) {
       console.error('Error loading jobs:', error);
       toast({

@@ -298,39 +298,42 @@ export default function PerformanceAnalyticsDashboard({ className = '' }: Perfor
 
   if (loading) {
     return (
-      <div className={`bg-black/60 backdrop-blur border border-emerald-500/25 rounded-2xl p-6 ${className}`}>
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-emerald-500/20 rounded w-1/3"></div>
-          <div className="grid grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-24 bg-emerald-500/10 rounded-xl"></div>
-            ))}
+      <div className={`w-full px-3 sm:px-4 lg:px-6 py-4 sm:py-6 ${className}`}>
+        <div className="bg-black/60 backdrop-blur border border-emerald-500/25 rounded-2xl p-4 sm:p-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-emerald-500/20 rounded w-1/3"></div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="h-20 sm:h-24 bg-emerald-500/10 rounded-xl"></div>
+              ))}
+            </div>
+            <div className="h-48 sm:h-64 bg-emerald-500/10 rounded-xl"></div>
           </div>
-          <div className="h-64 bg-emerald-500/10 rounded-xl"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`w-full px-3 sm:px-4 lg:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 ${className}`}>
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-emerald-300 flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Performance Analytics
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-xl font-bold text-emerald-300 flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+            <span className="truncate">Performance Analytics</span>
           </h2>
-          <p className="text-sm text-slate-400">View landscaper performance metrics (read-only)</p>
+          <p className="text-xs sm:text-sm text-slate-400">View landscaper performance metrics (read-only)</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Button
             variant="outline"
             size="sm"
             onClick={loadPerformanceData}
             className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
+            <RefreshCw className="h-4 w-4 mr-1.5 sm:mr-2" />
             Refresh
           </Button>
           <Button
@@ -339,76 +342,76 @@ export default function PerformanceAnalyticsDashboard({ className = '' }: Perfor
             onClick={exportToCSV}
             className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
           >
-            <Download className="h-4 w-4 mr-2" />
+            <Download className="h-4 w-4 mr-1.5 sm:mr-2" />
             Export
           </Button>
         </div>
       </div>
 
       {/* Platform Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <div className="bg-black/60 border border-emerald-500/25 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Users className="h-4 w-4 text-emerald-400" />
-            <span className="text-xs text-slate-400">Total Landscapers</span>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 lg:gap-4">
+        <div className="w-full min-w-0 bg-black/60 border border-emerald-500/25 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-400 flex-shrink-0" />
+            <span className="text-[10px] sm:text-xs text-slate-400 truncate">Total Landscapers</span>
           </div>
-          <div className="text-2xl font-bold text-white">{platformStats.totalLandscapers}</div>
+          <div className="text-xl sm:text-2xl font-bold text-white">{platformStats.totalLandscapers}</div>
         </div>
-        <div className="bg-black/60 border border-emerald-500/25 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <BarChart3 className="h-4 w-4 text-emerald-400" />
-            <span className="text-xs text-slate-400">Avg Score</span>
+        <div className="w-full min-w-0 bg-black/60 border border-emerald-500/25 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+            <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-400 flex-shrink-0" />
+            <span className="text-[10px] sm:text-xs text-slate-400 truncate">Avg Score</span>
           </div>
-          <div className="text-2xl font-bold text-white">{platformStats.avgScore}</div>
+          <div className="text-xl sm:text-2xl font-bold text-white">{platformStats.avgScore}</div>
         </div>
-        <div className="bg-black/60 border border-emerald-500/25 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Star className="h-4 w-4 text-amber-400" />
-            <span className="text-xs text-slate-400">Avg Rating</span>
+        <div className="w-full min-w-0 bg-black/60 border border-emerald-500/25 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+            <Star className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400 flex-shrink-0" />
+            <span className="text-[10px] sm:text-xs text-slate-400 truncate">Avg Rating</span>
           </div>
-          <div className="text-2xl font-bold text-white">{platformStats.avgRating}</div>
+          <div className="text-xl sm:text-2xl font-bold text-white">{platformStats.avgRating}</div>
         </div>
-        <div className="bg-black/60 border border-emerald-500/25 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <CheckCircle className="h-4 w-4 text-emerald-400" />
-            <span className="text-xs text-slate-400">Avg Completion</span>
+        <div className="w-full min-w-0 bg-black/60 border border-emerald-500/25 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+            <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-400 flex-shrink-0" />
+            <span className="text-[10px] sm:text-xs text-slate-400 truncate">Avg Completion</span>
           </div>
-          <div className="text-2xl font-bold text-white">{platformStats.avgCompletionRate}%</div>
+          <div className="text-xl sm:text-2xl font-bold text-white">{platformStats.avgCompletionRate}%</div>
         </div>
-        <div className="bg-black/60 border border-emerald-500/25 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <ArrowUpRight className="h-4 w-4 text-emerald-400" />
-            <span className="text-xs text-slate-400">Improving</span>
+        <div className="w-full min-w-0 bg-black/60 border border-emerald-500/25 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+            <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-400 flex-shrink-0" />
+            <span className="text-[10px] sm:text-xs text-slate-400 truncate">Improving</span>
           </div>
-          <div className="text-2xl font-bold text-emerald-400">{platformStats.improvingCount}</div>
+          <div className="text-xl sm:text-2xl font-bold text-emerald-400">{platformStats.improvingCount}</div>
         </div>
-        <div className="bg-black/60 border border-emerald-500/25 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <ArrowDownRight className="h-4 w-4 text-red-400" />
-            <span className="text-xs text-slate-400">Declining</span>
+        <div className="w-full min-w-0 bg-black/60 border border-emerald-500/25 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+            <ArrowDownRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-400 flex-shrink-0" />
+            <span className="text-[10px] sm:text-xs text-slate-400 truncate">Declining</span>
           </div>
-          <div className="text-2xl font-bold text-red-400">{platformStats.decliningCount}</div>
+          <div className="text-xl sm:text-2xl font-bold text-red-400">{platformStats.decliningCount}</div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-black/60 border border-emerald-500/25 rounded-xl p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
+      <div className="w-full bg-black/60 border border-emerald-500/25 rounded-xl p-3 sm:p-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search by name or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-black/40 border-emerald-500/30 text-white"
+              className="pl-10 bg-black/40 border-emerald-500/30 text-white text-sm"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-slate-400" />
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Filter className="h-4 w-4 text-slate-400 flex-shrink-0" />
             <select
               value={filterTier}
               onChange={(e) => setFilterTier(e.target.value)}
-              className="bg-black/40 border border-emerald-500/30 rounded-lg px-3 py-2 text-white text-sm"
+              className="bg-black/40 border border-emerald-500/30 rounded-lg px-3 py-2 text-white text-sm w-full sm:w-auto"
             >
               <option value="all">All Tiers</option>
               <option value="starter">Starter</option>
@@ -419,8 +422,11 @@ export default function PerformanceAnalyticsDashboard({ className = '' }: Perfor
         </div>
       </div>
 
+
+
       {/* Landscaper Table */}
-      <div className="bg-black/60 border border-emerald-500/25 rounded-xl overflow-hidden">
+      <div className="bg-black/60 border border-emerald-500/25 rounded-xl overflow-visible">
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

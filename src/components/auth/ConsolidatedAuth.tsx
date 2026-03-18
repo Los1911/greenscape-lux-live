@@ -170,34 +170,43 @@ export default function ConsolidatedAuth({
 
   return (
     <div 
-      className="bg-black relative flex flex-col"
+      className="bg-black relative flex flex-col w-full"
       style={{
-        // Use dvh for dynamic viewport height (handles iOS Safari address bar)
-        // Fallback to svh for older browsers
+        /* 100dvh for iOS Safari dynamic address bar */
         minHeight: '100dvh',
-        // @ts-ignore - CSS fallback
-        minHeight: '100svh',
-        // Safe area insets for notch/dynamic island devices
+        /* Safe area insets for notch/dynamic island devices */
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)',
-        // Smooth transition for layout recalculation after OAuth redirect
-        opacity: layoutReady ? 1 : 0.99,
-        transition: 'opacity 0.1s ease-in-out'
+        /**
+         * SAFARI COMPOSITING FIX:
+         * isolation: isolate creates a stacking context WITHOUT a compositing layer.
+         * Removed: opacity: 0.99 + transition: opacity (caused Safari to mis-order
+         * child compositing layers, allowing diagonal gradient to paint above card).
+         * overflow: hidden moved to AnimatedBackground wrapper only.
+         */
+        isolation: 'isolate' as any,
       }}
     >
-      <AnimatedBackground />
+      {/* Decorative background — scoped overflow-hidden prevents Safari
+          clip-context/stacking-context interaction bugs */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <AnimatedBackground />
+      </div>
       
-      {/* Main content - flexbox centered, no absolute positioning */}
+      {/* Main content — relative z-10, translateZ(0) forces own compositing layer
+          so Safari GPU correctly paints above z-0 background */}
       <div 
         className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-6"
         style={{
           paddingTop: 'max(1.5rem, env(safe-area-inset-top))',
-          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))'
+          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
+          transform: 'translateZ(0)',
         }}
       >
-        <div className="w-full max-w-md">
+        {/* Login card container — w-full max-w-md mx-auto */}
+        <div className="w-full max-w-md mx-auto">
           {showBackButton && onBack && (
             <Button onClick={onBack} variant="ghost" className="mb-6 text-emerald-400 hover:text-emerald-300">
               <ArrowLeft className="w-4 h-4 mr-2" />Back
@@ -214,10 +223,28 @@ export default function ConsolidatedAuth({
             <p className="text-gray-300">{config.description}</p>
           </div>
 
-          <Card className="bg-gray-900/80 border-emerald-500/30 backdrop-blur-sm">
-            <CardHeader className="pb-2">
+          {/* Login Card — COMPOSITING-SAFE for all iPhones:
+              - isolation: isolate → creates stacking context so internal semi-transparent
+                children (inputs bg-gray-800/50, TabsList) composite against this card's
+                opaque bg-gray-900, NOT against the global AnimatedBackground.
+              - transform: translateZ(0) → promotes to own GPU compositing layer so
+                Safari correctly paints it above the z-0 background layer.
+              - !bg-gray-900 → fully opaque (#111827), overrides bg-card from Card base.
+              - relative z-10 → ensures CSS stacking order above background.
+              No decorative overlays inside (removed in prior fix). */}
+          <Card
+            className="relative z-10 !bg-gray-900 border-emerald-500/30 shadow-lg shadow-emerald-500/5 w-full"
+            style={{
+              isolation: 'isolate' as any,
+              transform: 'translateZ(0)',
+            }}
+          >
+
+
+            <CardHeader className="relative pb-2">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-3 bg-gray-800/50">
+                <TabsList className="flex flex-row w-full bg-gray-800/50">
+
                   <TabsTrigger value="login">Login</TabsTrigger>
                   <TabsTrigger value="signup">Sign Up</TabsTrigger>
                   <TabsTrigger value="reset">Reset</TabsTrigger>
@@ -308,7 +335,7 @@ export default function ConsolidatedAuth({
             
             {/* Error/Success Messages */}
             {(message || socialAuthError) && (
-              <CardContent className="pt-0">
+              <CardContent className="relative pt-0">
                 {socialAuthError && (
                   <div className="flex items-start gap-2 text-sm text-red-400 bg-red-900/20 p-3 rounded-lg mb-2">
                     <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />

@@ -58,7 +58,7 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({
   children, 
   onComplete 
 }) => {
-  const { user, session, loading: authLoading, role } = useAuth();
+  const { user, session, loading: authLoading, role, roleResolved } = useAuth();
   const [state, setState] = useState<OnboardingState>({
     status: 'loading',
     personalInfoComplete: false,
@@ -66,10 +66,24 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({
     profileData: null,
     errorMessage: null,
   });
+
   
   const mountedRef = useRef(true);
   const checkInProgressRef = useRef(false);
   const hasCalledCompleteRef = useRef(false);
+  // ──────────────────────────────────────────────────────────────────
+  // FIX (2026-03-02): Track whether this is the initial DB check vs
+  // a re-check triggered by handleStepSaved.  On the INITIAL check,
+  // if the user is already onboarded, we must NOT call onComplete —
+  // doing so fires a navigate('/client-dashboard', { replace: true })
+  // that strips the sub-path and query params from the current URL.
+  //
+  // onComplete should ONLY fire when a user transitions from
+  // incomplete → complete (i.e. they just finished the onboarding
+  // form), NOT for returning users who were already complete.
+  // ──────────────────────────────────────────────────────────────────
+  const isInitialCheckRef = useRef(true);
+
 
   /**
    * GUARANTEE: Ensure a profiles row exists for this user
@@ -137,6 +151,17 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({
       return;
     }
 
+    // ──────────────────────────────────────────────────────────────────
+    // FIX (2026-03-01): Wait for roleResolved BEFORE making any
+    // onboarding decision.  Previously, when role was null (still
+    // resolving), the guard fell through to the profile-field check
+    // and showed client onboarding to admins / landscapers.
+    // ──────────────────────────────────────────────────────────────────
+    if (!roleResolved) {
+      log('Role not yet resolved — staying in loading state');
+      return;
+    }
+
     // No user = not in onboarding (they need to log in first)
     if (!user || !session) {
       log('No user/session - not in onboarding state');
@@ -151,7 +176,7 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({
       return;
     }
 
-    // Only apply onboarding to clients
+    // Only apply onboarding to clients — admin and landscaper always bypass
     if (role && role !== 'client') {
       log(`User is ${role}, not client - skipping onboarding`);
       if (mountedRef.current) {
@@ -164,6 +189,7 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({
       }
       return;
     }
+
 
     checkInProgressRef.current = true;
     log('Starting onboarding check for user:', user.id);
@@ -259,16 +285,36 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({
           errorMessage: null,
         });
 
-        // If complete and we haven't called onComplete yet, call it
-        if (isComplete && !hasCalledCompleteRef.current) {
-          log('Onboarding complete - calling onComplete callback');
+        // ────────────────────────────────────────────────────────────
+        // FIX (2026-03-02): Only call onComplete when the user has
+        // JUST transitioned from incomplete → complete (i.e. they
+        // finished the onboarding form during this session).
+        //
+        // On the INITIAL check, if the user is already onboarded, we
+        // skip onComplete entirely.  Calling it would fire a navigate
+        // to '/client-dashboard' that strips the current sub-path
+        // (e.g. /jobs) and query params (e.g. ?payment=success&job_id=…)
+        // — breaking the Stripe post-checkout verification flow.
+        //
+        // isInitialCheckRef starts as true and is set to false after
+        // the first check completes.  handleStepSaved also sets it to
+        // false before re-checking, so the transition fires correctly.
+        // ────────────────────────────────────────────────────────────
+        if (isComplete && !hasCalledCompleteRef.current && !isInitialCheckRef.current) {
+          log('Onboarding just completed (transition) - calling onComplete callback');
           hasCalledCompleteRef.current = true;
           // Small delay to ensure state has propagated
           setTimeout(() => {
             onComplete?.();
           }, 100);
+        } else if (isComplete && isInitialCheckRef.current) {
+          log('User already onboarded on initial check — skipping onComplete to preserve URL');
         }
+
+        // Mark initial check as done regardless of outcome
+        isInitialCheckRef.current = false;
       }
+
     } catch (error) {
       log('Unexpected error:', error);
       if (mountedRef.current) {
@@ -283,7 +329,8 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({
     } finally {
       checkInProgressRef.current = false;
     }
-  }, [user, session, authLoading, role, onComplete, ensureProfileExists]);
+  }, [user, session, authLoading, roleResolved, role, onComplete, ensureProfileExists]);
+
 
   // Initial check on mount and when auth changes
   useEffect(() => {
@@ -302,10 +349,13 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({
    */
   const handleStepSaved = useCallback(async () => {
     log('Step saved - re-checking database');
-    // Reset the complete flag so we can call onComplete again if needed
+    // Reset flags so onComplete can fire on the transition check
     hasCalledCompleteRef.current = false;
+    // Explicitly mark as non-initial so onComplete fires if now complete
+    isInitialCheckRef.current = false;
     await checkOnboardingFromDatabase();
   }, [checkOnboardingFromDatabase]);
+
 
   /**
    * Handle retry after error

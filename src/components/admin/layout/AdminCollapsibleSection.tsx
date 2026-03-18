@@ -127,9 +127,11 @@ export function AdminCollapsibleSection({
     <div 
       className={`
         bg-black/60 backdrop-blur border border-emerald-500/25 rounded-xl
-        overflow-hidden transition-all duration-200
+        overflow-visible transition-all duration-200
+        w-full min-w-0
         ${className}
       `}
+
       data-section-id={id}
     >
       {/* Header */}
@@ -140,7 +142,8 @@ export function AdminCollapsibleSection({
         disabled={nonCollapsible}
         className={`
           w-full flex items-center justify-between
-          px-4 py-3 sm:px-5 sm:py-4
+          px-3 py-2.5 sm:px-5 sm:py-4
+          min-w-0
           ${nonCollapsible ? 'cursor-default' : 'cursor-pointer hover:bg-emerald-500/5'}
           transition-colors
           focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:ring-inset
@@ -149,7 +152,7 @@ export function AdminCollapsibleSection({
         aria-controls={contentId}
       >
         {/* Left side: Icon, Title, Badge */}
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 overflow-hidden">
           {/* Expand/Collapse indicator */}
           {!nonCollapsible && (
             <span className="text-emerald-400 flex-shrink-0">
@@ -163,29 +166,29 @@ export function AdminCollapsibleSection({
           
           {/* Section icon */}
           {Icon && (
-            <Icon className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400 flex-shrink-0" />
           )}
           
           {/* Title */}
-          <h3 className="text-base sm:text-lg font-semibold text-emerald-300 truncate">
+          <h3 className="text-sm sm:text-base md:text-lg font-semibold text-emerald-300 truncate">
             {title}
           </h3>
           
           {/* Badge count */}
           {typeof badgeCount === 'number' && badgeCount > 0 && (
             <span className={`
-              px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0
+              px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-full flex-shrink-0
               ${badgeColorClasses[badgeColor]}
             `}>
               {badgeCount > 99 ? '99+' : badgeCount}
             </span>
           )}
           
-          {/* Summary stats (visible when collapsed) */}
+          {/* Summary stats (visible when collapsed, desktop only) */}
           {!isExpanded && summaryStats && summaryStats.length > 0 && (
-            <div className="hidden sm:flex items-center gap-4 ml-4 text-sm">
+            <div className="hidden md:flex items-center gap-4 ml-4 text-sm">
               {summaryStats.slice(0, 3).map((stat, index) => (
-                <span key={index} className="flex items-center gap-1.5">
+                <span key={index} className="flex items-center gap-1.5 whitespace-nowrap">
                   <span className="text-emerald-300/50">{stat.label}:</span>
                   <span className={stat.color || 'text-emerald-300'}>
                     {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
@@ -199,7 +202,7 @@ export function AdminCollapsibleSection({
         {/* Right side: Header action */}
         {headerAction && (
           <div 
-            className="flex-shrink-0 ml-3"
+            className="flex-shrink-0 ml-2 sm:ml-3"
             onClick={(e) => e.stopPropagation()}
           >
             {headerAction}
@@ -211,13 +214,14 @@ export function AdminCollapsibleSection({
       <div
         id={contentId}
         className={`
-          transition-all duration-300 ease-in-out overflow-hidden
-          ${isExpanded ? 'max-h-[10000px] opacity-100' : 'max-h-0 opacity-0'}
+          transition-all duration-300 ease-in-out
+          ${isExpanded ? 'max-h-[10000px] opacity-100 overflow-visible' : 'max-h-0 opacity-0 overflow-hidden'}
         `}
+
         aria-hidden={!isExpanded}
       >
-        <div className="px-4 pb-4 sm:px-5 sm:pb-5 border-t border-emerald-500/10">
-          <div className="pt-4">
+        <div className="px-3 pb-3 sm:px-5 sm:pb-5 border-t border-emerald-500/10">
+          <div className="pt-3 sm:pt-4 w-full min-w-0">
             {children}
           </div>
         </div>

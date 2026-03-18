@@ -171,11 +171,26 @@ export async function findBestMatches(
  */
 export async function autoAssignJob(jobId: string, landscaperId: string): Promise<boolean> {
   try {
-    // First, update the job with the assigned landscaper
+    // Look up the landscaper's user_id so we can set assigned_to.
+    // The DB constraint jobs_assignment_pairing_chk requires BOTH
+    // landscaper_id and assigned_to to be set together (or both null).
+    const { data: landscaper, error: lookupErr } = await supabase
+      .from('landscapers')
+      .select('id, user_id')
+      .eq('id', landscaperId)
+      .single();
+
+    if (lookupErr || !landscaper) {
+      console.error('[autoAssignJob] Could not look up landscaper user_id:', lookupErr?.message);
+      return false;
+    }
+
+    // Update the job with both landscaper_id and assigned_to
     const { error: jobError } = await supabase
       .from('jobs')
       .update({
-        landscaper_id: landscaperId,
+        landscaper_id: landscaper.id,
+        assigned_to: landscaper.user_id,
         status: 'assigned',
         is_available: false,
         accepted_at: new Date().toISOString()
@@ -224,3 +239,4 @@ export async function autoAssignJob(jobId: string, landscaperId: string): Promis
     return false;
   }
 }
+

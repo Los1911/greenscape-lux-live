@@ -163,15 +163,21 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // LIFECYCLE FIX: Set status to 'scheduled' (NOT 'assigned').
   // The job becomes 'assigned' only when a landscaper explicitly accepts it.
   // Flow: payment → scheduled → (landscaper accepts) → assigned → active → completed
+  //
+  // SCHEMA ALIGNMENT: jobs table uses 'payout_status', NOT 'payment_status'
+  // 'payment_status' column does NOT exist on the jobs table.
+  // Set payout_status to 'pending' = client payment received, awaiting admin review for payout.
+  // payout_status lifecycle: not_ready → pending → ready → held → paid
   await supabase
     .from('jobs')
     .update({
       status: 'scheduled',
       stripe_session_id: session.id,
-      payment_status: 'paid',
+      payout_status: 'pending',
       updated_at: new Date().toISOString()
     })
     .eq('id', jobId)
 
   console.log('✅ Job marked scheduled after payment:', jobId)
 }
+

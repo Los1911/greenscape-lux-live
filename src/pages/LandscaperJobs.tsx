@@ -16,21 +16,20 @@ async function getAuth() {
   } catch { return { email: null, uid: null } }
 }
 
-function orForLandscaper(uid: string | null, email: string | null) {
-  const parts: string[] = []
-  if (uid) { parts.push(`landscaper_id.eq.${uid}`); parts.push(`assigned_to.eq.${uid}`) }
-  if (email) { parts.push(`landscaper_email.eq.${email}`); parts.push(`assigned_email.eq.${email}`) }
-  return parts.join(",")
-}
-
+// OWNERSHIP MODEL: assigned_to is the ONLY authoritative ownership filter.
+// No OR logic. No landscaper_id in ownership filtering.
 async function fetchJobs(): Promise<Job[]> {
-  const { email, uid } = await getAuth()
-  const orFilter = orForLandscaper(uid, email)
-  if (!orFilter) return []
-  const { data, error } = await supabase.from("jobs").select("id,service_name,service_type,service_address,scheduled_at,completed_at,status,price,landscaper_id,landscaper_email,assigned_to,assigned_email").or(orFilter).order("scheduled_at", { ascending: true })
+  const { uid } = await getAuth()
+  if (!uid) return []
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("id,service_name,service_type,service_address,scheduled_at,completed_at,status,price,landscaper_id,landscaper_email,assigned_to,assigned_email")
+    .eq('assigned_to', uid)
+    .order("updated_at", { ascending: false })
   if (error) { console.error('[LANDSCAPER JOBS] Fetch error:', error); return [] }
   return (data as Job[]) || []
 }
+
 
 function demoJobs(): Job[] {
   const one = new Date(Date.now() + 60*60*1000).toISOString()

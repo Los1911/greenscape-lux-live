@@ -101,11 +101,12 @@ export function AdminSectionGroup({
   const contentId = `admin-group-${id}`;
 
   return (
-    <div className={`space-y-4 ${className}`} data-group-id={id}>
+    <div className={`space-y-4 w-full min-w-0 ${className}`} data-group-id={id}>
       {/* Group Header */}
       <div 
         className={`
-          flex items-center gap-3 pb-2 border-b border-emerald-500/20
+          flex items-center gap-2 sm:gap-3 pb-2 border-b border-emerald-500/20
+          min-w-0 w-full
           ${!nonCollapsible ? 'cursor-pointer' : ''}
         `}
         onClick={!nonCollapsible ? handleToggle : undefined}
@@ -122,29 +123,29 @@ export function AdminSectionGroup({
       >
         {/* Collapse indicator */}
         {!nonCollapsible && (
-          <span className="text-emerald-500/60">
+          <span className="text-emerald-500/60 flex-shrink-0">
             {isExpanded ? (
-              <ChevronDown className="w-5 h-5" />
+              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
             ) : (
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             )}
           </span>
         )}
         
         {/* Icon */}
         {Icon && (
-          <Icon className="w-5 h-5 text-emerald-500" />
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500 flex-shrink-0" />
         )}
         
         {/* Title and description */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-emerald-400 uppercase tracking-wide">
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-base sm:text-lg font-bold text-emerald-400 uppercase tracking-wide truncate">
               {title}
             </h2>
             {typeof badgeCount === 'number' && badgeCount > 0 && (
               <span className={`
-                px-2 py-0.5 text-xs font-medium rounded-full
+                px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0
                 ${badgeColorClasses[badgeColor]}
               `}>
                 {badgeCount > 99 ? '99+' : badgeCount}
@@ -152,7 +153,7 @@ export function AdminSectionGroup({
             )}
           </div>
           {description && (
-            <p className="text-sm text-emerald-300/50 mt-0.5">
+            <p className="text-xs sm:text-sm text-emerald-300/50 mt-0.5 truncate">
               {description}
             </p>
           )}
@@ -160,7 +161,7 @@ export function AdminSectionGroup({
         
         {/* Collapsed summary */}
         {!isExpanded && (
-          <span className="text-sm text-emerald-300/40">
+          <span className="text-xs sm:text-sm text-emerald-300/40 flex-shrink-0 whitespace-nowrap">
             {React.Children.count(children)} sections
           </span>
         )}
@@ -170,12 +171,13 @@ export function AdminSectionGroup({
       <div
         id={contentId}
         className={`
-          transition-all duration-300 ease-in-out overflow-hidden
-          ${isExpanded ? 'max-h-[50000px] opacity-100' : 'max-h-0 opacity-0'}
+          transition-all duration-300 ease-in-out
+          ${isExpanded ? 'max-h-[50000px] opacity-100 overflow-visible' : 'max-h-0 opacity-0 overflow-hidden'}
         `}
+
         aria-hidden={!isExpanded}
       >
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-4 w-full min-w-0">
           {children}
         </div>
       </div>

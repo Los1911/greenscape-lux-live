@@ -32,16 +32,18 @@ export function PlatformRevenueOverview() {
 
   const fetchMetrics = async () => {
     try {
+      // REVENUE FILTER: Only include finalized payments where payment_status = 'paid'.
+      // This excludes unpaid, pending, and incomplete payment intents from revenue totals.
+      // Gross revenue is derived from payment_amount_cents (authoritative cents field).
       const { data: jobs, error } = await supabase
         .from('jobs')
         .select(`
-          price,
+          payment_amount_cents,
           payout_amount,
-          status,
-          payment_status
+          status
         `)
-        .eq('status', 'completed')
         .eq('payment_status', 'paid')
+
 
       if (error) throw error
       if (!jobs || jobs.length === 0) {
@@ -49,16 +51,19 @@ export function PlatformRevenueOverview() {
         return
       }
 
+
+
       const calculated = jobs.reduce(
         (acc, job) => {
-          const price = job.price || 0
-          const payout = job.payout_amount || 0
-          const commission = price - payout
-          const stripeFee = price * 0.029 + 0.30
+          // Gross revenue from authoritative payment_amount_cents field
+          const grossFromJob = (job.payment_amount_cents || 0) / 100
+          const payout = Number(job.payout_amount) || 0
+          const commission = grossFromJob - payout
+          const stripeFee = grossFromJob * 0.029 + 0.30
           const net = commission - stripeFee
 
           return {
-            grossRevenue: acc.grossRevenue + price,
+            grossRevenue: acc.grossRevenue + grossFromJob,
             platformCommission: acc.platformCommission + commission,
             platformNet: acc.platformNet + Math.max(0, net),
             stripeFees: acc.stripeFees + stripeFee,
@@ -75,6 +80,7 @@ export function PlatformRevenueOverview() {
           jobCount: 0
         }
       )
+
 
       setMetrics({
         ...calculated,

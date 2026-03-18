@@ -33,9 +33,12 @@ interface Job {
   landscaper_email?: string | null;
   customer_name?: string;
   created_at: string;
-  /** Populated on-demand when a job is selected for review */
+  /** Relational photos loaded via job_photos(*) join */
+  job_photos?: JobPhoto[];
+  /** Populated on-demand when a job is selected for review (legacy fallback) */
   photos?: JobPhoto[];
 }
+
 
 /* ----------------------------------------
    Component
@@ -71,13 +74,24 @@ export function AdminJobsPanel() {
           landscaper_id,
           landscaper_email,
           customer_name,
-          created_at
+          created_at,
+          job_photos (
+            id,
+            job_id,
+            file_url,
+            type,
+            uploaded_at,
+            uploaded_by,
+            metadata,
+            caption,
+            sort_order
+          )
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      setJobs(data || []);
+      setJobs((data as Job[]) || []);
     } catch (err) {
       console.error('Error loading jobs:', err);
       setError('Failed to load jobs');
@@ -85,6 +99,7 @@ export function AdminJobsPanel() {
       setLoading(false);
     }
   };
+
 
   // Initial load only — NO realtime inside this effect
   useEffect(() => {
@@ -106,18 +121,17 @@ export function AdminJobsPanel() {
       if (table === 'jobs') {
         jobPatcher(eventType, newRow, oldRow);
         // If the currently-selected job was updated, merge but PRESERVE photos
-        // (realtime events from `jobs` table never carry photos)
         if (eventType === 'UPDATE' && newRow?.id && selectedJob?.id === newRow.id) {
           setSelectedJob(prev => {
             if (!prev) return null;
-            return { ...prev, ...newRow, photos: prev.photos };
+            return { ...prev, ...newRow, photos: prev.photos, job_photos: prev.job_photos };
           });
         }
       }
     }, [jobPatcher, selectedJob?.id]),
   });
 
-  /* ── Fetch photos on-demand for a single job ──────────────────────── */
+  /* ── Fetch photos on-demand for a single job (fallback) ──────────── */
 
   const fetchJobPhotos = useCallback(async (jobId: string): Promise<JobPhoto[]> => {
     const { data, error } = await supabase
@@ -138,30 +152,40 @@ export function AdminJobsPanel() {
 
   const handleJobClick = useCallback(async (job: any) => {
     if (job.status === 'completed_pending_review' || job.status === 'pending_review') {
-      setPhotosLoading(true);
-      setSelectedJob({ ...(job as Job), photos: undefined });
+      const typedJob = job as Job;
 
-      try {
-        const photos = await fetchJobPhotos(job.id);
-        setSelectedJob(prev => prev ? { ...prev, photos } : null);
-      } catch (err) {
-        console.error('[AdminJobsPanel] Photo fetch error:', err);
-        // Still show the panel — photos will be empty
-        setSelectedJob(prev => prev ? { ...prev, photos: [] } : null);
-      } finally {
+      const relationalPhotos: JobPhoto[] | undefined = typedJob.job_photos;
+      const hasRelationalPhotos = Array.isArray(relationalPhotos) && relationalPhotos.length > 0;
+
+      if (hasRelationalPhotos) {
+        setSelectedJob({ ...typedJob, photos: relationalPhotos });
         setPhotosLoading(false);
+      } else {
+        setPhotosLoading(true);
+        setSelectedJob({ ...typedJob, photos: undefined });
+
+        try {
+          const photos = await fetchJobPhotos(typedJob.id);
+          setSelectedJob(prev => prev ? { ...prev, photos, job_photos: photos } : null);
+        } catch (err) {
+          console.error('[AdminJobsPanel] Photo fetch error:', err);
+          setSelectedJob(prev => prev ? { ...prev, photos: [], job_photos: [] } : null);
+        } finally {
+          setPhotosLoading(false);
+        }
       }
     }
   }, [fetchJobPhotos]);
 
+
   const handleReviewActionComplete = useCallback((_jobId: string, _newStatus: string) => {
-    // Realtime will patch the array automatically; just close the panel
     setSelectedJob(null);
+    loadJobs();
   }, []);
+
 
   /* ----------------------------------------
      Derived Data — uses deriveAdminBucket()
-     from the canonical lifecycle contract
   ---------------------------------------- */
 
   const jobsWithLifecycle = jobs.map(job => ({
@@ -254,7 +278,7 @@ export function AdminJobsPanel() {
   ---------------------------------------- */
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full min-w-0">
       <AdminCompactFilters
         filters={filters}
         onClearAll={() => setLifecycleFilter('all')}
@@ -285,20 +309,23 @@ export function AdminJobsPanel() {
             job={selectedJob}
             onClose={() => setSelectedJob(null)}
             onActionComplete={handleReviewActionComplete}
+            onRefresh={loadJobs}
           />
+
         </div>
       )}
 
-      <Card className="bg-black/40 backdrop-blur border border-emerald-500/20">
-        <CardContent className="p-4">
+      <Card className="bg-black/40 backdrop-blur border border-emerald-500/20 w-full min-w-0">
+        <CardContent className="p-3 sm:p-4">
           <div className="flex items-center gap-2 mb-4">
-            <Briefcase className="w-5 h-5 text-emerald-400" />
+            <Briefcase className="w-5 h-5 text-emerald-400 flex-shrink-0" />
             <span className="text-white font-medium">
               Jobs ({filteredJobs.length})
             </span>
           </div>
 
-          <AdminJobsTable jobs={filteredJobs} onJobClick={handleJobClick} />
+          <AdminJobsTable jobs={filteredJobs} onJobClick={handleJobClick} onJobUpdated={loadJobs} />
+
         </CardContent>
       </Card>
     </div>

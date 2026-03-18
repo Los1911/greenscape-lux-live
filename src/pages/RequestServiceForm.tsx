@@ -667,7 +667,8 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
       <LayoutWrapper>
         <AnimatedBackground />
         {/* Mobile: 100dvh for iOS Safari | Desktop: 100vh for stability */}
-        <div className="flex items-center justify-center min-h-[100dvh] md:min-h-screen bg-gray-950">
+        <div className="relative z-10 flex items-center justify-center min-h-[100dvh] md:min-h-screen bg-gray-950">
+
           <div className="flex flex-col items-center gap-4">
             <RefreshCw className="h-8 w-8 text-emerald-400 animate-spin" />
             <p className="text-gray-400">Loading...</p>
@@ -682,7 +683,8 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
       <LayoutWrapper>
         <AnimatedBackground />
         {/* Mobile: 100dvh for iOS Safari | Desktop: 100vh for stability */}
-        <div className="flex items-center justify-center min-h-[100dvh] md:min-h-screen bg-gray-950">
+        <div className="relative z-10 flex items-center justify-center min-h-[100dvh] md:min-h-screen bg-gray-950">
+
           <div className="flex flex-col items-center gap-4">
             <RefreshCw className="h-8 w-8 text-emerald-400 animate-spin" />
             <p className="text-gray-400">
@@ -714,7 +716,8 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
         w-full and max-w-full prevent iOS auto-reflow issues
       */}
       <div className={cn(
-        "flex flex-col w-full max-w-full items-center px-4",
+        "relative z-10 flex flex-col w-full max-w-full items-center px-4",
+
         // Mobile: 100dvh for iOS Safari | Desktop: 100vh for stability
         "min-h-[100dvh] md:min-h-screen",
         // On mobile: align to top with padding; on desktop: center vertically

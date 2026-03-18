@@ -12,7 +12,11 @@ export function EnvironmentVariablesDashboard() {
   const [alerts, setAlerts] = useState<SyncAlert[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [lastCheck, setLastCheck] = useState<Date>(new Date());
-  const [syncResult, setSyncResult] = useState<{ success: boolean; synced: number; errors: string[] } | null>(null);
+  const [syncResult, setSyncResult] = useState<{
+    success: boolean;
+    synced: number;
+    errors: string[];
+  } | null>(null);
   const [syncService] = useState(() => new AutomatedEnvSyncService());
 
   useEffect(() => {
@@ -21,7 +25,9 @@ export function EnvironmentVariablesDashboard() {
 
     loadAlerts();
     syncService.startAutomatedSync();
-    return () => { syncService.stopAutomatedSync(); };
+    return () => {
+      syncService.stopAutomatedSync();
+    };
   }, [authLoading, user, syncService]);
 
   const loadAlerts = async () => {
@@ -51,66 +57,173 @@ export function EnvironmentVariablesDashboard() {
 
   const getAlertIcon = (type: string) => {
     switch (type) {
-      case 'missing': return <XCircle className="w-5 h-5 text-red-500" />;
-      case 'outdated': return <Clock className="w-5 h-5 text-yellow-500" />;
-      case 'error': return <AlertTriangle className="w-5 h-5 text-orange-500" />;
-      default: return <AlertTriangle className="w-5 h-5 text-gray-500" />;
+      case 'missing':
+        return <XCircle className="w-5 h-5 text-red-500 shrink-0" />;
+      case 'outdated':
+        return <Clock className="w-5 h-5 text-yellow-500 shrink-0" />;
+      case 'error':
+        return <AlertTriangle className="w-5 h-5 text-orange-500 shrink-0" />;
+      default:
+        return <AlertTriangle className="w-5 h-5 text-gray-500 shrink-0" />;
     }
   };
 
   if (authLoading) {
-    return <div className="flex items-center justify-center min-h-[400px]"><RefreshCw className="h-8 w-8 animate-spin" /></div>;
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <RefreshCw className="h-8 w-8 animate-spin text-emerald-400" />
+      </div>
+    );
   }
 
   if (!user) {
-    return <Card><CardContent className="pt-6 text-center text-gray-500">Please sign in to manage environment variables.</CardContent></Card>;
+    return (
+      <Card>
+        <CardContent className="pt-6 text-center text-gray-500">
+          Please sign in to manage environment variables.
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold">Environment Variables</h2>
-          <p className="text-sm text-muted-foreground mt-1">Last check: {lastCheck.toLocaleTimeString()}</p>
+    <div className="space-y-4 sm:space-y-6 w-full min-w-0">
+
+      {/* Header — stacked on mobile, row on sm+ */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white truncate">
+            Environment Variables
+          </h2>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            Last check: {lastCheck.toLocaleTimeString()}
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleHealthCheck}><RefreshCw className="w-4 h-4 mr-2" />Check Status</Button>
-          <Button onClick={handleSyncAll} disabled={syncing}><RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />{syncing ? 'Syncing...' : 'Sync All'}</Button>
+
+        {/* Buttons — full-width stacked on mobile, inline on sm+ */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-2 sm:shrink-0">
+          <Button
+            variant="outline"
+            onClick={handleHealthCheck}
+            className="w-full sm:w-auto h-10"
+          >
+            <RefreshCw className="w-4 h-4 mr-2 shrink-0" />
+            Check Status
+          </Button>
+          <Button
+            onClick={handleSyncAll}
+            disabled={syncing}
+            className="w-full sm:w-auto h-10"
+          >
+            <RefreshCw
+              className={`w-4 h-4 mr-2 shrink-0 ${syncing ? 'animate-spin' : ''}`}
+            />
+            {syncing ? 'Syncing...' : 'Sync All'}
+          </Button>
         </div>
       </div>
 
+      {/* Sync result alert */}
       {syncResult && (
         <Alert variant={syncResult.success ? 'default' : 'destructive'}>
-          {syncResult.success ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-          <AlertTitle>{syncResult.success ? 'Sync Completed' : 'Sync Completed with Errors'}</AlertTitle>
-          <AlertDescription>{syncResult.success ? `Synced ${syncResult.synced} variables.` : <><p>Synced {syncResult.synced} variables.</p><ul className="mt-2 list-disc list-inside">{syncResult.errors.map((e, i) => <li key={i} className="text-sm">{e}</li>)}</ul></>}</AlertDescription>
+          {syncResult.success ? (
+            <CheckCircle2 className="h-4 w-4" />
+          ) : (
+            <AlertTriangle className="h-4 w-4" />
+          )}
+          <AlertTitle>
+            {syncResult.success
+              ? 'Sync Completed'
+              : 'Sync Completed with Errors'}
+          </AlertTitle>
+          <AlertDescription>
+            {syncResult.success ? (
+              `Synced ${syncResult.synced} variables.`
+            ) : (
+              <>
+                <p>Synced {syncResult.synced} variables.</p>
+                <ul className="mt-2 list-disc list-inside">
+                  {syncResult.errors.map((e, i) => (
+                    <li key={i} className="text-sm break-words">
+                      {e}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </AlertDescription>
         </Alert>
       )}
 
-      <div className="grid gap-4">
+      {/* Alerts list */}
+      <div className="grid gap-3 sm:gap-4">
         {alerts.length === 0 ? (
-          <Card><CardContent className="pt-6"><div className="flex items-center gap-2 text-green-600"><CheckCircle2 className="w-5 h-5" /><span>All environment variables are properly configured</span></div></CardContent></Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-green-600">
+                <CheckCircle2 className="w-5 h-5 shrink-0" />
+                <span className="text-sm sm:text-base">
+                  All environment variables are properly configured
+                </span>
+              </div>
+            </CardContent>
+          </Card>
         ) : (
           alerts.map((alert) => (
-            <Alert key={alert.id} variant={alert.type === 'missing' || alert.type === 'error' ? 'destructive' : 'default'}>
+            <Alert
+              key={alert.id}
+              variant={
+                alert.type === 'missing' || alert.type === 'error'
+                  ? 'destructive'
+                  : 'default'
+              }
+            >
               {getAlertIcon(alert.type)}
-              <AlertTitle className="flex items-center gap-2"><Badge variant="outline">{alert.platform}</Badge><span>{alert.variable}</span></AlertTitle>
-              <AlertDescription>{alert.message}<p className="text-xs mt-1 opacity-70">{new Date(alert.timestamp).toLocaleString()}</p></AlertDescription>
+              <AlertTitle className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+                <Badge variant="outline" className="w-fit">
+                  {alert.platform}
+                </Badge>
+                <span className="truncate">{alert.variable}</span>
+              </AlertTitle>
+              <AlertDescription>
+                <span className="break-words">{alert.message}</span>
+                <p className="text-xs mt-1 opacity-70">
+                  {new Date(alert.timestamp).toLocaleString()}
+                </p>
+              </AlertDescription>
             </Alert>
           ))
         )}
       </div>
 
-      <Card><CardHeader><CardTitle>Platform Status</CardTitle></CardHeader><CardContent>
-        <div className="grid gap-4 md:grid-cols-3">
-          {['DeployPad', 'Vercel', 'GitHub Actions'].map((platform) => (
-            <div key={platform} className="flex items-center justify-between p-4 border rounded-lg">
-              <span className="font-medium">{platform}</span>
-              <Badge variant="outline">{alerts.some(a => a.platform?.toLowerCase() === platform.toLowerCase()) ? 'Issues' : 'OK'}</Badge>
-            </div>
-          ))}
-        </div>
-      </CardContent></Card>
+      {/* Platform Status — grid-cols-1 on mobile, 3 on md+ */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base sm:text-lg">Platform Status</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+            {['DeployPad', 'Vercel', 'GitHub Actions'].map((platform) => (
+              <div
+                key={platform}
+                className="flex items-center justify-between p-3 sm:p-4 border rounded-lg min-w-0"
+              >
+                <span className="font-medium text-sm sm:text-base truncate mr-2">
+                  {platform}
+                </span>
+                <Badge variant="outline" className="shrink-0">
+                  {alerts.some(
+                    (a) =>
+                      a.platform?.toLowerCase() === platform.toLowerCase()
+                  )
+                    ? 'Issues'
+                    : 'OK'}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

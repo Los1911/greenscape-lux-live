@@ -44,8 +44,8 @@ export function AdminStatCard({
     <Card 
       className={`
         bg-black/60 backdrop-blur ${borderColor}
-        h-full min-h-[120px]
-        flex flex-col
+        h-full min-h-[100px] sm:min-h-[120px]
+        flex flex-col w-full min-w-0
         ${isClickable ? 'cursor-pointer hover:bg-emerald-500/5 hover:border-emerald-500/40 transition-all duration-200' : ''}
       `}
       onClick={onClick}
@@ -53,31 +53,31 @@ export function AdminStatCard({
       tabIndex={isClickable ? 0 : undefined}
       onKeyDown={isClickable ? (e) => e.key === 'Enter' && onClick?.() : undefined}
     >
-      <CardHeader className="flex flex-row items-center justify-between pb-2 flex-shrink-0">
-        <CardTitle className="text-xs sm:text-sm font-medium text-white truncate pr-2">
+      <CardHeader className="flex flex-row items-center justify-between pb-1 sm:pb-2 px-3 sm:px-4 pt-3 sm:pt-4 flex-shrink-0">
+        <CardTitle className="text-[11px] sm:text-xs md:text-sm font-medium text-white truncate pr-2">
           {title}
         </CardTitle>
-        <Icon className={`h-4 w-4 flex-shrink-0 ${iconColor}`} />
+        <Icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0 ${iconColor}`} />
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col justify-center">
-        <div className={`text-xl sm:text-2xl font-bold ${valueColor} truncate`}>
+      <CardContent className="flex-1 flex flex-col justify-center px-3 sm:px-4 pb-3 sm:pb-4">
+        <div className={`text-lg sm:text-xl md:text-2xl font-bold ${valueColor} truncate`}>
           {typeof value === 'number' ? value.toLocaleString() : value}
         </div>
         
         {/* Trend indicator */}
         {trend && (
-          <div className={`text-xs mt-1 flex items-center gap-1 ${
+          <div className={`text-[10px] sm:text-xs mt-1 flex items-center gap-1 ${
             trend.isPositive ? 'text-green-400' : 'text-red-400'
           }`}>
             <span>{trend.isPositive ? '↑' : '↓'}</span>
             <span>{Math.abs(trend.value)}%</span>
-            <span className="text-emerald-300/50">vs last period</span>
+            <span className="text-emerald-300/50 hidden sm:inline">vs last period</span>
           </div>
         )}
         
         {/* Subtitle */}
         {subtitle && (
-          <div className="text-xs text-emerald-300/60 mt-1 truncate">
+          <div className="text-[10px] sm:text-xs text-emerald-300/60 mt-1 truncate">
             {subtitle}
           </div>
         )}

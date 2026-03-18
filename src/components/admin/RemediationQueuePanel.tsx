@@ -112,7 +112,6 @@ export default function RemediationQueuePanel() {
           break;
       }
 
-      // Update job
       const { error: updateError } = await supabase
         .from('jobs')
         .update(updates)
@@ -120,7 +119,6 @@ export default function RemediationQueuePanel() {
 
       if (updateError) throw updateError;
 
-      // Log the action
       await supabase.from('remediation_logs').insert({
         job_id: selectedJob.id,
         landscaper_id: selectedJob.landscaper_id,
@@ -170,16 +168,16 @@ export default function RemediationQueuePanel() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 w-full min-w-0">
       {/* Header */}
-      <Card className="bg-slate-900 border-slate-700">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold text-white flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-400" />
-              Remediation Queue
+      <Card className="bg-slate-900 border-slate-700 w-full min-w-0">
+        <CardHeader className="pb-4 px-3 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardTitle className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0" />
+              <span className="truncate">Remediation Queue</span>
             </CardTitle>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
               <Badge className="bg-slate-800 text-slate-300 border-slate-600">
                 {flaggedJobs.length} Active
               </Badge>
@@ -190,7 +188,7 @@ export default function RemediationQueuePanel() {
                 className="border-emerald-500/30 text-emerald-300"
               >
                 <RefreshCw className="h-4 w-4 mr-1" />
-                Refresh
+                <span className="hidden sm:inline">Refresh</span>
               </Button>
             </div>
           </div>
@@ -212,21 +210,21 @@ export default function RemediationQueuePanel() {
             const hoursRemaining = getHoursRemaining(job);
             
             return (
-              <Card key={job.id} className="bg-slate-900 border-slate-700 overflow-hidden">
+              <Card key={job.id} className="bg-slate-900 border-slate-700 overflow-hidden w-full min-w-0">
                 <CardContent className="p-0">
                   <div className="flex flex-col lg:flex-row">
                     {/* Left: Job Info */}
-                    <div className="flex-1 p-4 lg:p-6 space-y-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold text-white">
+                    <div className="flex-1 p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-semibold text-white truncate">
                             {job.service_name || job.service_type || 'Landscaping Service'}
                           </h3>
-                          <p className="text-sm text-slate-400 mt-1">
+                          <p className="text-xs sm:text-sm text-slate-400 mt-1">
                             Job #{job.id.slice(0, 8)}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 flex-wrap justify-end">
                           {getUrgencyBadge(hoursRemaining)}
                           {job.weather_extension_hours && job.weather_extension_hours > 0 && (
                             <Badge className="bg-blue-900/40 text-blue-300 border-blue-500/40">
@@ -238,22 +236,22 @@ export default function RemediationQueuePanel() {
                       </div>
 
                       {/* Details Grid */}
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                        <div className="flex items-center gap-2 text-slate-300">
-                          <User className="h-4 w-4 text-slate-500" />
-                          <span>{job.customer_name}</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 text-sm">
+                        <div className="flex items-center gap-2 text-slate-300 min-w-0">
+                          <User className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                          <span className="truncate">{job.customer_name}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-slate-300">
-                          <MapPin className="h-4 w-4 text-slate-500" />
+                        <div className="flex items-center gap-2 text-slate-300 min-w-0">
+                          <MapPin className="h-4 w-4 text-slate-500 flex-shrink-0" />
                           <span className="truncate">{job.service_address || 'No address'}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-slate-300">
-                          <DollarSign className="h-4 w-4 text-slate-500" />
+                        <div className="flex items-center gap-2 text-slate-300 min-w-0">
+                          <DollarSign className="h-4 w-4 text-slate-500 flex-shrink-0" />
                           <span>${job.price || 0}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-slate-300">
-                          <Calendar className="h-4 w-4 text-slate-500" />
-                          <span>
+                        <div className="flex items-center gap-2 text-slate-300 min-w-0">
+                          <Calendar className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                          <span className="truncate">
                             {job.preferred_date 
                               ? new Date(job.preferred_date).toLocaleDateString() 
                               : 'No date'}
@@ -262,35 +260,37 @@ export default function RemediationQueuePanel() {
                       </div>
 
                       {/* Landscaper Info */}
-                      <div className="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg">
-                        <div className="flex-1">
-                          <p className="text-sm text-slate-400">Assigned Landscaper</p>
-                          <p className="font-medium text-white">
+                      <div className="flex items-center gap-3 sm:gap-4 p-2 sm:p-3 bg-slate-800/50 rounded-lg">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs sm:text-sm text-slate-400">Assigned Landscaper</p>
+                          <p className="font-medium text-white truncate">
                             {job.landscaper_first_name} {job.landscaper_last_name}
                           </p>
-                          <p className="text-xs text-slate-500">{job.ls_email}</p>
+                          <p className="text-xs text-slate-500 truncate">{job.ls_email}</p>
                         </div>
                         {job.landscaper_tier && (
-                          <TierBadge tier={job.landscaper_tier} size="sm" />
+                          <div className="flex-shrink-0">
+                            <TierBadge tier={job.landscaper_tier} size="sm" />
+                          </div>
                         )}
                       </div>
 
                       {/* Flag Reason */}
                       {job.flagged_reason && (
-                        <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
-                          <p className="text-sm font-medium text-red-300 mb-1">Flag Reason</p>
-                          <p className="text-sm text-slate-300">{job.flagged_reason}</p>
+                        <div className="p-2 sm:p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
+                          <p className="text-xs sm:text-sm font-medium text-red-300 mb-1">Flag Reason</p>
+                          <p className="text-xs sm:text-sm text-slate-300 break-words">{job.flagged_reason}</p>
                         </div>
                       )}
                     </div>
 
                     {/* Right: Timer & Actions */}
-                    <div className="lg:w-64 p-4 lg:p-6 bg-slate-800/30 border-t lg:border-t-0 lg:border-l border-slate-700 flex flex-col">
+                    <div className="lg:w-56 xl:w-64 p-3 sm:p-4 lg:p-6 bg-slate-800/30 border-t lg:border-t-0 lg:border-l border-slate-700 flex flex-col">
                       {/* Timer */}
-                      <div className="text-center mb-4">
+                      <div className="text-center mb-3 sm:mb-4">
                         <div className="flex items-center justify-center gap-2 mb-2">
-                          <Clock className={`h-5 w-5 ${hoursRemaining <= 6 ? 'text-red-400' : 'text-amber-400'}`} />
-                          <span className={`text-2xl font-mono font-bold ${
+                          <Clock className={`h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 ${hoursRemaining <= 6 ? 'text-red-400' : 'text-amber-400'}`} />
+                          <span className={`text-xl sm:text-2xl font-mono font-bold ${
                             hoursRemaining <= 0 ? 'text-red-400' :
                             hoursRemaining <= 6 ? 'text-red-300' :
                             hoursRemaining <= 24 ? 'text-amber-300' : 'text-emerald-300'
@@ -303,41 +303,41 @@ export default function RemediationQueuePanel() {
 
                       {/* Status */}
                       {job.remediation_status && (
-                        <div className="text-center mb-4">
+                        <div className="text-center mb-3 sm:mb-4">
                           <Badge className="bg-slate-700 text-slate-300">
                             {job.remediation_status.replace('_', ' ')}
                           </Badge>
                         </div>
                       )}
 
-                      {/* Actions */}
-                      <div className="space-y-2 mt-auto">
+                      {/* Actions — horizontal on mobile when stacked, vertical on desktop sidebar */}
+                      <div className="flex flex-row lg:flex-col gap-2 mt-auto">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="w-full border-blue-500/30 text-blue-300 hover:bg-blue-900/30"
+                          className="flex-1 lg:w-full border-blue-500/30 text-blue-300 hover:bg-blue-900/30 text-xs sm:text-sm"
                           onClick={() => openActionModal(job, 'extend')}
                         >
-                          <CloudRain className="h-4 w-4 mr-2" />
-                          Weather Extension
+                          <CloudRain className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                          <span className="truncate">Weather Ext.</span>
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="w-full border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/30"
+                          className="flex-1 lg:w-full border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/30 text-xs sm:text-sm"
                           onClick={() => openActionModal(job, 'resolve')}
                         >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Resolve
+                          <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                          <span className="truncate">Resolve</span>
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="w-full border-amber-500/30 text-amber-300 hover:bg-amber-900/30"
+                          className="flex-1 lg:w-full border-amber-500/30 text-amber-300 hover:bg-amber-900/30 text-xs sm:text-sm"
                           onClick={() => openActionModal(job, 'escalate')}
                         >
-                          <Shield className="h-4 w-4 mr-2" />
-                          Escalate
+                          <Shield className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                          <span className="truncate">Escalate</span>
                         </Button>
                       </div>
                     </div>
@@ -351,7 +351,7 @@ export default function RemediationQueuePanel() {
 
       {/* Action Modal */}
       <Dialog open={actionModalOpen} onOpenChange={setActionModalOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-[95vw] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-emerald-300">
               {actionType === 'extend' && 'Weather Extension'}
@@ -411,22 +411,22 @@ export default function RemediationQueuePanel() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={() => setActionModalOpen(false)}
-              className="border-slate-600 text-slate-300"
+              className="border-slate-600 text-slate-300 w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button
               onClick={handleAction}
               disabled={processing}
-              className={
+              className={`w-full sm:w-auto ${
                 actionType === 'extend' ? 'bg-blue-600 hover:bg-blue-700' :
                 actionType === 'resolve' ? 'bg-emerald-600 hover:bg-emerald-700' :
                 'bg-amber-600 hover:bg-amber-700'
-              }
+              }`}
             >
               {processing ? 'Processing...' : 'Confirm'}
             </Button>

@@ -8,7 +8,9 @@ import {
   Loader2,
   CreditCard,
   ArrowRight,
+  RefreshCw,
 } from 'lucide-react';
+
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,7 +22,9 @@ interface PricedJob {
   service_type: string;
   price: number;
   created_at: string;
+  payment_status: string; // Track payment state for duplicate prevention
 }
+
 
 // ─── StatCard (module-level, not inline) ──────────────────────
 function StatCard({
@@ -85,6 +89,9 @@ export function LiveDashboardStats() {
   const [pricedLoading, setPricedLoading] = useState(true);
   const [acceptingJobId, setAcceptingJobId] = useState<string | null>(null);
   const [acceptError, setAcceptError] = useState<string | null>(null);
+  // Neutral info banner for 409 "already paid" — auto-clears
+  const [acceptInfo, setAcceptInfo] = useState<string | null>(null);
+
 
   // ── Fetch priced jobs once on mount ─────────────────────────
   const fetchPricedJobs = useCallback(async () => {
@@ -104,7 +111,7 @@ export function LiveDashboardStats() {
 
       const { data, error: qErr } = await supabase
         .from('jobs')
-        .select('id, service_name, service_type, price, created_at')
+        .select('id, service_name, service_type, price, created_at, payment_status')
         .eq('status', 'priced')
         .or(orConditions.join(','))
         .order('created_at', { ascending: false });
@@ -113,13 +120,16 @@ export function LiveDashboardStats() {
         console.warn('[LiveDashboardStats] priced jobs query error:', qErr.message);
         setPricedJobs([]);
       } else {
-        const normalized: PricedJob[] = (data || []).map((j: Record<string, unknown>) => ({
-          id: String(j.id ?? ''),
-          service_name: String(j.service_name ?? j.service_type ?? 'Service'),
-          service_type: String(j.service_type ?? ''),
-          price: Number(j.price) || 0,
-          created_at: String(j.created_at ?? ''),
-        }));
+        const normalized: PricedJob[] = (data || [])
+          .filter((j: Record<string, unknown>) => j.payment_status !== 'paid')
+          .map((j: Record<string, unknown>) => ({
+            id: String(j.id ?? ''),
+            service_name: String(j.service_name ?? j.service_type ?? 'Service'),
+            service_type: String(j.service_type ?? ''),
+            price: Number(j.price) || 0,
+            created_at: String(j.created_at ?? ''),
+            payment_status: String(j.payment_status ?? 'unpaid'),
+          }));
         setPricedJobs(normalized);
       }
     } catch (err) {
@@ -134,78 +144,90 @@ export function LiveDashboardStats() {
     fetchPricedJobs();
   }, [fetchPricedJobs]);
 
+
   // ── Accept estimate handler ─────────────────────────────────
   const handleAcceptEstimate = useCallback(
-    async (job: PricedJob) => {
+    async (jobId: string, jobPrice: number) => {
       if (!user?.id || acceptingJobId) return;
 
-      setAcceptingJobId(job.id);
+      const targetJob = pricedJobs.find(j => j.id === jobId);
+      if (targetJob?.payment_status === 'paid') {
+        setAcceptInfo('Payment already processed — syncing...');
+        setTimeout(() => setAcceptInfo(null), 4000);
+        fetchPricedJobs();
+        return;
+      }
+
+      console.log('[LiveDashboardStats] ACCEPT_CLICK job_id:', jobId, 'payment_status:', targetJob?.payment_status);
+
+      setAcceptingJobId(jobId);
       setAcceptError(null);
+      setAcceptInfo(null);
 
       try {
-        // Step 1: Update job status to 'assigned' (client-side via RLS)
-        const { data: updatedRows, error: updateErr } = await supabase
-          .from('jobs')
-          .update({ status: 'assigned', updated_at: new Date().toISOString() })
-
-          .eq('id', job.id)
-          .eq('status', 'priced')
-          .select('id');
-
-        if (updateErr) {
-          throw new Error('Failed to accept estimate: ' + updateErr.message);
-        }
-
-        if (!updatedRows || updatedRows.length === 0) {
-          throw new Error(
-            'Could not update job status. The estimate may have already been accepted or the job is no longer available.'
-          );
-        }
-
-        console.log('[LiveDashboardStats] Job', job.id, 'status → assigned');
-
-
-        // Step 2: Call edge function to create Stripe Checkout Session
         const { data: fnData, error: fnErr } = await supabase.functions.invoke(
           'create-checkout-session',
           {
             body: {
-              job_id: job.id,
-              price: job.price,
+              job_id: jobId,
+              price: jobPrice,
               client_user_id: user.id,
             },
           }
         );
 
         if (fnErr) {
+          // ── 409 Conflict = already paid / duplicate attempt ──
+          const httpStatus = (fnErr as any)?.context?.status;
+          if (httpStatus === 409) {
+            console.log('[LiveDashboardStats] 409 Conflict — payment already processed for job', jobId);
+            setPricedJobs(prev => prev.filter(j => j.id !== jobId));
+            setAcceptInfo('Payment already processed — syncing...');
+            setTimeout(() => setAcceptInfo(null), 4000);
+            setAcceptingJobId(null);
+            fetchPricedJobs().catch(() => {});
+            return;
+          }
           throw new Error('Checkout session error: ' + fnErr.message);
         }
 
         const parsed = typeof fnData === 'string' ? JSON.parse(fnData) : fnData;
 
         if (!parsed?.success || !parsed?.url) {
-          // Revert status on failure
-          await supabase
-            .from('jobs')
-            .update({ status: 'priced', updated_at: new Date().toISOString() })
-            .eq('id', job.id);
-
+          if (parsed?.error?.includes('already been paid') || parsed?.error?.includes('not available')) {
+            console.log('[LiveDashboardStats] Backend confirmed already paid — refetching');
+            setPricedJobs(prev => prev.filter(j => j.id !== jobId));
+            setAcceptInfo('Payment already processed — syncing...');
+            setTimeout(() => setAcceptInfo(null), 4000);
+            setAcceptingJobId(null);
+            fetchPricedJobs().catch(() => {});
+            return;
+          }
           throw new Error(parsed?.error || 'No checkout URL returned');
         }
 
-        console.log('[LiveDashboardStats] Redirecting to Stripe Checkout:', parsed.url);
-
-        // Step 3: Redirect to Stripe Checkout
+        console.log('[LiveDashboardStats] Redirecting to Stripe Checkout for job', jobId);
         window.location.href = parsed.url;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Unknown error';
-        console.error('[LiveDashboardStats] acceptEstimate error:', message);
-        setAcceptError(message);
+        console.error('[LiveDashboardStats] acceptEstimate error for job', jobId, ':', message);
+        if (message.includes('already been paid') || message.includes('not available for payment')) {
+          setPricedJobs(prev => prev.filter(j => j.id !== jobId));
+          setAcceptInfo('Payment already processed — syncing...');
+          setTimeout(() => setAcceptInfo(null), 4000);
+          fetchPricedJobs().catch(() => {});
+        } else {
+          setAcceptError(message);
+        }
         setAcceptingJobId(null);
       }
     },
-    [user?.id, acceptingJobId]
+    [user?.id, acceptingJobId, pricedJobs, fetchPricedJobs]
   );
+
+
+
+
 
   // ── Loading skeleton ────────────────────────────────────────
   if (loading) {
@@ -312,8 +334,9 @@ export function LiveDashboardStats() {
                   </div>
 
                   <button
-                    onClick={() => handleAcceptEstimate(job)}
+                    onClick={() => handleAcceptEstimate(job.id, job.price)}
                     disabled={isAccepting || !!acceptingJobId}
+
                     className={`
                       flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold
                       transition-all duration-200 shrink-0

@@ -179,18 +179,17 @@ export default function UnifiedAuthPage() {
 
   return (
     <div 
-      className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 flex flex-col relative overflow-hidden"
+      className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 flex flex-col relative overflow-hidden w-full"
       style={{
         minHeight: '100dvh',
-        minHeight: '100svh',
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)'
       }}
     >
-      {/* Background effects */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none">
+      {/* Decorative background — absolute inset-0 z-0 pointer-events-none */}
+      <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-emerald-400 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
@@ -198,31 +197,36 @@ export default function UnifiedAuthPage() {
       {/* Back to home link */}
       <Link 
         to="/" 
-        className="absolute top-6 left-6 text-emerald-400 hover:text-emerald-300 transition-colors z-20"
+        className="relative z-20 text-emerald-400 hover:text-emerald-300 transition-colors ml-6 mt-6"
         style={{
-          top: 'max(1.5rem, env(safe-area-inset-top))',
-          left: 'max(1.5rem, env(safe-area-inset-left))'
+          marginTop: 'max(1.5rem, env(safe-area-inset-top))',
+          marginLeft: 'max(1.5rem, env(safe-area-inset-left))'
         }}
       >
         ← Back to Home
       </Link>
       
-      {/* Main content - flexbox centered */}
+      {/* Main content — relative z-10, flexbox centered */}
       <div 
-        className="flex-1 flex items-center justify-center px-4 py-6"
+        className="relative z-10 flex-1 flex items-center justify-center px-4 py-6"
         style={{
-          paddingTop: 'max(4rem, env(safe-area-inset-top))',
+          paddingTop: 'max(1rem, env(safe-area-inset-top))',
           paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))'
         }}
       >
-        <Card className="w-full max-w-md bg-slate-800/80 backdrop-blur-sm border-emerald-500/20 shadow-2xl shadow-emerald-500/10">
-          <CardHeader className="text-center">
+        {/* Card — relative z-10, opaque bg, w-full max-w-md mx-auto */}
+        <Card className="relative z-10 w-full max-w-md mx-auto bg-slate-800 border-emerald-500/20 shadow-2xl shadow-emerald-500/10">
+          {/* Inner glow overlay */}
+          <div className="absolute inset-0 rounded-lg bg-gradient-to-b from-emerald-500/[0.03] to-transparent pointer-events-none" />
+
+          <CardHeader className="text-center relative">
             <CardTitle className="text-2xl font-bold text-white">GreenScape Lux</CardTitle>
             <p className="text-slate-400">Premium Landscaping Services</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="relative">
             <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-slate-700">
+              <TabsList className="flex flex-row w-full bg-slate-700">
+
                 <TabsTrigger value="login" className="data-[state=active]:bg-emerald-600">Login</TabsTrigger>
                 <TabsTrigger value="signup" className="data-[state=active]:bg-emerald-600">Sign Up</TabsTrigger>
                 <TabsTrigger value="reset" className="data-[state=active]:bg-emerald-600">Reset</TabsTrigger>

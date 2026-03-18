@@ -39,6 +39,11 @@ export interface Job {
   created_at: string;          // ISO timestamp
   updated_at: string;          // ISO timestamp
   
+  // Payment lifecycle fields (from jobs table)
+  payment_status?: string | null;    // 'unpaid' | 'pending' | 'paid'
+  payout_status?: string | null;     // 'unpaid' | 'ready_for_release' | 'paid'
+  stripe_session_id?: string | null;
+  
   // Remediation fields
   flagged_at?: string | null;
   flagged_reason?: string | null;
@@ -54,6 +59,7 @@ export interface Job {
   // Landscaper reference
   landscaper_id?: string | null;
 }
+
 
 /**
  * Type for inserting new jobs (omits auto-generated fields)

@@ -43,24 +43,28 @@ export async function ensureLandscaperProfile(profileData: LandscaperProfileData
 
     console.log('✅ Users record created/updated');
 
-    // 2. Create landscaper profile - CRITICAL: Set both id AND user_id
-    // NOTE: email, first_name, last_name, phone, status columns may NOT exist in landscapers table
-    // Only include columns that are known to exist in the actual database schema
+    // 2. Create landscaper profile
+    // CRITICAL: Include all NOT NULL columns (first_name, last_name, email)
+    // and use user_id for conflict resolution (has UNIQUE constraint)
     const { data: landscaper, error: landscaperError } = await supabase
       .from('landscapers')
       .upsert({
-        id: user.id,
-        user_id: user.id,  // CRITICAL: This field is used for lookups
+        user_id: user.id,
+        first_name: profileData.first_name || '',
+        last_name: profileData.last_name || '',
+        email: profileData.email || user.email || '',
+        phone: profileData.phone || null,
         business_name: `${profileData.first_name} ${profileData.last_name}`.trim() || null,
         approved: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }, { 
-        onConflict: 'id',
+        onConflict: 'user_id',
         ignoreDuplicates: false 
       })
       .select()
       .single();
+
 
 
     if (landscaperError) {
@@ -92,8 +96,9 @@ export async function fetchLandscaperProfile(emailOrUserId?: string) {
     console.log('📧 User Email:', user.email);
     
     // Query by user_id - use maybeSingle() to prevent PGRST116 errors
-    // NOTE: email column does NOT exist in landscapers table - only query by user_id
+    // The landscapers table has email as a column but user_id is the canonical lookup key
     const { data: landscaperByUserId, error: userIdError } = await supabase
+
       .from('landscapers')
       .select('*')
       .eq('user_id', user.id)
@@ -108,8 +113,8 @@ export async function fetchLandscaperProfile(emailOrUserId?: string) {
       return landscaperByUserId;
     }
     
-    // NOTE: email column does NOT exist in landscapers table
-    // Cannot search by email - only user_id works
+    // Fallback: user_id lookup returned nothing
+
     console.warn('⚠️ No landscaper profile found for user_id:', user.id);
     return null;
   } catch (error) {

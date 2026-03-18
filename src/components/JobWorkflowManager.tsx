@@ -24,11 +24,13 @@ const JobWorkflowManager: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // OWNERSHIP MODEL: assigned_to is the ONLY authoritative ownership filter.
       const { data, error } = await supabase
         .from('jobs')
-        .select('id, service_name, service_type, service_address, status, landscaper_id, created_at, price, customer_name, preferred_date')
-        .eq('landscaper_id', user.id)
+        .select('id, service_name, service_type, service_address, status, landscaper_id, assigned_to, created_at, price, customer_name, preferred_date')
+        .eq('assigned_to', user.id)
         .order('created_at', { ascending: false });
+
 
 
 

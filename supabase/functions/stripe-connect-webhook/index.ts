@@ -4,8 +4,9 @@ import Stripe from 'https://esm.sh/stripe@14.0.0'
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature'
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name, stripe-signature'
 }
+
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, { apiVersion: '2023-10-16' })
 const supabase = createClient(

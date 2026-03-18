@@ -109,22 +109,29 @@ export default function AdminLogin() {
 
   return (
     <div 
-      className="bg-black relative overflow-hidden flex flex-col min-h-screen"
+      className="bg-black relative flex flex-col min-h-screen"
       style={{
         minHeight: '100dvh',
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
-        paddingRight: 'env(safe-area-inset-right)'
+        paddingRight: 'env(safe-area-inset-right)',
+        /* Stacking context for background/content ordering */
+        isolation: 'isolate' as any,
       }}
     >
-      <AnimatedBackground />
+      {/* Decorative background — scoped overflow-hidden prevents Safari
+          clip-context/stacking-context interaction bugs */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <AnimatedBackground />
+      </div>
       
       <div 
         className="relative z-10 flex-1 flex items-center justify-center px-4 py-6"
         style={{
           paddingTop: 'max(1.5rem, env(safe-area-inset-top))',
-          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))'
+          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
+          transform: 'translateZ(0)',
         }}
       >
         <div className="w-full max-w-md">
@@ -147,8 +154,19 @@ export default function AdminLogin() {
             </p>
           </div>
 
-          {/* Login Card */}
-          <Card className="relative bg-black/80 border-2 border-red-500/30 backdrop-blur-xl shadow-[0_0_40px_rgba(239,68,68,0.3)]">
+          {/* Login Card — COMPOSITING-SAFE for all iPhones:
+              - isolation: isolate → stacking context boundary
+              - transform: translateZ(0) → own GPU compositing layer
+              - !bg-black → fully opaque (replaces bg-black/80)
+              - backdrop-blur removed (invisible behind opaque bg, and a compositing hazard) */}
+          <Card
+            className="relative z-10 !bg-black border-2 border-red-500/30 shadow-[0_0_40px_rgba(239,68,68,0.3)]"
+            style={{
+              isolation: 'isolate' as any,
+              transform: 'translateZ(0)',
+            }}
+          >
+
             <CardHeader className="space-y-6">
               {/* Security Warning */}
               <div className="bg-gradient-to-br from-red-500/10 to-red-600/10 border-2 border-red-500/40 rounded-xl p-4" role="alert">

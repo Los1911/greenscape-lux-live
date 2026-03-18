@@ -63,16 +63,22 @@ export function LandscaperApprovalToggle({
   };
 
   return (
-    <div className="border rounded-lg p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-medium">
+    <div className="border rounded-lg p-4 overflow-hidden">
+      {/* ── Card body ──────────────────────────────────────
+           Mobile (<lg): flex-col stacked
+           Desktop (lg+): flex-row, items-center, justify-between */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+
+        {/* ── Left: Name + email ─────────────────────────── */}
+        <div className="min-w-0">
+          <h3 className="font-medium truncate">
             {landscaper.first_name} {landscaper.last_name}
           </h3>
-          <p className="text-sm text-gray-600">{landscaper.email}</p>
+          <p className="text-sm text-gray-600 truncate">{landscaper.email}</p>
         </div>
-        
-        <div className="flex items-center space-x-2">
+
+        {/* ── Right: Status badge ────────────────────────── */}
+        <div className="flex items-center shrink-0">
           {landscaper.approved ? (
             <Badge className="bg-green-100 text-green-800">
               <CheckCircle className="h-3 w-3 mr-1" />
@@ -87,35 +93,43 @@ export function LandscaperApprovalToggle({
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div className="flex space-x-4 text-sm">
-          <div className="flex items-center">
-            <FileText className="h-4 w-4 mr-1" />
+      {/* ── Documents + Toggle row ─────────────────────────
+           Mobile (<lg): stacked vertically
+           Desktop (lg+): flex-row, items-center, justify-between */}
+      <div className="flex flex-col gap-3 mt-3 lg:flex-row lg:items-center lg:justify-between">
+
+        {/* ── Document status badges ─────────────────────── */}
+        <div className="flex flex-col gap-1 text-sm sm:flex-row sm:gap-4">
+          <div className="flex items-center h-10">
+            <FileText className="h-4 w-4 mr-1 shrink-0" />
             <span className={landscaper.insurance_file ? 'text-green-600' : 'text-red-600'}>
-              Insurance: {landscaper.insurance_file ? '✓' : '✗'}
+              Insurance: {landscaper.insurance_file ? 'Verified' : 'Missing'}
             </span>
           </div>
-          <div className="flex items-center">
-            <FileText className="h-4 w-4 mr-1" />
+          <div className="flex items-center h-10">
+            <FileText className="h-4 w-4 mr-1 shrink-0" />
             <span className={landscaper.license_file ? 'text-green-600' : 'text-red-600'}>
-              License: {landscaper.license_file ? '✓' : '✗'}
+              License: {landscaper.license_file ? 'Verified' : 'Missing'}
             </span>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        {/* ── Toggle + warning ───────────────────────────── */}
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-2 lg:shrink-0">
           {!hasRequiredDocuments && (
-            <div className="flex items-center text-amber-600 text-sm">
-              <AlertCircle className="h-4 w-4 mr-1" />
+            <div className="flex items-center text-amber-600 text-sm h-10">
+              <AlertCircle className="h-4 w-4 mr-1 shrink-0" />
               Missing docs
             </div>
           )}
           
-          <Switch
-            checked={landscaper.approved}
-            onCheckedChange={handleApprovalToggle}
-            disabled={!hasRequiredDocuments || isLoading}
-          />
+          <div className="flex items-center h-10">
+            <Switch
+              checked={landscaper.approved}
+              onCheckedChange={handleApprovalToggle}
+              disabled={!hasRequiredDocuments || isLoading}
+            />
+          </div>
         </div>
       </div>
     </div>

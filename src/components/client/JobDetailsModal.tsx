@@ -328,12 +328,24 @@ function PhotosSection({
   );
 }
 
-// Payment Summary Component — status-driven, no column inference
+// Payment Summary Component — uses both status AND payment_status
 function PaymentSummary({ job }: { job: Job }) {
   if (job.price == null) return null;
   
-  // Derive payment state strictly from job.status — no column checks
+  // Derive payment state from BOTH job.status and job.payment_status.
+  // payment_status is authoritative when available (set by webhook).
+  // Falls back to status-based inference for backward compatibility.
   const getPaymentState = () => {
+    // If payment_status is explicitly 'paid', always show Paid
+    // (covers the gap where status is still 'priced' but payment went through)
+    if (job.payment_status === 'paid') {
+      return { label: 'Paid', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' };
+    }
+    if (job.payment_status === 'pending') {
+      return { label: 'Payment Processing', style: 'bg-blue-500/10 text-blue-400 border-blue-500/30' };
+    }
+    
+    // Fall back to status-based inference
     switch (job.status) {
       case 'priced':
       case 'quoted':
@@ -352,6 +364,7 @@ function PaymentSummary({ job }: { job: Job }) {
         return { label: 'Not Yet Priced', style: 'bg-slate-800/80 text-slate-400 border-slate-600/50' };
     }
   };
+
 
 
   const paymentState = getPaymentState();
@@ -477,27 +490,23 @@ export default function JobDetailsModal({ isOpen, onClose, job, onJobStatusChang
   };
 
   // ── Accept estimate from modal ──────────────────────────────
+  // FIX: Removed pre-checkout status update to 'assigned' which caused a
+  // status mismatch — the edge function expects 'accepted' or 'priced',
+  // not 'assigned'. The edge function now owns the status transition atomically.
   const handleAcceptFromModal = useCallback(async () => {
     if (!job || !user?.id || actionLoading) return;
+
+    // DIAGNOSTIC: log the job_id at click time
+    console.log('ACCEPT_CLICK_JOB_ID', job.id);
 
     setActionLoading(true);
     setActionError(null);
 
     try {
-      const { data: updatedRows, error: updateErr } = await supabase
-        .from('jobs')
-        .update({ status: 'assigned', updated_at: new Date().toISOString() })
+      // DIAGNOSTIC: log the job_id being sent to the edge function
+      console.log('CHECKOUT_SESSION_JOB_ID', job.id);
 
-        .eq('id', job.id)
-        .eq('status', 'priced')
-        .select('id');
-
-      if (updateErr) throw new Error('Failed to accept: ' + updateErr.message);
-      if (!updatedRows || updatedRows.length === 0) {
-        throw new Error('Estimate may have already been actioned.');
-      }
-
-      // Create checkout session
+      // Create checkout session — edge function handles status transition
       const { data: fnData, error: fnErr } = await supabase.functions.invoke(
         'create-checkout-session',
         { body: { job_id: job.id, price: job.price, client_user_id: user.id } }
@@ -508,21 +517,19 @@ export default function JobDetailsModal({ isOpen, onClose, job, onJobStatusChang
       const parsed = typeof fnData === 'string' ? JSON.parse(fnData) : fnData;
 
       if (!parsed?.success || !parsed?.url) {
-        // Revert
-        await supabase
-          .from('jobs')
-          .update({ status: 'priced', updated_at: new Date().toISOString() })
-          .eq('id', job.id);
         throw new Error(parsed?.error || 'No checkout URL returned');
       }
 
+      console.log('[JobDetailsModal] Redirecting to Stripe Checkout for job', job.id);
       window.location.href = parsed.url;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[JobDetailsModal] acceptEstimate error for job', job?.id, ':', message);
       setActionError(message);
       setActionLoading(false);
     }
   }, [job, user?.id, actionLoading]);
+
 
   // ── Reject estimate from modal ──────────────────────────────
   const handleRejectFromModal = useCallback(async () => {
@@ -584,7 +591,11 @@ export default function JobDetailsModal({ isOpen, onClose, job, onJobStatusChang
 
 
   const hasLandscaper = !!job?.landscaper_id;
-  const isPriced = job?.status === 'priced';
+  // CRITICAL: isPriced must check BOTH status AND payment_status.
+  // After payment, status may still be 'priced' (webhook hasn't fired yet),
+  // but payment_status will be 'paid'. Without this check, the Accept button
+  // remains visible and allows duplicate payments.
+  const isPriced = job?.status === 'priced' && job?.payment_status !== 'paid';
 
   // Status badge styling — uses deriveClientStage() for label, status for fine-grained color
   const getStatusConfig = (status: string | undefined) => {

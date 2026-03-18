@@ -195,11 +195,26 @@ export function ProfileCompletionWizard({ userId, onComplete }: { userId: string
         profilePhotoUrl = publicUrl;
       }
 
+      // Fetch current auth user for NOT NULL fallback values
+      // (needed if upsert creates a new record)
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const firstName = authUser?.user_metadata?.first_name || '';
+      const lastName = authUser?.user_metadata?.last_name || '';
+      const email = authUser?.email || '';
+
       // NOTE: license_number column does not exist in the database - do not include it
       // Store license info in certifications field instead if needed
+      // USE UPSERT with onConflict: 'user_id' so this works even if
+      // the landscaper record was not created during signup
       const { error: updateError } = await supabase
         .from('landscapers')
-        .update({
+        .upsert({
+          user_id: userId,
+          // NOT NULL fields — required if this creates a new row
+          first_name: firstName,
+          last_name: lastName,
+          email: email,
+          // Profile wizard fields
           business_name: formData.businessName,
           business_description: formData.businessDescription,
           years_in_business: parseInt(formData.yearsInBusiness),
@@ -213,8 +228,10 @@ export function ProfileCompletionWizard({ userId, onComplete }: { userId: string
           policy_number: formData.policyNumber,
           insurance_expiration: formData.expirationDate,
           profile_photo_url: profilePhotoUrl || null,
-        })
-        .eq('user_id', userId);
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id'
+        });
 
 
       if (updateError) throw updateError;
@@ -227,6 +244,7 @@ export function ProfileCompletionWizard({ userId, onComplete }: { userId: string
       setSaving(false);
     }
   };
+
 
 
   const steps = [

@@ -192,6 +192,15 @@ a.text-emerald-300:focus-visible {
 html, body, #root {
   height: 100%;
   font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent horizontal overflow globally on all viewports */
+html {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 body {
@@ -202,7 +211,21 @@ body {
   /* Prevent iOS Safari from auto-adjusting text size */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+  /* Safe area insets for notch/dynamic island - applied globally */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
+
+#root {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+  position: relative;
+}
+
 
 
 /* iOS Safari viewport height fix - Mobile Auth Alignment Canon */

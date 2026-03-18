@@ -34,14 +34,17 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   role: string | null;
+  roleResolved: boolean;
   signOut: () => Promise<void>;
   refreshUserRole: () => Promise<void>;
 }
 
+
 const AuthContext = createContext<AuthContextType>({
-  user: null, session: null, loading: true, role: null,
+  user: null, session: null, loading: true, role: null, roleResolved: false,
   signOut: async () => {}, refreshUserRole: async () => {},
 });
+
 
 export const useAuth = () => useContext(AuthContext);
 export const useAuthContext = useAuth;
@@ -53,6 +56,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userRole, setUserRole] = useState<string | null>(() => {
     try { return sessionStorage.getItem('user_role'); } catch { return null; }
   });
+  const [roleResolved, setRoleResolved] = useState(false);
+
   
   const processingRef = useRef(false);
   const lastProcessedSessionRef = useRef<string | null>(null);
@@ -109,7 +114,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('role')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
+
         .maybeSingle();
 
       log('ROLE', `Profile check: role=${profileData?.role || 'none'}, error=${profileError?.message || 'none'}`);
@@ -157,6 +163,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     log('ROLE', 'Refreshing user role...');
     const role = await getUserRole(user);
     setUserRole(role);
+    setRoleResolved(true);
+
     try { sessionStorage.setItem('user_role', role || ''); } catch {}
     log('ROLE', `Role refreshed: ${role}`);
   }, [user, getUserRole]);
@@ -182,6 +190,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const role = await getUserRole(currentSession.user);
           if (mountedRef.current) {
             setUserRole(role);
+            setRoleResolved(true);
+
             try { sessionStorage.setItem('user_role', role || ''); } catch {}
           }
         }
@@ -222,7 +232,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       
-      try {
+       try {
+        setRoleResolved(false);
+
         setSession(sess);
         setUser(sess?.user || null);
         
@@ -236,6 +248,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             log('RECOVERY', '🔒 Recovery session detected (recovery_sent_at present)');
             // Recovery intent is set by URL detection in landing/reset pages, not here
           }
+
+          // ============================================================
+          // STEP 1: ENSURE USER RECORDS EXIST *BEFORE* ROLE RESOLUTION
+          // This guarantees the landscapers/clients row is present so
+          // getUserRole() finds it on the very first login after signup.
+          // ============================================================
+          const userMetaRole = sess.user.user_metadata?.role as string || 'client';
+          try {
+            const ensureResult = await ensureUserRecords({ 
+              role: userMetaRole === 'landscaper' ? 'landscaper' : 'client',
+              firstName: sess.user.user_metadata?.first_name,
+              lastName: sess.user.user_metadata?.last_name,
+              phone: sess.user.user_metadata?.phone
+            });
+            if (ensureResult.success) {
+              log('ENSURE', `✅ User records ensured: users=${ensureResult.usersCreated}, clients=${ensureResult.clientsCreated}, landscapers=${ensureResult.landscapersCreated}`);
+            } else {
+              log('ENSURE', `⚠️ User records ensure failed: ${ensureResult.error}`);
+            }
+          } catch (ensureErr) {
+            log('ENSURE', `❌ User records ensure exception: ${ensureErr}`);
+          }
+
+          // ============================================================
+          // STEP 2: AUTHORITATIVE ROLE RESOLUTION
+          // Now that records are guaranteed to exist, resolve the role.
+          // ============================================================
 
           // IMPORTANT: Always use authoritative role resolution
           // Do NOT trust cached role for landscapers - always verify
@@ -256,6 +295,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               log('ROLE', '✅ Landscaper record verified - using cached role');
               if (mountedRef.current) {
                 setUserRole('landscaper');
+                setRoleResolved(true);
+
                 setLoading(false);
               }
             } else {
@@ -263,6 +304,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const role = await getUserRole(sess.user);
               if (mountedRef.current) {
                 setUserRole(role);
+                setRoleResolved(true);
+
                 try { sessionStorage.setItem('user_role', role || ''); } catch {}
                 setLoading(false);
               }
@@ -280,6 +323,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               log('ROLE', '✅ LANDSCAPER RECORD FOUND - overriding cached role');
               if (mountedRef.current) {
                 setUserRole('landscaper');
+                setRoleResolved(true);
+
                 try { sessionStorage.setItem('user_role', 'landscaper'); } catch {}
                 setLoading(false);
               }
@@ -288,6 +333,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               log('ROLE', `No landscaper record - using cached role: ${cachedRole}`);
               if (mountedRef.current) {
                 setUserRole(cachedRole);
+                setRoleResolved(true);
+
                 setLoading(false);
               }
             }
@@ -296,38 +343,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             log('ROLE', 'No valid cached role - performing full authoritative resolution');
             const role = await getUserRole(sess.user);
             if (mountedRef.current) {
-              setUserRole(role);
+                setUserRole(role);
+                setRoleResolved(true);
+
               try { sessionStorage.setItem('user_role', role || ''); } catch {}
               setLoading(false);
             }
           }
           
-          // SYSTEM STABILIZATION: Ensure user records exist after login/signup
-          // This guarantees users, clients, and landscapers tables are populated
-          const userMetaRole = sess.user.user_metadata?.role as string || 'client';
-          ensureUserRecords({ 
-            role: userMetaRole === 'landscaper' ? 'landscaper' : 'client',
-            firstName: sess.user.user_metadata?.first_name,
-            lastName: sess.user.user_metadata?.last_name,
-            phone: sess.user.user_metadata?.phone
-          }).then(result => {
-            if (result.success) {
-              log('ENSURE', `✅ User records ensured: users=${result.usersCreated}, clients=${result.clientsCreated}, landscapers=${result.landscapersCreated}`);
-            } else {
-              log('ENSURE', `⚠️ User records ensure failed: ${result.error}`);
-            }
-          }).catch(err => {
-            log('ENSURE', `❌ User records ensure exception: ${err}`);
-          });
-          
           // Background sync - don't block loading
           syncUserProfile(sess.user.id, sess.user.email || '').catch(() => {});
           
+
 
         } else {
           // User signed out - clear password reset flags
           clearPasswordResetFlag();
           setUserRole(null);
+          setRoleResolved(true);
+
           lastProcessedSessionRef.current = null;
           try { sessionStorage.removeItem('user_role'); } catch {}
           if (mountedRef.current) setLoading(false);
@@ -388,7 +422,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user, loading]);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, role: userRole, signOut, refreshUserRole }}>
+    <AuthContext.Provider value={{ user, session, loading, role: userRole, roleResolved, signOut, refreshUserRole }}>
+
       {children}
     </AuthContext.Provider>
   );

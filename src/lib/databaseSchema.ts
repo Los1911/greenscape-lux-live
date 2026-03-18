@@ -87,19 +87,20 @@ export const JOBS_COLUMNS = {
   ],
   
   // Client dashboard view
-  clientView: 'id, service_name, service_type, service_address, status, price, created_at, scheduled_date, completed_at, preferred_date, landscaper_email',
+  // SCHEMA FIX: payment_status DOES exist on jobs table (text column, default 'unpaid').
+  // Also include user_id + client_user_id for ownership checks, and updated_at for realtime.
+  clientView: 'id, service_name, service_type, service_address, status, price, created_at, updated_at, scheduled_date, completed_at, preferred_date, landscaper_email, payout_status, payment_status, user_id, client_user_id, client_email, customer_name, stripe_session_id, flagged_at, flagged_reason, remediation_deadline, remediation_status, remediation_notes',
   
   // Landscaper dashboard view — only columns confirmed to exist in jobs table
-  // REMOVED: 'amount' (42703), 'earnings' (unconfirmed), 'comments' (42703), 'estimated_duration' (unconfirmed)
-  landscaperView: 'id, service_name, service_type, service_address, status, price, created_at, scheduled_date, completed_at, preferred_date, customer_name, client_email, is_available, assigned_to, landscaper_id, started_at, selected_services',
+  landscaperView: 'id, service_name, service_type, service_address, status, price, payout_amount, created_at, scheduled_date, completed_at, preferred_date, customer_name, client_email, is_available, assigned_to, landscaper_id, started_at, selected_services, payout_status, payment_status',
 
-
-  
   // Admin view
-  adminView: 'id, service_name, service_type, service_address, status, price, created_at, updated_at, customer_name, client_email, landscaper_id, landscaper_email, preferred_date',
+  adminView: 'id, service_name, service_type, service_address, status, price, created_at, updated_at, customer_name, client_email, landscaper_id, landscaper_email, preferred_date, payout_status, payment_status, stripe_session_id, stripe_payment_intent_id, paid_at',
   
   // Minimal view for counts/stats
-  minimal: 'id, status, price, created_at',
+  minimal: 'id, status, price, created_at, payout_status, payment_status',
+
+
 } as const;
 
 // ============================================
@@ -274,7 +275,8 @@ export const PAYMENTS_COLUMNS = {
     'created_at',
   ],
   
-  select: 'id, job_id, client_id, landscaper_id, stripe_payment_intent_id, amount, platform_fee, landscaper_payout, status, payment_method, currency, description, created_at, updated_at, paid_at',
+  select: 'id, job_id, client_id, landscaper_id, stripe_payment_intent_id, amount, platform_commission, landscaper_payout, status, payment_method, currency, description, created_at, updated_at, paid_at',
+
   
   minimal: 'id, amount, status, created_at',
 } as const;
@@ -506,7 +508,8 @@ export function normalizePayment(payment: Record<string, unknown> | null): Recor
     client_id: safeString(payment, 'client_id'),
     landscaper_id: safeString(payment, 'landscaper_id'),
     amount: safeNumber(payment, 'amount'),
-    platform_fee: safeNumber(payment, 'platform_fee'),
+    platform_commission: safeNumber(payment, 'platform_commission'),
+
     landscaper_payout: safeNumber(payment, 'landscaper_payout'),
     status: safeString(payment, 'status', 'pending'),
     payment_method: safeString(payment, 'payment_method'),

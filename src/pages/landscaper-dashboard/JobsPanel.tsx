@@ -44,6 +44,7 @@ import {
 function normalizeJobData(rawJob: Record<string, unknown>) {
   const adminPrice = safeNumber(rawJob, 'admin_price');
   const regularPrice = safeNumber(rawJob, 'price');
+  const payoutAmount = safeNumber(rawJob, 'payout_amount');
 
   // Parse selected_services - could be JSON string or array
   let selectedServices: string[] = [];
@@ -79,9 +80,12 @@ function normalizeJobData(rawJob: Record<string, unknown>) {
       safeString(rawJob, 'service_address') ||
       safeString(rawJob, 'property_address'),
 
-    // Price hierarchy: admin_price > price
+    // Price hierarchy: admin_price > price (kept for BidSuggestionCard & internal logic)
     price: adminPrice || regularPrice,
     admin_price: adminPrice,
+
+    // Payout amount: what the landscaper actually earns (set by Stripe webhook)
+    payout_amount: payoutAmount,
 
     is_available: safeBoolean(rawJob, 'is_available'),
     created_at: safeString(rawJob, 'created_at'),
@@ -90,8 +94,12 @@ function normalizeJobData(rawJob: Record<string, unknown>) {
     preferred_date: safeString(rawJob, 'preferred_date'),
     started_at: safeString(rawJob, 'started_at'),
     landscaper_id: safeString(rawJob, 'landscaper_id'),
+    payout_status: safeString(rawJob, 'payout_status'),
+    // SCHEMA ALIGNMENT: 'payment_status' does NOT exist on jobs table — removed
   };
+
 }
+
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
@@ -152,23 +160,46 @@ export default function JobsPanel() {
         setWorkAreaPrefs(prefs);
       }
 
-      // Query jobs with explicit column selection instead of select('*')
-      // Include 'priced' and 'scheduled' status as available for landscapers
-      // 1. Available jobs (status='available' OR status='priced' OR status='scheduled', is_available=true, assigned_to IS NULL)
-      // 2. Jobs assigned to this landscaper
-      const { data: jobsData, error: fetchError } = await supabase
+      // ── QUERY 1: My Jobs (assigned_to = auth.uid) ──
+      // assigned_to is the ONLY authoritative ownership field.
+      // No OR logic. No landscaper_id in ownership filtering.
+      const { data: myJobsData, error: myJobsError } = await supabase
         .from('jobs')
         .select(JOBS_COLUMNS.landscaperView + ',admin_price,admin_notes,priced_at')
-        .or(`and(status.in.(available,priced,scheduled),is_available.eq.true,assigned_to.is.null),landscaper_id.eq.${authUser.id},assigned_to.eq.${authUser.id}`)
-        .order('created_at', { ascending: false });
+        .eq('assigned_to', authUser.id)
+        .order('updated_at', { ascending: false });
 
-
-
-
-      if (fetchError) {
-        console.error('[JobsPanel] Supabase fetch error:', fetchError);
-        throw new Error('Failed to load jobs from server');
+      if (myJobsError) {
+        console.error('[JobsPanel] My Jobs fetch error:', myJobsError);
+        throw new Error('Failed to load your jobs from server');
       }
+
+      // ── QUERY 2: Marketplace (unassigned, available jobs) ──
+      // Both assigned_to AND landscaper_id must be null.
+      const { data: marketplaceData, error: marketplaceError } = await supabase
+        .from('jobs')
+        .select(JOBS_COLUMNS.landscaperView + ',admin_price,admin_notes,priced_at')
+        .in('status', ['available', 'priced', 'scheduled'])
+        .is('assigned_to', null)
+        .is('landscaper_id', null)
+        .eq('is_available', true)
+        .order('created_at', { ascending: true });
+
+      if (marketplaceError) {
+        console.error('[JobsPanel] Marketplace fetch error:', marketplaceError);
+        throw new Error('Failed to load available jobs from server');
+      }
+
+      // ── MERGE: Deduplicate by id (my jobs take priority) ──
+      const myJobsMap = new Map((myJobsData || []).map(j => [j.id, j]));
+      for (const mj of (marketplaceData || [])) {
+        if (!myJobsMap.has(mj.id)) {
+          myJobsMap.set(mj.id, mj);
+        }
+      }
+      const jobsData = Array.from(myJobsMap.values());
+
+
       
       // Normalize jobs to handle missing columns safely
       const normalizedJobs = (jobsData || []).map(job => normalizeJobData(job as Record<string, unknown>));
@@ -186,12 +217,14 @@ export default function JobsPanel() {
   // ── Realtime: patch jobs array in-place (no loading toggle, no remount) ──
   const jobsSubs = useMemo(() => {
     if (!user?.id) return [];
+    // OWNERSHIP MODEL: assigned_to is the ONLY authoritative ownership filter.
+    // No landscaper_id subscription. No wildcard INSERT subscription.
+    // This eliminates realtime double-fire risk.
     return [
-      { table: 'jobs', event: '*' as const, filter: `landscaper_id=eq.${user.id}` },
       { table: 'jobs', event: '*' as const, filter: `assigned_to=eq.${user.id}` },
-      { table: 'jobs', event: 'INSERT' as const },
     ];
   }, [user?.id]);
+
 
 
   useRealtimePatch({
@@ -224,13 +257,52 @@ export default function JobsPanel() {
 
 
 
-  // LIFECYCLE FIX: When filter is 'available', also include 'scheduled' and 'priced' statuses
-  const AVAILABLE_FILTER_STATUSES = ['available', 'scheduled', 'priced'];
-  const filteredJobs = jobs?.filter(job => {
-    if (filter === 'all') return true;
-    if (filter === 'available') return AVAILABLE_FILTER_STATUSES.includes(job?.status);
-    return job?.status === filter;
-  }) ?? [];
+  // ── BUCKET HELPERS ──
+  // These define the four tab buckets without introducing new statuses.
+  // Admin-assigned jobs: status='scheduled', landscaper_id=auth.uid()
+  // Self-accepted jobs:  status='assigned', assigned_to=auth.uid()
+
+  const isAssignedToMe = useCallback((job: any) => {
+    const myId = user?.id;
+    if (!myId) return false;
+    // OWNERSHIP MODEL: assigned_to is the ONLY authoritative ownership field.
+    // A job is "assigned to me" if assigned_to matches AND status is pre-active.
+    return (job.assigned_to === myId) && ['assigned', 'scheduled'].includes(job.status);
+  }, [user?.id]);
+
+
+  const isAvailableJob = useCallback((job: any) => {
+    // Available = in an open status AND not claimed by anyone
+    const OPEN_STATUSES = ['available', 'scheduled', 'priced'];
+    return OPEN_STATUSES.includes(job?.status) && !job.landscaper_id && !job.assigned_to;
+  }, []);
+
+  const isActiveJob = useCallback((job: any) => job?.status === 'active', []);
+
+  const isCompletedJob = useCallback((job: any) =>
+    ['completed_pending_review', 'completed'].includes(job?.status), []);
+
+  const getTabCount = useCallback((key: string) => {
+    if (key === 'all') return jobs.length;
+    if (key === 'available') return jobs.filter(isAvailableJob).length;
+    if (key === 'assigned') return jobs.filter(isAssignedToMe).length;
+    if (key === 'active') return jobs.filter(isActiveJob).length;
+    if (key === 'completed') return jobs.filter(isCompletedJob).length;
+    return jobs.filter(j => j?.status === key).length;
+  }, [jobs, isAvailableJob, isAssignedToMe, isActiveJob, isCompletedJob]);
+
+  const filteredJobs = useMemo(() => {
+    return (jobs ?? []).filter(job => {
+      if (filter === 'all') return true;
+      if (filter === 'available') return isAvailableJob(job);
+      if (filter === 'assigned') return isAssignedToMe(job);
+      if (filter === 'active') return isActiveJob(job);
+      if (filter === 'completed') return isCompletedJob(job);
+      return job?.status === filter;
+    });
+  }, [jobs, filter, isAvailableJob, isAssignedToMe, isActiveJob, isCompletedJob]);
+
+
 
 
 
@@ -493,37 +565,41 @@ export default function JobsPanel() {
 };
 
 
-  // Manual job start - bypasses GPS requirement (mobile-safe fallback)
-  // CRITICAL FIX: Optimistic UI update + non-blocking refetch
-  const handleManualStartJob = async (jobId: string) => {
+
+  // ── START JOB ──
+  // Handles BOTH admin-assigned (status='scheduled', landscaper_id=uid)
+  // AND self-accepted (status='assigned', assigned_to=uid) jobs.
+  // Transitions to status='active' with started_at timestamp.
+  // SAFE: No payment/payout/webhook side effects on 'active'.
+  const handleStartJob = async (jobId: string) => {
     try {
       setActionLoading(jobId);
-      
+
       const startedAt = new Date().toISOString();
-      
-      const { error } = await supabase
+
+      // Use .or() to match EITHER assignment path:
+      //   Case A (self-accepted):  assigned_to = uid AND status = 'assigned'
+      //   Case B (admin-assigned): landscaper_id = uid AND status = 'scheduled'
+      const { data, error } = await supabase
         .from('jobs')
         .update({
           status: 'active',
-
           started_at: startedAt,
           start_method: 'manual_override'
         })
         .eq('id', jobId)
-.eq('assigned_to', user?.id)
-.eq('status', 'assigned');
+        .or(`and(assigned_to.eq.${user?.id},status.eq.assigned),and(landscaper_id.eq.${user?.id},status.eq.scheduled)`);
 
       if (error) throw error;
 
-      // OPTIMISTIC UI UPDATE: Update local state immediately
-      setJobs(prev => prev.map(job => 
-        job.id === jobId 
-          ? { 
-              ...job, 
-              status: 'active', 
-
+      // OPTIMISTIC UI UPDATE: Move job from Assigned → Active instantly
+      setJobs(prev => prev.map(job =>
+        job.id === jobId
+          ? {
+              ...job,
+              status: 'active',
               started_at: startedAt,
-              start_method: 'manual_override' 
+              start_method: 'manual_override'
             }
           : job
       ));
@@ -549,6 +625,10 @@ export default function JobsPanel() {
       setActionLoading(null);
     }
   };
+
+  // Legacy alias — kept so any existing callers still work
+  const handleManualStartJob = handleStartJob;
+
 
   // Callback when a job is auto-started via geofencing
   const handleJobAutoStarted = useCallback(() => {
@@ -613,23 +693,20 @@ export default function JobsPanel() {
 
 
 
-  // Filter available jobs by work area preferences
-  // LIFECYCLE FIX: Include 'scheduled' and 'priced' status jobs as available
-  // Webhook sets 'scheduled' after payment; admin may set 'priced' before release
-  const AVAILABLE_STATUSES = ['available', 'scheduled', 'priced'];
-  const allAvailableJobs = jobs.filter(j => AVAILABLE_STATUSES.includes(j.status) && !j.assigned_to);
 
-  
+  // ── SECTION BUCKETS ──
+
+  // Filter available jobs by work area preferences
+  // Available = open status AND not claimed by anyone (neither landscaper_id nor assigned_to)
+  const allAvailableJobs = jobs.filter(j => isAvailableJob(j));
+
   // Apply work area filtering
   const { visibleJobs: workAreaVisibleJobs, hiddenJobs: workAreaHiddenJobs } = filterJobsByWorkArea(
     allAvailableJobs,
     workAreaPrefs
   );
   
-  // Update hidden job count for display
   const workAreaHiddenCount = workAreaHiddenJobs.length;
-  
-  // Now apply insurance filtering to work-area-visible jobs
   const availableJobs = workAreaVisibleJobs;
   
   // Separate jobs into accessible and insurance-locked
@@ -637,35 +714,45 @@ export default function JobsPanel() {
   const lockedAvailableJobs = availableJobs.filter(job => jobRequiresInsurance(job) && !hasInsurance);
   const hasLockedJobs = lockedAvailableJobs.length > 0;
 
+  // My Jobs: Scheduled (assigned/scheduled) and In Progress (active)
+  const myScheduledJobs = jobs.filter(j => isAssignedToMe(j));
+  const myActiveJobs = jobs.filter(j => isActiveJob(j) && j.assigned_to === user?.id);
+  const myJobsCount = myScheduledJobs.length + myActiveJobs.length;
+
+  // Completed Jobs: last 10
+  const completedJobs = jobs
+    .filter(j => isCompletedJob(j))
+    .sort((a, b) => {
+      const dateA = a.completed_at || a.updated_at || a.created_at || '';
+      const dateB = b.completed_at || b.updated_at || b.created_at || '';
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    })
+    .slice(0, 10);
+
   return (
-    <div className="py-6 sm:py-8 space-y-6">
+    <div className="py-4 sm:py-6 space-y-6">
 
-      {/* Filter Tabs */}
-      <Panel>
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold text-emerald-300">Job Management</h2>
-          <div className="flex flex-wrap gap-2">
-            {['all', 'available', 'assigned', 'active', 'completed'].map((key) => {
-
-              const count = key === 'all' ? jobs.length : jobs.filter(j => j.status === key).length;
-              return (
-                <button key={key} onClick={() => setFilter(key as any)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
-                    filter === key 
-                      ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/50' 
-                      : 'bg-black/40 text-emerald-300/70 border border-emerald-500/25 hover:border-emerald-500/40'
-                  }`}>
-                  {key === 'all' ? 'All Jobs' : key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  <span className="bg-emerald-500/30 px-2 py-0.5 rounded-full text-xs">{count}</span>
-                </button>
-              );
-            })}
-          </div>
+      {/* ── PAGE HEADER ── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Jobs</h1>
+          <p className="text-sm text-emerald-300/60 mt-1">
+            {jobs.length} total &middot; {myActiveJobs.length} active &middot; {myScheduledJobs.length} scheduled
+          </p>
         </div>
-      </Panel>
+        <button
+          onClick={() => loadJobs()}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-sm font-medium transition-all disabled:opacity-50"
+          title="Refresh jobs"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">Refresh</span>
+        </button>
+      </div>
 
-      {/* Work Area Hidden Jobs Notice */}
-      {workAreaHiddenCount > 0 && (filter === 'all' || filter === 'available') && (
+      {/* ── NOTICES ── */}
+      {workAreaHiddenCount > 0 && (
         <div className="flex items-center gap-3 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
           <EyeOff className="w-5 h-5 text-blue-400 flex-shrink-0" />
           <div className="text-sm text-blue-300">
@@ -677,8 +764,7 @@ export default function JobsPanel() {
         </div>
       )}
 
-      {/* Insurance Banner - show if there are locked jobs */}
-      {hasLockedJobs && (filter === 'all' || filter === 'available') && (
+      {hasLockedJobs && (
         <InsuranceRequiredBanner 
           onUploadClick={() => {
             window.location.href = '/landscaper/profile?tab=documents';
@@ -686,125 +772,262 @@ export default function JobsPanel() {
         />
       )}
 
-      {/* Available Jobs Section */}
-      {(filter === 'all' || filter === 'available') && availableJobs.length > 0 && (
-        <Panel>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            <h3 className="text-lg font-semibold text-emerald-300">
-              Available Jobs ({accessibleAvailableJobs.length}
-              {hasLockedJobs ? ` + ${lockedAvailableJobs.length} locked` : ''})
-            </h3>
-          </div>
-          <div className="space-y-4">
-            {/* Accessible Jobs First */}
-            {accessibleAvailableJobs.map((job) => (
-              <AvailableJobCard 
-                key={job.id} 
-                job={job} 
-                onAccept={handleAcceptJob}
-                onDecline={handleDeclineJob}
-                isLoading={actionLoading === job.id}
-                requiresInsurance={jobRequiresInsurance(job)}
-                isLocked={false}
-              />
-            ))}
-            
-            {/* Locked Jobs (shown in disabled state) */}
-            {lockedAvailableJobs.map((job) => (
-              <AvailableJobCard 
-                key={job.id} 
-                job={job} 
-                onAccept={handleAcceptJob}
-                onDecline={handleDeclineJob}
-                isLoading={actionLoading === job.id}
-                requiresInsurance={true}
-                isLocked={true}
-              />
-            ))}
-          </div>
-        </Panel>
-      )}
 
-      {/* My Jobs Section */}
-      <Panel>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-emerald-300">
-            {filter === 'available' ? 'Available Jobs' : `Jobs (${filteredJobs.length})`}
-          </h3>
-          {/* Manual refresh button */}
-          <button
-            onClick={() => loadJobs()}
-            disabled={loading}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-sm transition-all disabled:opacity-50"
-            title="Refresh jobs"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
+      {/* ════════════════════════════════════════════════════════════════
+          SECTION 1: AVAILABLE JOBS
+          ════════════════════════════════════════════════════════════════ */}
+      <section className="bg-black/60 backdrop-blur border border-emerald-500/25 rounded-2xl ring-1 ring-emerald-500/20 shadow-[0_0_25px_-10px_rgba(52,211,153,0.25)] overflow-hidden">
+        {/* Section Header */}
+        <div className="px-5 py-4 sm:px-6 border-b border-emerald-500/15 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+            <h2 className="text-lg font-bold text-white">Available Jobs</h2>
+            <span className="px-2.5 py-1 rounded-full bg-green-500/20 text-green-300 text-xs font-semibold">
+              {availableJobs.length}
+            </span>
+          </div>
         </div>
-        {filteredJobs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 space-y-4">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <Calendar className="h-8 w-8 text-emerald-400/50" />
-            </div>
-            <div className="text-center space-y-2">
-              <h4 className="text-lg font-medium text-emerald-300">
-                {filter === 'available' 
-                  ? 'No Available Jobs' 
-                  : filter === 'assigned'
-                  ? 'No Assigned Jobs'
-                  : filter === 'active'
 
-                  ? 'No Jobs In Progress'
-                  : filter === 'completed'
-                  ? 'No Completed Jobs Yet'
-                  : 'No Jobs Found'}
-              </h4>
-              <p className="text-emerald-300/60 text-sm max-w-sm">
-                {filter === 'available' 
-                  ? 'No jobs are available right now. Check back soon or expand your work areas.'
-                  : filter === 'assigned'
-                  ? 'You don\'t have any assigned jobs. Accept available jobs to get started.'
-                  : filter === 'active'
-
-                  ? 'You don\'t have any jobs in progress. Start an assigned job to begin.'
-                  : filter === 'completed'
-                  ? 'You haven\'t completed any jobs yet. Complete jobs to build your history.'
-                  : 'No jobs match your current filter. Try selecting a different category.'}
+        <div className="p-4 sm:p-6">
+          {availableJobs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 space-y-3">
+              <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <MapPin className="h-7 w-7 text-emerald-400/40" />
+              </div>
+              <h4 className="text-base font-medium text-emerald-300/80">No Available Jobs</h4>
+              <p className="text-emerald-300/50 text-sm text-center max-w-xs">
+                No jobs are available right now. Check back soon or expand your work areas.
               </p>
             </div>
-            {filter !== 'all' && (
-              <button
-                onClick={() => setFilter('all')}
-                className="text-emerald-400 hover:text-emerald-300 text-sm underline transition-colors"
-              >
-                View all jobs
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredJobs.filter(j => filter !== 'available' || (j.status === 'available')).map((job) => (
-              <JobCard 
-                key={job.id} 
-                job={job} 
-                onAccept={handleAcceptJob}
-                onComplete={handleCompleteJob}
-                onManualStart={handleManualStartJob}
-                onJobAutoStarted={handleJobAutoStarted}
-                isLoading={actionLoading === job.id}
-                isMyJob={job.assigned_to === user?.id || job.landscaper_id === user?.id}
-              />
-            ))}
+          ) : (
+            <div className="space-y-4">
+              {accessibleAvailableJobs.map((job) => (
+                <AvailableJobCard 
+                  key={job.id} 
+                  job={job} 
+                  onAccept={handleAcceptJob}
+                  onDecline={handleDeclineJob}
+                  isLoading={actionLoading === job.id}
+                  requiresInsurance={jobRequiresInsurance(job)}
+                  isLocked={false}
+                />
+              ))}
+              {lockedAvailableJobs.map((job) => (
+                <AvailableJobCard 
+                  key={job.id} 
+                  job={job} 
+                  onAccept={handleAcceptJob}
+                  onDecline={handleDeclineJob}
+                  isLoading={actionLoading === job.id}
+                  requiresInsurance={true}
+                  isLocked={true}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
+
+      {/* ════════════════════════════════════════════════════════════════
+          SECTION 2: MY JOBS (Scheduled + In Progress)
+          ════════════════════════════════════════════════════════════════ */}
+      <section className="bg-black/60 backdrop-blur border border-emerald-500/25 rounded-2xl ring-1 ring-emerald-500/20 shadow-[0_0_25px_-10px_rgba(52,211,153,0.25)] overflow-hidden">
+        {/* Section Header */}
+        <div className="px-5 py-4 sm:px-6 border-b border-emerald-500/15 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-blue-400 rounded-full" />
+            <h2 className="text-lg font-bold text-white">My Jobs</h2>
+            <span className="px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-semibold">
+              {myJobsCount}
+            </span>
           </div>
-        )}
-      </Panel>
+        </div>
+
+        <div className="p-4 sm:p-6 space-y-6">
+
+          {/* ── IN PROGRESS sub-section ── */}
+          {myActiveJobs.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse shadow-[0_0_6px_rgba(234,179,8,0.5)]" />
+                <h3 className="text-sm font-semibold text-yellow-200 uppercase tracking-wider">In Progress</h3>
+                <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 text-xs font-medium">
+                  {myActiveJobs.length}
+                </span>
+              </div>
+              <div className="space-y-4">
+                {myActiveJobs.map((job) => (
+                  <JobCard 
+                    key={job.id} 
+                    job={job} 
+                    onAccept={handleAcceptJob}
+                    onComplete={handleCompleteJob}
+                    onManualStart={handleManualStartJob}
+                    onJobAutoStarted={handleJobAutoStarted}
+                    isLoading={actionLoading === job.id}
+                    isMyJob={true}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Divider between active and scheduled */}
+          {myActiveJobs.length > 0 && myScheduledJobs.length > 0 && (
+            <div className="border-t border-emerald-500/15" />
+          )}
+
+          {/* ── SCHEDULED sub-section ── */}
+          {myScheduledJobs.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-400 rounded-full" />
+                <h3 className="text-sm font-semibold text-blue-200 uppercase tracking-wider">Scheduled</h3>
+                <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-xs font-medium">
+                  {myScheduledJobs.length}
+                </span>
+              </div>
+              <div className="space-y-4">
+                {myScheduledJobs.map((job) => (
+                  <JobCard 
+                    key={job.id} 
+                    job={job} 
+                    onAccept={handleAcceptJob}
+                    onComplete={handleCompleteJob}
+                    onManualStart={handleManualStartJob}
+                    onJobAutoStarted={handleJobAutoStarted}
+                    isLoading={actionLoading === job.id}
+                    isMyJob={true}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Empty state for My Jobs */}
+          {myJobsCount === 0 && (
+            <div className="flex flex-col items-center justify-center py-10 space-y-3">
+              <div className="w-14 h-14 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <Calendar className="h-7 w-7 text-blue-400/40" />
+              </div>
+              <h4 className="text-base font-medium text-emerald-300/80">No Active or Scheduled Jobs</h4>
+              <p className="text-emerald-300/50 text-sm text-center max-w-xs">
+                Accept available jobs above to get started. Jobs you accept will appear here.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+
+
+      {/* ════════════════════════════════════════════════════════════════
+          SECTION 3: COMPLETED JOBS (Last 10)
+          ════════════════════════════════════════════════════════════════ */}
+      <section className="bg-black/60 backdrop-blur border border-emerald-500/25 rounded-2xl ring-1 ring-emerald-500/20 shadow-[0_0_25px_-10px_rgba(52,211,153,0.25)] overflow-hidden">
+        {/* Section Header */}
+        <div className="px-5 py-4 sm:px-6 border-b border-emerald-500/15 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-emerald-400 rounded-full" />
+            <h2 className="text-lg font-bold text-white">Completed</h2>
+            <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold">
+              {completedJobs.length}
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-6">
+          {completedJobs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 space-y-3">
+              <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <CheckCircle className="h-7 w-7 text-emerald-400/40" />
+              </div>
+              <h4 className="text-base font-medium text-emerald-300/80">No Completed Jobs Yet</h4>
+              <p className="text-emerald-300/50 text-sm text-center max-w-xs">
+                Complete jobs to build your history and earn payouts.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {completedJobs.map((job) => {
+                const completionDate = job.completed_at || job.updated_at;
+                const payoutAmt = typeof job.payout_amount === 'number' && job.payout_amount > 0 ? job.payout_amount : null;
+                const isPendingReview = job.status === 'completed_pending_review';
+
+                return (
+                  <div
+                    key={job.id}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-xl bg-black/40 border border-emerald-500/15 hover:border-emerald-500/30 transition-colors"
+                  >
+                    {/* Status indicator */}
+                    <div className="flex-shrink-0">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        isPendingReview 
+                          ? 'bg-amber-500/15 border border-amber-500/30' 
+                          : 'bg-emerald-500/15 border border-emerald-500/30'
+                      }`}>
+                        <CheckCircle className={`w-5 h-5 ${isPendingReview ? 'text-amber-400' : 'text-emerald-400'}`} />
+                      </div>
+                    </div>
+
+                    {/* Job info */}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-semibold text-emerald-200 truncate">
+                          {job.service_type || job.service_name || 'Service'}
+                        </h4>
+                        {isPendingReview && (
+                          <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[11px] font-medium">
+                            Pending Review
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-emerald-300/50">
+                        <MapPin className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate">{job.service_address || 'No address'}</span>
+                      </div>
+                      {completionDate && (
+                        <div className="flex items-center gap-1.5 text-xs text-emerald-300/40">
+                          <Calendar className="w-3 h-3 flex-shrink-0" />
+                          <span>{new Date(completionDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Payout */}
+                    <div className="flex-shrink-0 text-right sm:text-right">
+                      {payoutAmt ? (
+                        <div>
+                          <p className="text-lg font-bold text-emerald-400">${payoutAmt.toFixed(2)}</p>
+                          <p className="text-[11px] text-emerald-300/40">Payout</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm text-gray-500 italic">Pending</p>
+                          <p className="text-[11px] text-emerald-300/40">Payout</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Show count indicator if there are more */}
+              {jobs.filter(isCompletedJob).length > 10 && (
+                <p className="text-center text-xs text-emerald-300/40 pt-2">
+                  Showing last 10 of {jobs.filter(isCompletedJob).length} completed jobs
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
 
     </div>
   );
 }
+
+
 
 // Available Job Card Component with insurance gating
 function AvailableJobCard({ job, onAccept, onDecline, isLoading, requiresInsurance, isLocked }: { 
@@ -847,13 +1070,17 @@ function AvailableJobCard({ job, onAccept, onDecline, isLoading, requiresInsuran
                 <span>{new Date(job.preferred_date).toLocaleDateString()}</span>
               </div>
             )}
-            {job?.price > 0 && (
-              <div className="flex items-center gap-1 text-emerald-400 font-semibold">
-                <DollarSign className="w-4 h-4" />
-                <span>${job.price.toFixed(2)}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-1 text-emerald-400 font-semibold">
+              <DollarSign className="w-4 h-4" />
+              {typeof job?.payout_amount === 'number' && job.payout_amount > 0 ? (
+                <span>${job.payout_amount.toFixed(2)}</span>
+              ) : (
+                <span className="text-gray-500 italic font-normal">Earnings pending</span>
+              )}
+              <span className="text-emerald-300/40 text-xs ml-1 font-normal">Your Earnings</span>
+            </div>
           </div>
+
 
         </div>
       </div>
@@ -934,9 +1161,11 @@ function JobCard({ job, onAccept, onComplete, onManualStart, onJobAutoStarted, i
   const supabase = useSupabaseClient();
   const [landscaperId, setLandscaperId] = useState('');
   const [gpsUnavailable, setGpsUnavailable] = useState(false);
+  const [isInsideGeofence, setIsInsideGeofence] = useState(false);
   const [scopeExpanded, setScopeExpanded] = useState(false);
   const [photoCounts, setPhotoCounts] = useState<{ before: number; after: number }>({ before: 0, after: 0 });
   const [photoCountsLoaded, setPhotoCountsLoaded] = useState(false);
+
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }: any) => { 
@@ -1001,8 +1230,9 @@ function JobCard({ job, onAccept, onComplete, onManualStart, onJobAutoStarted, i
     return () => clearTimeout(timeoutId);
   }, []);
 
-  // Derive job price - use price field (already normalized with admin_price priority)
-  const jobPrice = typeof job?.price === 'number' && job.price > 0 ? job.price : null;
+  // Derive payout amount - what the landscaper earns (set by Stripe webhook)
+  const payoutAmount = typeof job?.payout_amount === 'number' && job.payout_amount > 0 ? job.payout_amount : null;
+
   const isActive = job?.status === 'active';
   const canComplete = photoCounts.before > 0 && photoCounts.after > 0;
   const selectedServices: string[] = Array.isArray(job?.selected_services) ? job.selected_services : [];
@@ -1055,7 +1285,8 @@ function JobCard({ job, onAccept, onComplete, onManualStart, onJobAutoStarted, i
             <div className="flex items-center gap-2 flex-wrap">
               {getStatusBadge(job?.status)}
               {isMyJob && <span className="px-2 py-1 rounded-lg bg-purple-500/20 text-purple-300 text-xs">My Job</span>}
-              {gpsUnavailable && job?.status === 'assigned' && isMyJob && (
+              {gpsUnavailable && ['assigned', 'scheduled'].includes(job?.status) && isMyJob && (
+
                 <span className="px-2 py-1 rounded-lg bg-orange-500/20 text-orange-300 text-xs flex items-center gap-1">
                   <AlertTriangle className="w-3 h-3" />
                   GPS Unavailable
@@ -1080,17 +1311,19 @@ function JobCard({ job, onAccept, onComplete, onManualStart, onJobAutoStarted, i
                   <span>{new Date(job.preferred_date).toLocaleDateString()}</span>
                 </div>
               )}
-              {/* ── FIXED PRICE DISPLAY ── */}
-              {/* Show job.price (not earnings). Earnings are calculated post-completion. */}
+
+              {/* ── PAYOUT AMOUNT DISPLAY ── */}
+              {/* Landscapers see payout_amount (their earnings), not the client-facing price */}
               <div className="flex items-center gap-1.5">
                 <DollarSign className="w-4 h-4 text-emerald-400" />
-                {jobPrice ? (
-                  <span className="text-emerald-400 font-bold text-base">${jobPrice.toFixed(2)}</span>
+                {payoutAmount ? (
+                  <span className="text-emerald-400 font-bold text-base">${payoutAmount.toFixed(2)}</span>
                 ) : (
-                  <span className="text-gray-500 italic text-sm">Price pending</span>
+                  <span className="text-gray-500 italic text-sm">Earnings pending</span>
                 )}
-                <span className="text-emerald-300/40 text-xs ml-1">Job Price</span>
+                <span className="text-emerald-300/40 text-xs ml-1">Your Earnings</span>
               </div>
+
             </div>
 
             {/* Client Email */}
@@ -1149,45 +1382,97 @@ function JobCard({ job, onAccept, onComplete, onManualStart, onJobAutoStarted, i
           </div>
         )}
 
-        {/* Geofence tracker for assigned/active jobs */}
-        {['assigned', 'active'].includes(job?.status) && landscaperId && isMyJob && job?.id && !gpsUnavailable && (
+        {/* Geofence tracker for scheduled/assigned/active jobs */}
+        {['assigned', 'scheduled', 'active'].includes(job?.status) && landscaperId && isMyJob && job?.id && !gpsUnavailable && (
+
           <GeofenceTracker 
             jobId={job.id} 
             landscaperId={landscaperId} 
             jobStatus={job.status}
             onJobStarted={onJobAutoStarted}
+            onGeofenceStatusChange={setIsInsideGeofence}
           />
         )}
 
-        {/* MANUAL START BUTTON - Shows for assigned jobs */}
-        {job?.status === 'assigned' && isMyJob && (
+        {/* ── ARRIVAL-GATED START JOB BUTTON ──
+            Shows for assigned AND scheduled (admin-assigned) jobs.
+            
+            Three modes:
+            A) GPS unavailable → manual start allowed (no geofence gating)
+            B) GPS available, outside geofence → button disabled + "Arrive at property" msg
+            C) GPS available, inside geofence → button enabled + "Arrival verified" msg
+        */}
+        {['assigned', 'scheduled'].includes(job?.status) && isMyJob && (
+
           <div className="space-y-3">
+            {/* ── MODE A: GPS unavailable — allow manual start ── */}
             {gpsUnavailable && (
-              <div className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
-                <div className="flex items-center gap-2 text-orange-300 text-sm">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>GPS unavailable. You can start the job manually.</span>
+              <>
+                <div className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                  <div className="flex items-center gap-2 text-orange-300 text-sm">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>GPS unavailable. You can start the job manually.</span>
+                  </div>
                 </div>
-              </div>
+                <button
+                  onClick={() => onManualStart(job.id)}
+                  disabled={isLoading}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-medium transition-all disabled:opacity-50"
+                >
+                  {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  Start Job (Manual)
+                </button>
+              </>
             )}
-            <button
-              onClick={() => onManualStart(job.id)}
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-medium transition-all disabled:opacity-50"
-            >
-              {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-              {gpsUnavailable ? 'Start Job (Manual)' : 'Start Job Now'}
-            </button>
-            {!gpsUnavailable && (
-              <p className="text-center text-xs text-emerald-300/50">
-                Or wait for GPS auto-start when you arrive onsite
-              </p>
+
+            {/* ── MODE B: GPS available, OUTSIDE geofence — button disabled ── */}
+            {!gpsUnavailable && !isInsideGeofence && (
+              <>
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <div className="flex items-center gap-2 text-amber-300 text-sm">
+                    <MapPin className="w-4 h-4" />
+                    <span>Arrive at property to start job</span>
+                  </div>
+                </div>
+                <button
+                  disabled
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gray-700 text-gray-400 font-medium cursor-not-allowed opacity-60"
+                >
+                  <Play className="w-4 h-4" />
+                  Start Job
+                </button>
+                <p className="text-center text-xs text-emerald-300/50">
+                  Or wait for GPS auto-start when you arrive onsite
+                </p>
+              </>
+            )}
+
+            {/* ── MODE C: GPS available, INSIDE geofence — button enabled ── */}
+            {!gpsUnavailable && isInsideGeofence && (
+              <>
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                  <div className="flex items-center gap-2 text-emerald-300 text-sm">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="font-medium">Arrival verified</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onManualStart(job.id)}
+                  disabled={isLoading}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-medium transition-all disabled:opacity-50"
+                >
+                  {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  Start Job Now
+                </button>
+              </>
             )}
           </div>
         )}
 
-        {/* Job Actions Panel - visible for assigned, active, flagged_review */}
-        {['assigned', 'active', 'flagged_review'].includes(job?.status) && isMyJob && (
+
+        {/* Job Actions Panel - visible for scheduled (admin-assigned), assigned, active, flagged_review */}
+        {['scheduled', 'assigned', 'active', 'flagged_review'].includes(job?.status) && isMyJob && (
+
           <JobActionsPanel jobId={job.id} jobStatus={job.status} />
         )}
 
@@ -1966,11 +2251,12 @@ function JobActionsPanel({ jobId, jobStatus }: { jobId: string; jobStatus: strin
     }
   };
 
-  // Check if add-ons section should be visible (only for assigned/active)
-  const showAddOnsSection = ['assigned', 'active'].includes(jobStatus);
+  // Check if add-ons section should be visible (scheduled/assigned/active)
+  const showAddOnsSection = ['scheduled', 'assigned', 'active'].includes(jobStatus);
   
   // Check if unable to complete section should be visible
-  const showUnableToCompleteSection = ['assigned', 'active'].includes(jobStatus);
+  const showUnableToCompleteSection = ['scheduled', 'assigned', 'active'].includes(jobStatus);
+
 
 
   const sections = [
@@ -2466,11 +2752,12 @@ function JobActionsPanel({ jobId, jobStatus }: { jobId: string; jobStatus: strin
             <div className="text-left">
               <h4 className="text-sm font-semibold text-emerald-300">Job Actions</h4>
               <p className="text-xs text-emerald-300/60">
-                {jobStatus === 'assigned' ? 'Prepare for job' : 
+                {['assigned', 'scheduled'].includes(jobStatus) ? 'Prepare for job' : 
                  jobStatus === 'active' ? 'Job in progress' : 
-
                  'Review required'}
               </p>
+
+
             </div>
           </div>
           {isExpanded ? (
@@ -2619,5 +2906,4 @@ function JobActionsPanel({ jobId, jobStatus }: { jobId: string; jobStatus: strin
     </>
   );
 }
-
 

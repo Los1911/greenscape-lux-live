@@ -166,7 +166,8 @@ export default function LandscaperProfile() {
   return (
     <AppLayout>
       <AnimatedBackground />
-      <div className="flex flex-col items-center justify-start min-h-screen px-4 pt-24">
+      <div className="relative z-10 flex flex-col items-center justify-start min-h-screen px-4 pt-24">
+
         <div className="w-full max-w-3xl bg-black/80 border border-green-500 rounded-lg p-8 shadow-lg">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-3xl font-bold text-green-400">Landscaper Profile</h1>

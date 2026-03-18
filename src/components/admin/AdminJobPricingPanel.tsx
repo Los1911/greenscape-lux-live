@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRealtimePatch, patchArray } from '@/hooks/useRealtimePatch'
 import { AdminOverridePanel } from '@/components/admin/AdminOverridePanel'
+import { LandscaperAssignmentDropdown } from '@/components/admin/LandscaperAssignmentDropdown'
 import { JOB_STATUS_VALUES, JOB_STATUS_LABELS, type JobStatus as CanonicalJobStatus } from '@/constants/jobStatus'
 import {
   deriveAdminBucket,
@@ -54,6 +55,13 @@ import {
 } from 'lucide-react'
 
 
+// ============================================================================
+// BETA TESTING MODE: Minimum price temporarily set to $1 for Stripe test validation. Revert to $25 before production launch.
+// ============================================================================
+const MINIMUM_PRICE_DOLLARS = 1.00;
+
+
+
 
 // ============================================================================
 // JOB INTERFACE - ONLY includes columns that exist in the database
@@ -79,34 +87,19 @@ interface Job {
 
 // ============================================================================
 // BUCKET DERIVATION — delegates to the canonical lifecycle contract
-//
-// deriveAdminBucket() uses job.status as PRIMARY signal, with column-based
-// fallback only for jobs with null/unknown status. This is the SINGLE SOURCE
-// OF TRUTH for admin bucket classification.
 // ============================================================================
 
-/**
- * Check if a job belongs to the 'exceptions' bucket (flagged, blocked, cancelled, rescheduled)
- */
 function isJobFlagged(job: Job | null | undefined): boolean {
   if (!job) return false
-  // Primary: status-based via lifecycle contract
   if (deriveAdminBucket(job) === 'exceptions') return true
-  // Secondary: flagged_at column as overlay indicator
   return job.flagged_at != null
 }
 
-/**
- * Check if a job can be priced (only jobs in the needs_pricing bucket)
- */
 function isJobEditable(job: Job | null | undefined): boolean {
   if (!job) return false
   return deriveAdminBucket(job) === 'needs_pricing'
 }
 
-/**
- * Get display name for a job
- */
 function getJobDisplayName(job: Job | null | undefined): string {
   if (!job) return 'Unknown Job'
   return job.service_name || job.service_type || 'Unnamed Service'
@@ -130,7 +123,6 @@ const STATUS_ICON_MAP: Record<string, any> = {
   assigned: User, scheduled: CalendarCheck, active: Play, pending_review: Clock,
   completed: CheckCircle, completed_pending_review: Clock, flagged_review: Flag,
   blocked: AlertCircle, cancelled: XCircle, rescheduled: RotateCcw,
-  // Legacy aliases
   blocked_review: AlertCircle,
 }
 
@@ -169,8 +161,7 @@ function getStatusConfig(status: string | null | undefined) {
 
 
 // ============================================================================
-// BUCKET DISPLAY CONFIG — driven by ADMIN_BUCKET_CONFIG from lifecycle contract
-// Extended with icons for tab rendering
+// BUCKET DISPLAY CONFIG
 // ============================================================================
 const BUCKET_ICON_MAP: Record<AdminBucket, any> = {
   needs_pricing:    DollarSign,
@@ -218,7 +209,7 @@ function JobScopeDetails({ job }: { job: Job }) {
         <Tag className="w-4 h-4 text-blue-400/70 mt-0.5 flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <span className="text-gray-500 text-xs block">Service</span>
-          <span className="text-gray-200">{getJobDisplayName(job)}</span>
+          <span className="text-gray-200 break-words">{getJobDisplayName(job)}</span>
         </div>
       </div>
 
@@ -299,8 +290,13 @@ function PricingForm({
   const handleSave = () => {
     const finalPrice = Number(priceInput)
     if (isNaN(finalPrice) || finalPrice <= 0) return
+    if (finalPrice < MINIMUM_PRICE_DOLLARS) return
     onSave()
   }
+
+  const parsedPrice = Number(priceInput)
+  const isBelowMinimum = !isNaN(parsedPrice) && parsedPrice > 0 && parsedPrice < MINIMUM_PRICE_DOLLARS
+
 
   return (
     <div className="space-y-3 p-3 rounded-lg bg-emerald-900/20 border border-emerald-700/30">
@@ -340,9 +336,17 @@ function PricingForm({
           className="bg-gray-800/50 border-gray-700 min-h-[80px] text-sm resize-none"
         />
       </div>
+      {isBelowMinimum && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
+          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <span className="text-xs text-red-300">Minimum job price is ${MINIMUM_PRICE_DOLLARS.toFixed(2)}.</span>
+        </div>
+      )}
+
+
       <Button 
         onClick={handleSave} 
-        disabled={saving || !priceInput || Number(priceInput) <= 0}
+        disabled={saving || !priceInput || Number(priceInput) <= 0 || isBelowMinimum}
         className="w-full bg-emerald-600 hover:bg-emerald-700 h-11 text-base font-medium"
       >
         {saving ? (
@@ -357,9 +361,9 @@ function PricingForm({
 }
 
 
-
 // Read-Only Job Details Component
-function ReadOnlyJobDetails({ job }: { job: Job }) {
+
+function ReadOnlyJobDetails({ job, onAssigned }: { job: Job; onAssigned?: () => void }) {
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return null
     try {
@@ -386,14 +390,14 @@ function ReadOnlyJobDetails({ job }: { job: Job }) {
     <div className="space-y-4">
       {/* Status Banner */}
       <div className={`p-3 rounded-lg ${statusConfig.bgColor} border border-gray-700/50`}>
-        <div className="flex items-center gap-2">
-          <StatusIcon className={`w-5 h-5 ${statusConfig.color}`} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <StatusIcon className={`w-5 h-5 ${statusConfig.color} flex-shrink-0`} />
           <span className={`font-medium ${statusConfig.color}`}>
             {statusConfig.label}
             {job.status && <span className="text-xs text-gray-500 ml-2">(status: {job.status})</span>}
           </span>
           {flagged && (
-            <Badge className="ml-auto bg-red-500/20 text-red-300 text-xs">
+            <Badge className="ml-auto bg-red-500/20 text-red-300 text-xs flex-shrink-0">
               <Flag className="w-3 h-3 mr-1" />
               Flagged
             </Badge>
@@ -406,6 +410,25 @@ function ReadOnlyJobDetails({ job }: { job: Job }) {
 
       {/* Job Scope Details */}
       <JobScopeDetails job={job} />
+
+      {/* ── Landscaper Assignment (scheduled jobs only) ─────────────── */}
+      {job.status === 'scheduled' && (
+        <div className="p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20 space-y-2">
+          <h4 className="text-sm font-semibold text-cyan-400 flex items-center gap-2 pb-2 border-b border-cyan-500/15">
+            <User className="w-4 h-4" />
+            Assign Landscaper
+          </h4>
+          <p className="text-xs text-gray-500">
+            Select an approved landscaper to assign this scheduled job.
+          </p>
+          <LandscaperAssignmentDropdown
+            jobId={job.id}
+            jobStatus={job.status}
+            currentLandscaperId={job.landscaper_id}
+            onAssigned={onAssigned}
+          />
+        </div>
+      )}
 
       {/* Execution Details */}
       <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700 space-y-3">
@@ -471,6 +494,7 @@ function ReadOnlyJobDetails({ job }: { job: Job }) {
 }
 
 // Job List Item Component
+
 function JobListItem({ 
   job, 
   isSelected, 
@@ -491,7 +515,7 @@ function JobListItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left p-3 rounded-lg border transition-all ${
+      className={`w-full text-left p-3 rounded-lg border transition-all min-w-0 ${
         isSelected 
           ? 'bg-emerald-500/20 border-emerald-500/50 border-l-4 border-l-emerald-500' 
           : 'bg-gray-800/30 border-gray-700/50 hover:bg-gray-800/50 hover:border-gray-600'
@@ -504,12 +528,12 @@ function JobListItem({
               {getJobDisplayName(job)}
             </span>
             {flagged && (
-              <Badge className="bg-red-500/20 text-red-300 text-xs px-1.5 py-0">
+              <Badge className="bg-red-500/20 text-red-300 text-xs px-1.5 py-0 flex-shrink-0">
                 <Flag className="w-3 h-3" />
               </Badge>
             )}
             {showBucket && (
-              <Badge className={`${bucketConfig.bgColor} ${bucketConfig.color} text-xs px-1.5 py-0 flex items-center gap-1`}>
+              <Badge className={`${bucketConfig.bgColor} ${bucketConfig.color} text-xs px-1.5 py-0 flex items-center gap-1 flex-shrink-0`}>
                 {React.createElement(bucketConfig.icon, { className: "w-3 h-3" })}
                 <span className="hidden sm:inline">{bucketConfig.label}</span>
               </Badge>
@@ -538,7 +562,6 @@ function JobListItem({
               {job.price.toFixed(2)}
             </span>
           )}
-          {/* Show raw status for debugging */}
           {job.status && (
             <span className="text-xs text-gray-600 block mt-0.5">
               status: {job.status}
@@ -553,7 +576,7 @@ function JobListItem({
   )
 }
 
-// All Jobs Table Component
+// All Jobs Table Component — with mobile card view
 function AllJobsTable({ 
   jobs, 
   selectedJob, 
@@ -577,12 +600,12 @@ function AllJobsTable({
   }
 
   return (
-    <Card className="bg-gray-900/50 border-gray-800 mt-6">
+    <Card className="bg-gray-900/50 border-gray-800 mt-6 w-full min-w-0">
       <CardHeader className="pb-3">
         <CardTitle className="text-gray-200 flex items-center gap-2">
-          <List className="w-5 h-5" />
-          All Jobs
-          <Badge variant="secondary" className="ml-2 bg-gray-700 text-gray-300">
+          <List className="w-5 h-5 flex-shrink-0" />
+          <span className="truncate">All Jobs</span>
+          <Badge variant="secondary" className="ml-2 bg-gray-700 text-gray-300 flex-shrink-0">
             {jobs.length}
           </Badge>
         </CardTitle>
@@ -591,87 +614,146 @@ function AllJobsTable({
         </p>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-700">
-                <th className="text-left py-2 px-3 text-gray-400 font-medium">Service</th>
-                <th className="text-left py-2 px-3 text-gray-400 font-medium">Client</th>
-                <th className="text-left py-2 px-3 text-gray-400 font-medium">Status</th>
-                <th className="text-left py-2 px-3 text-gray-400 font-medium">Bucket</th>
-                <th className="text-left py-2 px-3 text-gray-400 font-medium">Price</th>
-                <th className="text-left py-2 px-3 text-gray-400 font-medium">Created</th>
-                <th className="text-left py-2 px-3 text-gray-400 font-medium">Flags</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-8 text-gray-500">
-                    No jobs found
-                  </td>
-                </tr>
-              ) : (
-                jobs.map(job => {
-                  const bucket = deriveAdminBucket(job)
-                  const bucketConfig = getBucketConfig(bucket)
-                  const flagged = isJobFlagged(job)
-                  const isSelected = selectedJob?.id === job.id
+        {jobs.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            No jobs found
+          </div>
+        ) : (
+          <>
+            {/* Mobile Card View — visible below md */}
+            <div className="md:hidden space-y-2">
+              {jobs.map(job => {
+                const bucket = deriveAdminBucket(job)
+                const bucketConfig = getBucketConfig(bucket)
+                const flagged = isJobFlagged(job)
+                const isSelected = selectedJob?.id === job.id
 
-                  return (
-                    <tr 
-                      key={job.id}
-                      onClick={() => onSelectJob(job)}
-                      className={`border-b border-gray-800 cursor-pointer transition-colors ${
-                        isSelected 
-                          ? 'bg-emerald-500/10' 
-                          : 'hover:bg-gray-800/50'
-                      }`}
-                    >
-                      <td className="py-2 px-3">
-                        <span className="text-gray-200 font-medium">
-                          {getJobDisplayName(job)}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3">
-                        <span className="text-gray-400 text-xs truncate block max-w-[150px]">
-                          {job.client_email || '-'}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3">
-                        <span className="text-gray-500 text-xs">
-                          {job.status || '-'}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3">
-                        <Badge className={`${bucketConfig.bgColor} ${bucketConfig.color} text-xs`}>
-                          {bucketConfig.label}
-                        </Badge>
-                      </td>
-                      <td className="py-2 px-3">
-                        {job.price != null ? (
-                          <span className="text-emerald-400">${job.price.toFixed(2)}</span>
-                        ) : (
-                          <span className="text-gray-500">-</span>
-                        )}
-                      </td>
-                      <td className="py-2 px-3 text-gray-400 text-xs">
-                        {formatDate(job.created_at)}
-                      </td>
-                      <td className="py-2 px-3">
+                return (
+                  <button
+                    key={job.id}
+                    onClick={() => onSelectJob(job)}
+                    className={`w-full text-left p-3 rounded-lg border transition-colors min-w-0 ${
+                      isSelected
+                        ? 'bg-emerald-500/10 border-emerald-500/40'
+                        : 'bg-gray-800/30 border-gray-700/50 hover:bg-gray-800/50'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span className="font-medium text-gray-200 text-sm truncate flex-1">
+                        {getJobDisplayName(job)}
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
                         {flagged && (
-                          <Badge className="bg-red-500/20 text-red-300 text-xs">
+                          <Badge className="bg-red-500/20 text-red-300 text-xs px-1 py-0">
                             <Flag className="w-3 h-3" />
                           </Badge>
                         )}
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        <Badge className={`${bucketConfig.bgColor} ${bucketConfig.color} text-[10px] px-1.5 py-0`}>
+                          {bucketConfig.label}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      {job.client_email && (
+                        <p className="text-xs text-gray-400 truncate">
+                          {job.client_email}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-gray-500">{formatDate(job.created_at)}</span>
+                        <div className="flex items-center gap-2">
+                          {job.status && (
+                            <span className="text-[10px] text-gray-600">{job.status}</span>
+                          )}
+                          {job.price != null ? (
+                            <span className="text-xs text-emerald-400 font-medium">${job.price.toFixed(2)}</span>
+                          ) : (
+                            <span className="text-xs text-gray-600">-</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Desktop Table — visible at md and above */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-700">
+                    <th className="text-left py-2 px-3 text-gray-400 font-medium">Service</th>
+                    <th className="text-left py-2 px-3 text-gray-400 font-medium">Client</th>
+                    <th className="text-left py-2 px-3 text-gray-400 font-medium">Status</th>
+                    <th className="text-left py-2 px-3 text-gray-400 font-medium">Bucket</th>
+                    <th className="text-left py-2 px-3 text-gray-400 font-medium">Price</th>
+                    <th className="text-left py-2 px-3 text-gray-400 font-medium">Created</th>
+                    <th className="text-left py-2 px-3 text-gray-400 font-medium">Flags</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jobs.map(job => {
+                    const bucket = deriveAdminBucket(job)
+                    const bucketConfig = getBucketConfig(bucket)
+                    const flagged = isJobFlagged(job)
+                    const isSelected = selectedJob?.id === job.id
+
+                    return (
+                      <tr 
+                        key={job.id}
+                        onClick={() => onSelectJob(job)}
+                        className={`border-b border-gray-800 cursor-pointer transition-colors ${
+                          isSelected 
+                            ? 'bg-emerald-500/10' 
+                            : 'hover:bg-gray-800/50'
+                        }`}
+                      >
+                        <td className="py-2 px-3">
+                          <span className="text-gray-200 font-medium">
+                            {getJobDisplayName(job)}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3">
+                          <span className="text-gray-400 text-xs truncate block max-w-[150px]">
+                            {job.client_email || '-'}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3">
+                          <span className="text-gray-500 text-xs">
+                            {job.status || '-'}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3">
+                          <Badge className={`${bucketConfig.bgColor} ${bucketConfig.color} text-xs`}>
+                            {bucketConfig.label}
+                          </Badge>
+                        </td>
+                        <td className="py-2 px-3">
+                          {job.price != null ? (
+                            <span className="text-emerald-400">${job.price.toFixed(2)}</span>
+                          ) : (
+                            <span className="text-gray-500">-</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-gray-400 text-xs">
+                          {formatDate(job.created_at)}
+                        </td>
+                        <td className="py-2 px-3">
+                          {flagged && (
+                            <Badge className="bg-red-500/20 text-red-300 text-xs">
+                              <Flag className="w-3 h-3" />
+                            </Badge>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   )
@@ -881,7 +963,7 @@ export function AdminJobPricingPanel() {
           status: 'priced'
         })
         .eq('id', selectedJob.id)
-        .select('id')
+        .select('id, client_email, customer_name, service_name, service_type')
 
       if (jobError) throw jobError
 
@@ -903,6 +985,37 @@ export function AdminJobPricingPanel() {
         })
         .eq('job_id', selectedJob.id)
 
+      // ── EVENT 2: QUOTE PRICED — lifecycle email to client via unified-email ────
+      const pricedJob = updatedRows[0]
+      if (pricedJob?.client_email) {
+        try {
+          await supabase.functions.invoke('unified-email', {
+            body: {
+              type: 'admin_alert',
+              to: pricedJob.client_email,
+              data: {
+                subject: 'Your GreenScape Lux quote is ready',
+                title: 'Your Quote is Ready',
+                message: `Hello ${pricedJob.customer_name || 'Valued Customer'},<br/><br/>Your service quote is ready.<br/><br/><strong>Service:</strong> ${pricedJob.service_name || pricedJob.service_type || 'Landscaping Service'}<br/><strong>Price:</strong> $${price.toFixed(2)}<br/><br/>Log in to confirm and schedule your service.<br/><br/>Thank you for choosing GreenScape Lux.`
+              }
+            }
+          })
+          console.log('Lifecycle email sent:', {
+            event: 'QUOTE_PRICED',
+            job_id: selectedJob.id,
+            recipient: pricedJob.client_email,
+            timestamp: new Date().toISOString()
+          })
+        } catch (emailErr: any) {
+          console.error('Lifecycle email failed:', {
+            event: 'QUOTE_PRICED',
+            job_id: selectedJob.id,
+            error: emailErr?.message || 'Unknown error'
+          })
+        }
+      }
+
+
       toast({ 
         title: 'Price saved successfully', 
         description: `Job priced at $${price.toFixed(2)}${notesInput.trim() ? ' with notes' : ''}. Client can now pay.` 
@@ -916,6 +1029,7 @@ export function AdminJobPricingPanel() {
       setSaving(false)
     }
   }
+
 
 
 
@@ -984,66 +1098,76 @@ export function AdminJobPricingPanel() {
   }
 
   return (
-    <>
-      {/* Stats Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-4">
-        {VISIBLE_BUCKETS.map(bucket => {
-          const config = getBucketConfig(bucket)
-          const count = stats[bucket as keyof JobStats] as number || 0
-          return (
-            <div
-              key={bucket}
-              className={`${config.bgColor} border border-${config.color.replace('text-', '')}/30 rounded-lg p-3 text-center cursor-pointer hover:opacity-80 transition-opacity`}
-              onClick={() => setActiveTab(bucket)}
-            >
-              <div className={`text-2xl font-bold ${config.color}`}>{count}</div>
-              <div className="text-xs text-gray-400">{config.label}</div>
-            </div>
-          )
-        })}
-        <div className="bg-gray-500/10 border border-gray-500/30 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-gray-400">{stats.total}</div>
-          <div className="text-xs text-gray-400">Total</div>
+    <div className="w-full min-w-0">
+      {/* Stats Summary — horizontally scrollable on mobile, grid on larger screens */}
+      <div className="overflow-x-auto -mx-1 px-1 pb-2 mb-4">
+        <div className="flex gap-2 sm:gap-3 min-w-max sm:min-w-0 sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8">
+          {VISIBLE_BUCKETS.map(bucket => {
+            const config = getBucketConfig(bucket)
+            const count = stats[bucket as keyof JobStats] as number || 0
+            return (
+              <div
+                key={bucket}
+                className={`${config.bgColor} border border-emerald-500/20 rounded-lg p-2 sm:p-3 text-center cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0 w-24 sm:w-auto`}
+                onClick={() => setActiveTab(bucket)}
+              >
+                <div className={`text-xl sm:text-2xl font-bold ${config.color}`}>{count}</div>
+                <div className="text-[10px] sm:text-xs text-gray-400 truncate">{config.label}</div>
+              </div>
+            )
+          })}
+          <div className="bg-gray-500/10 border border-gray-500/30 rounded-lg p-2 sm:p-3 text-center flex-shrink-0 w-24 sm:w-auto">
+            <div className="text-xl sm:text-2xl font-bold text-gray-400">{stats.total}</div>
+            <div className="text-[10px] sm:text-xs text-gray-400">Total</div>
+          </div>
         </div>
       </div>
 
       {/* Main Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as BucketTab)} className="w-full">
-        <TabsList className={`grid w-full mb-4 bg-gray-900/50 border border-gray-800 h-auto`} style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))` }}>
-          {visibleTabs.map((tab) => {
-            const config = getTabConfig(tab)
-            const Icon = config?.icon || HelpCircle
-            const count = getTabCount(tab)
-            return (
-              <TabsTrigger 
-                key={tab}
-                value={tab} 
-                className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 px-1 sm:px-3"
-              >
-                <Icon className="w-4 h-4" />
-                <span className="text-xs sm:text-sm hidden sm:inline">{config?.label || tab}</span>
-                {count > 0 && (
-                  <Badge variant="secondary" className={`${config?.bgColor || 'bg-gray-600'} ${config?.color || 'text-gray-400'} text-xs px-1.5`}>
-                    {count}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            )
-          })}
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as BucketTab)} className="w-full min-w-0">
+        {/* ── Lifecycle Tab Bar ──────────────────────────────────────────
+             HIDDEN on mobile (<768px) via `hidden md:block`.
+             Stat cards above already handle tab switching on mobile.
+        ──────────────────────────────────────────────────────────────── */}
+        <div className="hidden md:block overflow-x-auto -mx-1 px-1 mb-4">
+          <TabsList className="inline-flex w-max sm:w-full sm:grid bg-gray-900/50 border border-gray-800 h-auto gap-0" style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))` }}>
+            {visibleTabs.map((tab) => {
+              const config = getTabConfig(tab)
+              const Icon = config?.icon || HelpCircle
+              const count = getTabCount(tab)
+              return (
+                <TabsTrigger 
+                  key={tab}
+                  value={tab} 
+                  className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white flex items-center gap-1 sm:gap-2 py-2 px-2 sm:px-3 whitespace-nowrap flex-shrink-0"
+                >
+                  <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <span className="text-[10px] sm:text-xs md:text-sm truncate">{config?.label || tab}</span>
+                  {count > 0 && (
+                    <Badge variant="secondary" className={`${config?.bgColor || 'bg-gray-600'} ${config?.color || 'text-gray-400'} text-[10px] sm:text-xs px-1 sm:px-1.5 flex-shrink-0`}>
+                      {count}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              )
+            })}
+          </TabsList>
+        </div>
+
+
 
         {/* Tab Content */}
         {visibleTabs.map((tab) => (
           <TabsContent key={tab} value={tab} className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               {/* Jobs List Panel */}
-              <Card className="bg-gray-900/50 border-gray-800">
-                <CardHeader className="pb-3">
-                  <CardTitle className={`${getTabConfig(tab)?.color || 'text-gray-400'} flex items-center gap-2`}>
-                    {React.createElement(getTabConfig(tab)?.icon || HelpCircle, { className: "w-5 h-5" })}
-                    {getTabConfig(tab)?.label || tab}
+              <Card className="bg-gray-900/50 border-gray-800 w-full min-w-0">
+                <CardHeader className="pb-3 px-3 sm:px-6">
+                  <CardTitle className={`${getTabConfig(tab)?.color || 'text-gray-400'} flex items-center gap-2 text-sm sm:text-base`}>
+                    {React.createElement(getTabConfig(tab)?.icon || HelpCircle, { className: "w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" })}
+                    <span className="truncate">{getTabConfig(tab)?.label || tab}</span>
                     {getJobsForTab(tab).length > 0 && (
-                      <Badge variant="secondary" className={`ml-2 ${getTabConfig(tab)?.bgColor || 'bg-gray-600'} ${getTabConfig(tab)?.color || 'text-gray-400'}`}>
+                      <Badge variant="secondary" className={`ml-2 ${getTabConfig(tab)?.bgColor || 'bg-gray-600'} ${getTabConfig(tab)?.color || 'text-gray-400'} flex-shrink-0`}>
                         {getJobsForTab(tab).length}
                       </Badge>
                     )}
@@ -1052,7 +1176,7 @@ export function AdminJobPricingPanel() {
                     {getTabConfig(tab)?.description || ''}
                   </p>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-3 sm:px-6">
                   {getJobsForTab(tab).length === 0 ? (
                     <div className="text-center py-10 text-gray-400">
                       {React.createElement(getTabConfig(tab)?.icon || HelpCircle, { className: "w-10 h-10 mx-auto mb-2 opacity-50" })}
@@ -1126,7 +1250,8 @@ export function AdminJobPricingPanel() {
                       {tab === 'needs_pricing' && isJobEditable(selectedJob) ? (
                         pricingPanelContent
                       ) : (
-                        <ReadOnlyJobDetails job={selectedJob} />
+                        <ReadOnlyJobDetails job={selectedJob} onAssigned={loadJobs} />
+
                       )}
 
                       {/* Override Job — toggle button + collapsible panel */}
@@ -1192,23 +1317,23 @@ export function AdminJobPricingPanel() {
               <SheetHeader>
                 <SheetTitle className={`flex items-center gap-2 text-base ${getTabConfig(activeTab)?.color || 'text-gray-400'}`}>
                   {activeTab === 'needs_pricing' && isJobEditable(selectedJob) ? (
-                    <DollarSign className="w-5 h-5" />
+                    <DollarSign className="w-5 h-5 flex-shrink-0" />
                   ) : (
-                    <Eye className="w-5 h-5" />
+                    <Eye className="w-5 h-5 flex-shrink-0" />
                   )}
                   <span className="truncate">
                     {selectedJob ? getJobDisplayName(selectedJob) : 
                       (activeTab === 'needs_pricing' ? 'Set Job Price' : 'Job Details')}
                   </span>
                   {selectedJob && isJobFlagged(selectedJob) && (
-                    <Badge className="bg-red-500/20 text-red-300 text-xs ml-auto">
+                    <Badge className="bg-red-500/20 text-red-300 text-xs ml-auto flex-shrink-0">
                       <Flag className="w-3 h-3 mr-1" />
                       Flagged
                     </Badge>
                   )}
                 </SheetTitle>
                 {selectedJob?.client_email && (
-                  <p className="text-xs text-gray-500 mt-0.5">{selectedJob.client_email}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 truncate">{selectedJob.client_email}</p>
                 )}
               </SheetHeader>
             </div>
@@ -1220,7 +1345,8 @@ export function AdminJobPricingPanel() {
                   {activeTab === 'needs_pricing' && isJobEditable(selectedJob) ? (
                     pricingPanelContent
                   ) : (
-                    <ReadOnlyJobDetails job={selectedJob} />
+                    <ReadOnlyJobDetails job={selectedJob} onAssigned={loadJobs} />
+
                   )}
 
                   {/* Override Job — toggle button + collapsible panel (mobile) */}
@@ -1258,7 +1384,7 @@ export function AdminJobPricingPanel() {
 
         </SheetContent>
       </Sheet>
-    </>
+    </div>
   )
 }
 

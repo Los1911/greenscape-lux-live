@@ -39,19 +39,17 @@ export default function UnifiedLogin() {
 
   return (
     <div 
-      className="bg-black relative overflow-hidden flex flex-col"
+      className="bg-black relative overflow-hidden flex flex-col w-full"
       style={{
         minHeight: '100dvh',
-        /* Fallback for browsers that don't support dvh */
-        minHeight: '100svh',
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)'
       }}
     >
-      {/* Animated Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black">
+      {/* Decorative background — absolute inset-0 z-0 pointer-events-none */}
+      <div className="absolute inset-0 z-0 bg-gradient-to-br from-black via-gray-900 to-black pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0%,transparent_50%)]" />
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-400/5 rounded-full blur-3xl animate-pulse delay-1000" />
@@ -65,7 +63,8 @@ export default function UnifiedLogin() {
           paddingBottom: 'max(2rem, env(safe-area-inset-bottom))'
         }}
       >
-        <div className="w-full max-w-md">
+        {/* Login card container — w-full max-w-md mx-auto */}
+        <div className="w-full max-w-md mx-auto">
           <ConsolidatedAuth 
             defaultTab={tab}
             userType={userType}

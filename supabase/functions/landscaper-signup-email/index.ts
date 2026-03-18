@@ -11,11 +11,12 @@ function cors(origin?: string | null) {
     'Access-Control-Allow-Origin': allowed,
     'Vary': 'Origin',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-info, apikey, x-application-name',
     'Access-Control-Max-Age': '86400',
     'Content-Type': 'application/json'
   };
 }
+
 
 const resend = new Resend(serverConfig.resendApiKey);
 

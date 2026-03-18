@@ -21,10 +21,11 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import type { JobPhoto } from '@/types/jobPhoto';
 import { groupPhotosByType } from '@/types/jobPhoto';
 
-/* ── Types ─────────────────────────────────────────────────────────── */
+/* Types */
 
 interface ReviewJob {
   id: string;
@@ -41,7 +42,7 @@ interface ReviewJob {
   completed_at?: string | null;
   status: string;
 
-  /** Relational photos from job_photos table */
+  job_photos?: JobPhoto[];
   photos?: JobPhoto[];
 }
 
@@ -49,9 +50,10 @@ interface CompletionReviewPanelProps {
   job: ReviewJob;
   onClose: () => void;
   onActionComplete?: (jobId: string, newStatus: string) => void;
+  onRefresh?: () => void;
 }
 
-/* ── Photo Modal ───────────────────────────────────────────────────── */
+/* Photo Modal */
 
 function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
   return (
@@ -59,7 +61,7 @@ function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
       className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={onClose}
     >
-      <div className="relative max-w-4xl max-h-[90vh]" onClick={e => e.stopPropagation()}>
+      <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onClose}
           className="absolute -top-3 -right-3 z-10 bg-black/80 border border-gray-600 rounded-full p-1.5 text-gray-300 hover:text-white"
@@ -72,7 +74,7 @@ function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
   );
 }
 
-/* ── Photo Gallery Strip ───────────────────────────────────────────── */
+/* Photo Gallery Strip */
 
 function PhotoGalleryStrip({
   photos,
@@ -128,14 +130,14 @@ function PhotoGalleryStrip({
         {photos.length > visibleCount && (
           <div className="flex gap-1">
             <button
-              onClick={() => setScrollIndex(i => Math.max(0, i - 1))}
+              onClick={() => setScrollIndex((i) => Math.max(0, i - 1))}
               disabled={!canScrollLeft}
               className="p-0.5 rounded text-gray-500 hover:text-white disabled:opacity-30 transition-colors"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
             <button
-              onClick={() => setScrollIndex(i => Math.min(photos.length - visibleCount, i + 1))}
+              onClick={() => setScrollIndex((i) => Math.min(photos.length - visibleCount, i + 1))}
               disabled={!canScrollRight}
               className="p-0.5 rounded text-gray-500 hover:text-white disabled:opacity-30 transition-colors"
             >
@@ -149,7 +151,7 @@ function PhotoGalleryStrip({
         className="grid gap-2"
         style={{ gridTemplateColumns: `repeat(${Math.min(visiblePhotos.length, visibleCount)}, 1fr)` }}
       >
-        {visiblePhotos.map(photo => (
+        {visiblePhotos.map((photo) => (
           <div
             key={photo.id}
             className={`relative aspect-video rounded-lg overflow-hidden border border-${accentColor}-500/20 cursor-pointer group`}
@@ -174,29 +176,33 @@ function PhotoGalleryStrip({
   );
 }
 
-/* ── Main Component ────────────────────────────────────────────────── */
+/* Main Component */
 
-export default function CompletionReviewPanel({ job, onClose, onActionComplete }: CompletionReviewPanelProps) {
+export default function CompletionReviewPanel({
+  job,
+  onClose,
+  onActionComplete,
+  onRefresh,
+}: CompletionReviewPanelProps) {
   const [adminNote, setAdminNote] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const [landscaperDisplay, setLandscaperDisplay] = useState<string>('Unassigned');
   const [landscaperLoading, setLandscaperLoading] = useState(false);
 
-  /* ── Derive before/after from relational photos ──────────────────── */
-
   const photoGroup = useMemo(() => {
-    return groupPhotosByType(job.photos || []);
-  }, [job.photos]);
+    const resolved = job.job_photos ?? job.photos ?? [];
+    return groupPhotosByType(resolved);
+  }, [job.job_photos, job.photos]);
 
   const beforePhotos = photoGroup.before;
   const afterPhotos = photoGroup.after;
   const hasAfterPhoto = afterPhotos.length > 0;
-  const photosLoaded = job.photos !== undefined;
 
-  /* ── Resolve landscaper display ──────────────────────────────────── */
+  const photosLoaded = job.job_photos !== undefined || job.photos !== undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -207,8 +213,10 @@ export default function CompletionReviewPanel({ job, onClose, onActionComplete }
         return;
       }
 
-      const landscaperId = job.landscaper_id || job.assigned_to;
-      if (!landscaperId) {
+      const landscaperId = job.landscaper_id || null;
+      const assignedUserId = job.assigned_to || null;
+
+      if (!landscaperId && !assignedUserId) {
         setLandscaperDisplay('Unassigned');
         return;
       }
@@ -216,29 +224,56 @@ export default function CompletionReviewPanel({ job, onClose, onActionComplete }
       setLandscaperLoading(true);
 
       try {
-        const { data, error: err } = await supabase
-          .from('landscapers')
-          .select('email, full_name')
-          .eq('id', landscaperId)
-          .maybeSingle();
+        if (landscaperId) {
+          const { data, error: err } = await supabase
+            .from('landscapers')
+            .select('email, full_name')
+            .eq('id', landscaperId)
+            .maybeSingle();
 
-        if (cancelled) return;
+          if (cancelled) return;
 
-        if (err) {
-          console.warn('[CompletionReviewPanel] landscaper lookup error:', err);
-          setLandscaperDisplay(landscaperId);
+          if (err) {
+            console.warn('[CompletionReviewPanel] landscaper lookup error:', err);
+            setLandscaperDisplay(landscaperId);
+            return;
+          }
+
+          if (!data) {
+            setLandscaperDisplay(landscaperId);
+            return;
+          }
+
+          const email = (data as any).email as string | null;
+          const fullName = (data as any).full_name as string | null;
+          setLandscaperDisplay(fullName || email || landscaperId);
           return;
         }
 
-        if (!data) {
-          setLandscaperDisplay(landscaperId);
-          return;
+        if (assignedUserId) {
+          const { data, error: err } = await supabase
+            .from('landscapers')
+            .select('email, full_name')
+            .eq('user_id', assignedUserId)
+            .maybeSingle();
+
+          if (cancelled) return;
+
+          if (err) {
+            console.warn('[CompletionReviewPanel] landscaper lookup error:', err);
+            setLandscaperDisplay(assignedUserId);
+            return;
+          }
+
+          if (!data) {
+            setLandscaperDisplay(assignedUserId);
+            return;
+          }
+
+          const email = (data as any).email as string | null;
+          const fullName = (data as any).full_name as string | null;
+          setLandscaperDisplay(fullName || email || assignedUserId);
         }
-
-        const email = (data as any).email as string | null;
-        const fullName = (data as any).full_name as string | null;
-
-        setLandscaperDisplay(fullName || email || landscaperId);
       } finally {
         if (!cancelled) setLandscaperLoading(false);
       }
@@ -251,28 +286,96 @@ export default function CompletionReviewPanel({ job, onClose, onActionComplete }
     };
   }, [job.landscaper_email, job.landscaper_id, job.assigned_to]);
 
-  /* ── Action handlers ─────────────────────────────────────────────── */
+  const invokeJobExecution = async (payload: {
+    action: 'admin_approve' | 'admin_reject';
+    jobId: string;
+    rejectionReason?: string;
+  }) => {
+    const { data, error: fnError } = await supabase.functions.invoke('job-execution', {
+      body: payload,
+    });
+
+    if (fnError) throw fnError;
+
+    if (data && typeof data === 'object' && (data as any).success === false) {
+      const msg = (data as any).error || 'Edge function failed';
+      throw new Error(msg);
+    }
+
+    return data;
+  };
 
   const handleApprove = async () => {
     if (!hasAfterPhoto) return;
+
+    if (job.status !== 'completed_pending_review') {
+      setError(`Job must be completed_pending_review to approve. Current status: ${job.status}`);
+      return;
+    }
+
     setActionLoading('approve');
     setError(null);
-    try {
-      const { error: err } = await supabase
-        .from('jobs')
-        .update({
-          status: 'completed',
-          admin_approved_at: new Date().toISOString(),
-        })
-        .eq('id', job.id);
 
-      if (err) throw err;
+    try {
+      await invokeJobExecution({
+        action: 'admin_approve',
+        jobId: job.id,
+      });
+
+      toast({
+        title: 'Job Approved',
+        description: 'The job has been approved and payout is now eligible.',
+      });
 
       onActionComplete?.(job.id, 'completed');
+      onRefresh?.();
       onClose();
     } catch (e: any) {
       console.error('[CompletionReview] Approve failed:', e);
       setError(e.message || 'Failed to approve');
+      toast({
+        title: 'Approval Failed',
+        description: e.message || 'Failed to approve job.',
+        variant: 'destructive',
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReject = async () => {
+    setActionLoading('reject');
+    setError(null);
+
+    try {
+      const reason = adminNote.trim();
+      if (!reason) {
+        setError('Admin note is required to reject.');
+        return;
+      }
+
+      await invokeJobExecution({
+        action: 'admin_reject',
+        jobId: job.id,
+        rejectionReason: reason,
+      });
+
+      toast({
+        title: 'Job Rejected',
+        description: 'The job was rejected and returned to active.',
+      });
+
+      onActionComplete?.(job.id, 'active');
+      onRefresh?.();
+      onClose();
+    } catch (e: any) {
+      console.error('[CompletionReview] Reject failed:', e);
+      setError(e.message || 'Failed to reject');
+      toast({
+        title: 'Rejection Failed',
+        description: e.message || 'Failed to reject job.',
+        variant: 'destructive',
+      });
     } finally {
       setActionLoading(null);
     }
@@ -283,8 +386,10 @@ export default function CompletionReviewPanel({ job, onClose, onActionComplete }
       setError('Admin note is required to return a job to active.');
       return;
     }
+
     setActionLoading('return');
     setError(null);
+
     try {
       const { error: err } = await supabase
         .from('jobs')
@@ -296,43 +401,28 @@ export default function CompletionReviewPanel({ job, onClose, onActionComplete }
 
       if (err) throw err;
 
+      toast({
+        title: 'Returned to Active',
+        description: 'The job has been returned to the landscaper for rework.',
+      });
+
       onActionComplete?.(job.id, 'active');
+      onRefresh?.();
       onClose();
     } catch (e: any) {
       console.error('[CompletionReview] Return failed:', e);
       setError(e.message || 'Failed to return to active');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleFlag = async () => {
-    setActionLoading('flag');
-    setError(null);
-    try {
-      const { error: err } = await supabase
-        .from('jobs')
-        .update({
-          status: 'completion_flagged',
-          admin_review_notes: adminNote.trim() || null,
-        })
-        .eq('id', job.id);
-
-      if (err) throw err;
-
-      onActionComplete?.(job.id, 'completion_flagged');
-      onClose();
-    } catch (e: any) {
-      console.error('[CompletionReview] Flag failed:', e);
-      setError(e.message || 'Failed to flag');
+      toast({
+        title: 'Return Failed',
+        description: e.message || 'Failed to return job to active.',
+        variant: 'destructive',
+      });
     } finally {
       setActionLoading(null);
     }
   };
 
   const isLoading = !!actionLoading;
-
-  /* ── Render ──────────────────────────────────────────────────────── */
 
   return (
     <>
@@ -435,12 +525,12 @@ export default function CompletionReviewPanel({ job, onClose, onActionComplete }
 
           <div>
             <label className="block text-sm font-semibold text-gray-300 mb-2">
-              Admin Note <span className="text-gray-500 font-normal">(required for Return / optional for Flag)</span>
+              Admin Note <span className="text-gray-500 font-normal">(required for Reject and Return)</span>
             </label>
             <Textarea
               placeholder="Enter review notes..."
               value={adminNote}
-              onChange={e => setAdminNote(e.target.value)}
+              onChange={(e) => setAdminNote(e.target.value)}
               className="bg-black/40 border-gray-600 text-white placeholder-gray-500 resize-none focus:border-orange-500/50 focus:ring-orange-500/20"
               rows={3}
               disabled={isLoading}
@@ -454,7 +544,7 @@ export default function CompletionReviewPanel({ job, onClose, onActionComplete }
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <div className="flex gap-3 pt-2">
             <Button
               onClick={handleApprove}
               disabled={!hasAfterPhoto || !photosLoaded || isLoading}
@@ -465,9 +555,24 @@ export default function CompletionReviewPanel({ job, onClose, onActionComplete }
               ) : (
                 <CheckCircle className="w-4 h-4 mr-2" />
               )}
-              Approve Completion
+              Approve Job
             </Button>
 
+            <Button
+              onClick={handleReject}
+              disabled={isLoading}
+              className="flex-1 bg-red-500 hover:bg-red-400 text-white font-bold transition-all"
+            >
+              {actionLoading === 'reject' ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Flag className="w-4 h-4 mr-2" />
+              )}
+              Reject
+            </Button>
+          </div>
+
+          <div className="flex gap-3">
             <Button
               onClick={handleReturnToActive}
               disabled={isLoading}
@@ -480,20 +585,6 @@ export default function CompletionReviewPanel({ job, onClose, onActionComplete }
                 <RotateCcw className="w-4 h-4 mr-2" />
               )}
               Return To Active
-            </Button>
-
-            <Button
-              onClick={handleFlag}
-              disabled={isLoading}
-              variant="outline"
-              className="flex-1 border-red-500/50 text-red-300 hover:bg-red-500/10 hover:border-red-400/70 font-semibold transition-all"
-            >
-              {actionLoading === 'flag' ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Flag className="w-4 h-4 mr-2" />
-              )}
-              Flag For Investigation
             </Button>
           </div>
 

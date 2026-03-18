@@ -149,10 +149,16 @@ export const useDashboardData = (role: 'client' | 'landscaper' = 'client') => {
         const active = jobsData.filter(j => activeStatuses.includes(j.status));
         const completed = jobsData.filter(j => completedStatuses.includes(j.status));
 
-        const totalEarnings = completed.reduce(
-          (sum, j) => sum + (Number(j.price) || 0),
+        // SCHEMA ALIGNMENT: jobs table uses 'payout_status', NOT 'payment_status'
+        // payout_status != 'not_ready' means client payment has been received
+        const paidCompleted = completed.filter(j => (j as any).payout_status && (j as any).payout_status !== 'not_ready');
+
+        const totalEarnings = paidCompleted.reduce(
+          (sum, j) => sum + (role === 'landscaper' ? (Number((j as any).payout_amount) || 0) : (Number(j.price) || 0)),
           0
         );
+
+
 
         setStats({
           totalJobs: jobsData.length,

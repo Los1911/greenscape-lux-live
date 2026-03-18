@@ -34,16 +34,27 @@ export default function EarningsPanel() {
       await waitForSupabaseSession();
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (authUser?.id) {
+        // SCHEMA ALIGNMENT: jobs table uses 'payout_status', NOT 'payment_status'
+        // Earnings = SUM of jobs.payout_amount WHERE payout_status != 'not_ready'
+        // payout_status != 'not_ready' means client payment has been received
+        // Landscapers see payout_amount (their net earnings), not the client-facing price
+
         const { data: jobsData } = await supabase
           .from('jobs')
           .select('*')
           .eq('landscaper_id', authUser.id)
           .eq('status', 'completed')
+          .neq('payout_status', 'not_ready')
           .order('completed_at', { ascending: false });
+
 
         const earningsData = jobsData?.map(job => ({
           id: job.id, jobId: job.id, jobTitle: job.service_type || 'Service',
-          amount: job.price || 0, status: job.payout_status || 'pending_payout',
+          amount: Number(job.payout_amount) || 0,
+
+          // FINANCIAL ALIGNMENT: Use actual payout_status from DB
+          // payout_status values: 'not_ready', 'pending', 'ready', 'held', 'paid'
+          payout_status: job.payout_status || 'not_ready',
           completedDate: job.completed_at || job.updated_at, client: job.customer_name || 'Client'
         })) ?? [];
 
@@ -90,7 +101,11 @@ export default function EarningsPanel() {
   }) ?? [];
 
   const totalEarnings = filteredEarnings.reduce((sum, e) => sum + (e?.amount ?? 0), 0);
-  const pendingPayouts = earnings?.filter(e => e?.status === 'pending_payout').reduce((sum, e) => sum + (e?.amount ?? 0), 0) ?? 0;
+  // FINANCIAL ALIGNMENT: Pending Payouts = SUM where payout_status != 'paid'
+  // Previously filtered on 'pending_payout' which never matched actual DB values
+  // Actual payout_status values: 'not_ready', 'pending', 'ready', 'held', 'paid'
+  const pendingPayouts = earnings?.filter(e => e?.payout_status !== 'paid').reduce((sum, e) => sum + (e?.amount ?? 0), 0) ?? 0;
+
 
   // Auth loading guard
   if (authLoading) {
@@ -162,12 +177,13 @@ export default function EarningsPanel() {
                 </div>
                 <div className="text-right">
                   <div className="text-xl font-bold text-emerald-400">${earning.amount?.toFixed(2)}</div>
-                  <div className={`text-sm ${earning.status === 'paid_out' ? 'text-emerald-400' : 'text-yellow-400'}`}>
-                    {earning.status === 'paid_out' ? 'Paid' : 'Pending'}
+                  <div className={`text-sm ${earning.payout_status === 'paid' ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                    {earning.payout_status === 'paid' ? 'Paid' : 'Pending'}
                   </div>
                 </div>
               </div>
             ))}
+
           </div>
         )}
       </Panel>

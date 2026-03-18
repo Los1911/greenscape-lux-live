@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+
 
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,6 +43,7 @@ interface LocalJob {
   created_at: string;
   updated_at?: string;
   user_id?: string;
+  client_user_id?: string;
   client_email?: string;
   customer_name?: string;
   flagged_at?: string;
@@ -49,6 +51,9 @@ interface LocalJob {
   remediation_deadline?: string;
   remediation_status?: string;
   remediation_notes?: string;
+  // Payment lifecycle fields
+  payment_status?: string;
+  stripe_session_id?: string;
 }
 
 interface UnreadCounts {
@@ -66,12 +71,12 @@ function normalizeJobData(rawJob: Record<string, unknown>): LocalJob {
     scheduled_date: safeString(rawJob, 'scheduled_date'),
     status: safeString(rawJob, 'status', 'pending'),
     price: safeNumber(rawJob, 'price'),
-
     landscaper_id: safeString(rawJob, 'landscaper_id'),
     landscaper_email: safeString(rawJob, 'landscaper_email'),
     created_at: safeString(rawJob, 'created_at'),
     updated_at: safeString(rawJob, 'updated_at'),
     user_id: safeString(rawJob, 'user_id'),
+    client_user_id: safeString(rawJob, 'client_user_id'),
     client_email: safeString(rawJob, 'client_email'),
     customer_name: safeString(rawJob, 'customer_name'),
     flagged_at: safeString(rawJob, 'flagged_at'),
@@ -79,10 +84,15 @@ function normalizeJobData(rawJob: Record<string, unknown>): LocalJob {
     remediation_deadline: safeString(rawJob, 'remediation_deadline'),
     remediation_status: safeString(rawJob, 'remediation_status'),
     remediation_notes: safeString(rawJob, 'remediation_notes'),
+    // Payment lifecycle
+    payment_status: safeString(rawJob, 'payment_status', 'unpaid'),
+    stripe_session_id: safeString(rawJob, 'stripe_session_id'),
   };
 }
 
+
 // Convert LocalJob to Job type for modal
+// CRITICAL: Must include payment_status so modal can gate Accept button
 function toJob(localJob: LocalJob): Job {
   return {
     id: localJob.id,
@@ -96,6 +106,11 @@ function toJob(localJob: LocalJob): Job {
     created_at: localJob.created_at,
     updated_at: localJob.updated_at || localJob.created_at,
     landscaper_id: localJob.landscaper_id || null,
+    // Payment lifecycle — required for modal Accept button visibility
+    payment_status: localJob.payment_status || null,
+    payout_status: null,
+    stripe_session_id: localJob.stripe_session_id || null,
+    // Remediation fields
     flagged_at: localJob.flagged_at || null,
     flagged_reason: localJob.flagged_reason || null,
     remediation_deadline: localJob.remediation_deadline || null,
@@ -103,6 +118,7 @@ function toJob(localJob: LocalJob): Job {
     remediation_notes: localJob.remediation_notes || null,
   };
 }
+
 
 // ── Module-level status indicator (not inline) ────────────────
 function JobStatusIndicator({ status }: { status: string }) {
@@ -123,6 +139,13 @@ function JobStatusIndicator({ status }: { status: string }) {
           bg: 'bg-emerald-500/20',
           label: 'Estimate Ready'
         };
+      case 'available':
+        return {
+          icon: Clock,
+          color: 'text-slate-400',
+          bg: 'bg-slate-500/20',
+          label: 'Available'
+        };
       case 'assigned':
         return {
           icon: Clock,
@@ -130,20 +153,12 @@ function JobStatusIndicator({ status }: { status: string }) {
           bg: 'bg-blue-500/20',
           label: 'Assigned'
         };
-
       case 'scheduled':
         return {
           icon: Calendar,
           color: 'text-blue-400',
           bg: 'bg-blue-500/20',
           label: 'Scheduled'
-        };
-      case 'assigned':
-        return { 
-          icon: Circle, 
-          color: 'text-blue-400', 
-          bg: 'bg-blue-500/20',
-          label: 'Assigned' 
         };
       case 'in_progress':
         return { 
@@ -178,9 +193,10 @@ function JobStatusIndicator({ status }: { status: string }) {
           icon: Circle, 
           color: 'text-slate-400', 
           bg: 'bg-slate-500/20',
-          label: status 
+          label: 'Unknown' 
         };
     }
+
   };
 
   const config = getConfig();
@@ -205,6 +221,8 @@ export function MyJobsSection() {
   // ── Accept / Reject state ─────────────────────────────────
   const [actionJobId, setActionJobId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Neutral info banner for 409 "already paid" — auto-clears
+  const [actionInfo, setActionInfo] = useState<string | null>(null);
 
   const loadJobs = useCallback(async () => {
     if (!user?.id) return;
@@ -396,54 +414,188 @@ export function MyJobsSection() {
     loadUnreadCounts();
   }, [jobs, loadUnreadCounts]);
 
+  // ── Stripe payment return: verify checkout and refresh jobs ──
+  // FLOW: redirect back → optimistic update → verify → refetch → poll
+  const paymentVerifiedRef = useRef(false);
+  useEffect(() => {
+    if (paymentVerifiedRef.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get('payment');
+    const jobId = params.get('job_id');
+
+    if (paymentStatus !== 'success' || !jobId) return;
+
+    // Mark immediately so React re-renders / StrictMode double-invoke
+    // cannot trigger a second call.
+    paymentVerifiedRef.current = true;
+
+    console.log('[MyJobsSection] Stripe redirect detected — verifying payment for job', jobId);
+
+    // ── OPTIMISTIC UPDATE: immediately hide Accept button ──
+    // Set payment_status='paid' locally so the isPayable filter excludes
+    // this job BEFORE the DB confirms. This eliminates the visual gap
+    // between redirect and webhook/verify completion.
+    setJobs(prev => prev.map(j =>
+      j.id === jobId
+        ? { ...j, payment_status: 'paid' }
+        : j
+    ));
+
+    (async () => {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        const clientUserId = authData?.user?.id;
+        if (!clientUserId) {
+          console.warn('[MyJobsSection] No authenticated user for payment verification');
+          return;
+        }
+
+        const { data, error: fnErr } = await supabase.functions.invoke(
+          'verify-checkout-session',
+          { body: { job_id: jobId, client_user_id: clientUserId } }
+        );
+
+        if (fnErr) {
+          console.error('[MyJobsSection] verify-checkout-session invoke error:', fnErr);
+        } else {
+          const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+          console.log('[MyJobsSection] verify-checkout-session result:', parsed);
+        }
+      } catch (err) {
+        console.error('[MyJobsSection] Payment verification failed:', err);
+      } finally {
+        // Clean payment params from URL to prevent re-fire on navigation
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+
+        // ── REFETCH WAVE 1: immediate ──
+        // Fetch latest DB state. If webhook already fired, this picks it up.
+        loadJobs().catch(err =>
+          console.warn('[MyJobsSection] Post-payment job refresh failed:', err)
+        );
+
+        // ── REFETCH WAVE 2: delayed 3s ──
+        // Webhook typically fires within 1-5s of Stripe payment.
+        // This catches the common case where webhook fires after verify returns.
+        setTimeout(() => {
+          console.log('[MyJobsSection] Post-payment poll (3s)');
+          loadJobs().catch(() => {});
+        }, 3000);
+
+        // ── REFETCH WAVE 3: delayed 8s ──
+        // Safety net for slow webhook delivery.
+        setTimeout(() => {
+          console.log('[MyJobsSection] Post-payment poll (8s)');
+          loadJobs().catch(() => {});
+        }, 8000);
+      }
+    })();
+  }, []); // Empty deps — runs once on mount only
+
+
 
   // ── Accept estimate handler ─────────────────────────────────
-  const handleAcceptEstimate = useCallback(async (job: LocalJob, e: React.MouseEvent) => {
+  // FIX: Accept primitive jobId + jobPrice to guarantee the exact row-level
+  // id is forwarded to create-checkout-session. Passing the full job object
+  // risks stale-object references if the jobs array is patched between render
+  // and click.
+  const handleAcceptEstimate = useCallback(async (jobId: string, jobPrice: number | undefined, e: React.MouseEvent) => {
     e.stopPropagation(); // Don't open the detail modal
     if (!user?.id || actionJobId) return;
 
-    setActionJobId(job.id);
+    // ── Frontend guard: check local state before calling backend ──
+    const targetJob = jobs.find(j => j.id === jobId);
+    if (targetJob?.payment_status === 'paid') {
+      setActionError('This job has already been paid.');
+      loadJobs(); // Refetch to get latest state
+      return;
+    }
+
+    console.log('[MyJobsSection] ACCEPT_CLICK job_id:', jobId, 'payment_status:', targetJob?.payment_status);
+
+    setActionJobId(jobId);
+
     setActionError(null);
+    setActionInfo(null);
 
     try {
-     
-
-      // Step 3: Call edge function to create Stripe Checkout Session
+      // Call edge function to create Stripe Checkout Session
       const { data: fnData, error: fnErr } = await supabase.functions.invoke(
         'create-checkout-session',
         {
           body: {
-            job_id: job.id,
-            price: job.price,
+            job_id: jobId,
+            price: jobPrice,
             client_user_id: user.id,
           },
         }
       );
 
       if (fnErr) {
+        // ── 409 Conflict = already paid / duplicate attempt ──
+        // supabase.functions.invoke() puts the Response in fnErr.context
+        // when the edge function returns a non-2xx status code.
+        // 409 is NOT a user error — it means payment already went through.
+        const httpStatus = (fnErr as any)?.context?.status;
+        if (httpStatus === 409) {
+          console.log('[MyJobsSection] 409 Conflict — payment already processed for job', jobId);
+          // Optimistic: hide Accept button immediately
+          setJobs(prev => prev.map(j =>
+            j.id === jobId ? { ...j, payment_status: 'paid' } : j
+          ));
+          setActionInfo('Payment already processed — syncing...');
+          setTimeout(() => setActionInfo(null), 4000);
+          setActionJobId(null);
+          // Refetch to get authoritative DB state
+          loadJobs().catch(() => {});
+          return;
+        }
         throw new Error('Checkout session error: ' + fnErr.message);
       }
 
       const parsed = typeof fnData === 'string' ? JSON.parse(fnData) : fnData;
 
       if (!parsed?.success || !parsed?.url) {
-
+        // If response body indicates "already paid" — same treatment as 409
+        if (parsed?.error?.includes('already been paid') || parsed?.error?.includes('not available')) {
+          console.log('[MyJobsSection] Backend confirmed already paid — refetching');
+          setJobs(prev => prev.map(j =>
+            j.id === jobId ? { ...j, payment_status: 'paid' } : j
+          ));
+          setActionInfo('Payment already processed — syncing...');
+          setTimeout(() => setActionInfo(null), 4000);
+          setActionJobId(null);
+          loadJobs().catch(() => {});
+          return;
+        }
         throw new Error(parsed?.error || 'No checkout URL returned');
       }
 
-      console.log('[MyJobsSection] Redirecting to Stripe Checkout');
+      console.log('[MyJobsSection] Redirecting to Stripe Checkout for job', jobId);
 
-      // Step 4: Redirect to Stripe Checkout
+      // Redirect to Stripe Checkout
       window.location.href = parsed.url;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      console.error('[MyJobsSection] acceptEstimate error:', message);
-      setActionError(message);
+      console.error('[MyJobsSection] acceptEstimate error for job', jobId, ':', message);
+      // If error message mentions "already paid", treat as info not error
+      if (message.includes('already been paid') || message.includes('not available for payment')) {
+        setJobs(prev => prev.map(j =>
+          j.id === jobId ? { ...j, payment_status: 'paid' } : j
+        ));
+        setActionInfo('Payment already processed — syncing...');
+        setTimeout(() => setActionInfo(null), 4000);
+        loadJobs().catch(() => {});
+      } else {
+        setActionError(message);
+      }
       setActionJobId(null);
     }
-  }, [user?.id, actionJobId]);
+  }, [user?.id, actionJobId, jobs, loadJobs]);
 
-  // ── Reject estimate handler ─────────────────────────────────
+
+
   const handleRejectEstimate = useCallback(async (job: LocalJob, e: React.MouseEvent) => {
     e.stopPropagation(); // Don't open the detail modal
     if (!user?.id || actionJobId) return;
@@ -545,10 +697,13 @@ export function MyJobsSection() {
       </Card>
     );
   }
-
-  // ── Partition jobs: priced first, then the rest ─────────────
-  const pricedJobs = jobs.filter(j => j.status === 'priced');
-  const otherJobs = jobs.filter(j => j.status !== 'priced');
+  // ── Partition jobs: payable (priced + unpaid) first, then the rest ──
+  // CRITICAL: A job is only payable if status='priced' AND payment_status is NOT 'paid'.
+  // This prevents showing Accept button after payment completes but before
+  // the webhook/verify-checkout updates the status to 'scheduled'.
+  const isPayable = (j: LocalJob) => j.status === 'priced' && j.payment_status !== 'paid';
+  const pricedJobs = jobs.filter(isPayable);
+  const otherJobs = jobs.filter(j => !isPayable(j));
 
   return (
     <>
@@ -588,6 +743,16 @@ export function MyJobsSection() {
                   </button>
                 </div>
               )}
+
+              {/* ── Neutral info banner (409 "already paid") ─── */}
+              {actionInfo && (
+                <div className="p-3 bg-blue-900/30 border border-blue-500/30 rounded-xl text-blue-300 text-sm flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{actionInfo}</span>
+                  <RefreshCw className="w-3.5 h-3.5 ml-auto animate-spin text-blue-400" />
+                </div>
+              )}
+
 
               {/* ── Priced jobs: explicit decision required ──── */}
               {pricedJobs.length > 0 && (
@@ -640,11 +805,14 @@ export function MyJobsSection() {
                         </div>
 
                         {/* ── Accept / Reject buttons ──────────── */}
-                        {job.status === 'priced' && (
+                        {/* DEFENSE-IN-DEPTH: check BOTH status AND payment_status */}
+                        {job.status === 'priced' && job.payment_status !== 'paid' && (
+
                           <div className="flex gap-3 pt-3 border-t border-emerald-500/15">
                             <button
-                              onClick={(e) => handleAcceptEstimate(job, e)}
+                              onClick={(e) => handleAcceptEstimate(job.id, job.price, e)}
                               disabled={isActioning || !!actionJobId}
+
                               className={`
                                 flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
                                 transition-all duration-200
