@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { invokeEdgeFunction } from '@/lib/edgeFunctionClient';
 import { loadStripe } from '@stripe/stripe-js';
+
 import {
   Elements,
   PaymentElement,
@@ -280,14 +282,12 @@ export function PayNowModal({ isOpen, onClose, quote, onSuccess }: PayNowModalPr
           customerId = profile.stripe_customer_id;
         } else {
           // Create a new Stripe customer
-          const { data: customerData, error: customerError } = await supabase.functions.invoke(
+          const { data: customerData, error: customerError } = await invokeEdgeFunction(
             'create-stripe-customer',
             {
-              body: {
-                email: user.email,
-                name: quote.customer_name || user.user_metadata?.name || user.email,
-                userId: user.id
-              }
+              email: user.email,
+              name: quote.customer_name || user.user_metadata?.name || user.email,
+              userId: user.id
             }
           );
 
@@ -305,17 +305,15 @@ export function PayNowModal({ isOpen, onClose, quote, onSuccess }: PayNowModalPr
       }
 
       // Create payment intent with job_id for server-side idempotency check
-      const { data: intentData, error: intentError } = await supabase.functions.invoke(
+      const { data: intentData, error: intentError } = await invokeEdgeFunction(
         'create-payment-intent',
         {
-          body: {
-            amount: quote.approved_amount,
-            currency: 'usd',
-            customerId: customerId,
-            jobId: quote.job_id, // Pass job_id for server-side idempotency check
-            quoteId: quote.id,
-            description: `GreenScape Lux - ${quote.service_type} - Quote #${quote.id.slice(0, 8)}`
-          }
+          amount: quote.approved_amount,
+          currency: 'usd',
+          customerId: customerId,
+          jobId: quote.job_id,
+          quoteId: quote.id,
+          description: `GreenScape Lux - ${quote.service_type} - Quote #${quote.id.slice(0, 8)}`
         }
       );
 
@@ -327,7 +325,7 @@ export function PayNowModal({ isOpen, onClose, quote, onSuccess }: PayNowModalPr
           initializingRef.current = false;
           return;
         }
-        throw new Error(intentData?.error || intentError?.message || 'Failed to create payment');
+        throw new Error(intentData?.error || intentError || 'Failed to create payment');
       }
 
       // Insert payment record (only if we got a new payment intent)

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { invokeJobExecution } from '@/lib/edgeFunctionClient';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Camera, Upload, X, Check, Loader2, Eye, AlertCircle } from 'lucide-react';
+import { Camera, Upload, X, Check, Loader2, Eye, AlertCircle, Lock } from 'lucide-react';
 import { useToast } from '@/components/SharedUI/Toast';
 import { compressImage } from '@/utils/imageCompression';
 import { useMobile } from '@/hooks/use-mobile';
@@ -13,9 +14,19 @@ import { JobPhoto, PHOTO_CONFIG, groupPhotosByType } from '@/types/jobPhoto';
 import BeforeAfterComparison from '@/components/photos/BeforeAfterComparison';
 import { JOB_PHOTOS_COLUMNS, safeString } from '@/lib/databaseSchema';
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LIFECYCLE ENFORCEMENT:
+//   - Before photos: ONLY when status === 'active' AND startedAt exists
+//   - After photos:  ONLY when before photos exist
+//   - Complete:      Uses invokeJobExecution('complete') — NOT direct DB update
+//   - NO local payout_amount calculation (admin sets this on approval)
+// ═══════════════════════════════════════════════════════════════════════════
+
+
 interface JobCompletionFormProps {
   jobId: number | string;
   status: string;
+  startedAt?: string;
   beforeUrl?: string;
   afterUrl?: string;
 }
@@ -47,6 +58,7 @@ function normalizePhoto(rawPhoto: Record<string, unknown>): JobPhoto {
 const JobCompletionForm: React.FC<JobCompletionFormProps> = ({
   jobId,
   status,
+  startedAt,
   beforeUrl,
   afterUrl
 }) => {
@@ -61,6 +73,15 @@ const JobCompletionForm: React.FC<JobCompletionFormProps> = ({
   const [cameraMode, setCameraMode] = useState<'before' | 'after' | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(false);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LIFECYCLE GATES
+  // ═══════════════════════════════════════════════════════════════════════
+  const isActive = status === 'active';
+  const hasStartedAt = !!startedAt;
+  // Before photos: require active + started_at
+  const canUploadBeforePhotos = isActive && hasStartedAt;
+  // After photos: require before photos exist (checked dynamically below)
 
   // Fetch existing photos
   useEffect(() => {
@@ -132,6 +153,9 @@ const JobCompletionForm: React.FC<JobCompletionFormProps> = ({
   const canAddBefore = totalBeforeCount < PHOTO_CONFIG.MAX_BEFORE_PHOTOS;
   const canAddAfter = totalAfterCount < PHOTO_CONFIG.MAX_AFTER_PHOTOS;
 
+  // LIFECYCLE GATE: After photos require at least 1 before photo
+  const canUploadAfterPhotos = canUploadBeforePhotos && totalBeforeCount > 0;
+
   const validateFile = (file: File): boolean => {
     if (file.size > PHOTO_CONFIG.MAX_FILE_SIZE_MB * 1024 * 1024) {
       showToast(`File size must be under ${PHOTO_CONFIG.MAX_FILE_SIZE_MB}MB`, 'error');
@@ -147,6 +171,20 @@ const JobCompletionForm: React.FC<JobCompletionFormProps> = ({
   };
 
   const handleFileSelect = async (type: 'before' | 'after', files: FileList | File[]) => {
+    // ── LIFECYCLE GATE: Block uploads if prerequisites not met ──
+    if (type === 'before' && !canUploadBeforePhotos) {
+      showToast('Start the job before uploading photos', 'error');
+      return;
+    }
+    if (type === 'after' && !canUploadAfterPhotos) {
+      if (!canUploadBeforePhotos) {
+        showToast('Start the job before uploading photos', 'error');
+      } else {
+        showToast('Upload before photos first', 'error');
+      }
+      return;
+    }
+
     const fileArray = Array.from(files);
     const maxCount = type === 'before' ? PHOTO_CONFIG.MAX_BEFORE_PHOTOS : PHOTO_CONFIG.MAX_AFTER_PHOTOS;
     const currentCount = type === 'before' ? totalBeforeCount : totalAfterCount;
@@ -201,6 +239,12 @@ const JobCompletionForm: React.FC<JobCompletionFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // ── LIFECYCLE GATE: Must be active to submit ──
+    if (!isActive) {
+      showToast('Job must be active to submit completion', 'error');
+      return;
+    }
+
     if (totalBeforeCount === 0) {
       showToast('Please add at least one before photo', 'error');
       return;
@@ -211,8 +255,8 @@ const JobCompletionForm: React.FC<JobCompletionFormProps> = ({
     }
 
     if (pendingPhotos.length === 0) {
-      // No new photos, just mark complete
-      await completeJob();
+      // No new photos to upload, go straight to completion via edge function
+      await completeJobViaEdgeFunction();
       return;
     }
 
@@ -275,6 +319,7 @@ const JobCompletionForm: React.FC<JobCompletionFormProps> = ({
         }
 
         // Insert into database with uploaded_by field to satisfy RLS policy
+        // NOTE: This does NOT update job status — only the edge function does that
         const { error: insertError } = await supabase
           .from('job_photos')
           .insert({
@@ -293,23 +338,50 @@ const JobCompletionForm: React.FC<JobCompletionFormProps> = ({
         );
       }
 
-      await completeJob();
+      // Photos uploaded — now complete via edge function
+      await completeJobViaEdgeFunction();
     } catch (err: any) {
       showToast(err.message || 'Upload failed', 'error');
       setUploading(false);
     }
   };
 
-  const completeJob = async () => {
+  // ═══════════════════════════════════════════════════════════════════════
+  // LIFECYCLE-ENFORCED COMPLETION
+  // Uses invokeJobExecution('complete') — the edge function validates:
+  //   - status === 'active'
+  //   - started_at exists
+  //   - before photos exist in DB
+  //   - after photos exist in DB
+  // Then sets status → 'completed_pending_review' (NOT 'completed')
+  // Does NOT set payout_amount (admin does that on approval)
+  // ═══════════════════════════════════════════════════════════════════════
+  const completeJobViaEdgeFunction = async () => {
     try {
-      const { error: updateError } = await supabase
-        .from('jobs')
-        .update({ status: 'completed' })
-        .eq('id', jobId);
+      console.log('[JobCompletionForm] Completing job via edge function:', { jobId });
 
-      if (updateError) throw updateError;
+      const { data, error: fnErr } = await invokeJobExecution({
+        action: 'complete',
+        jobId: String(jobId),
+      });
 
-      showToast('Job completed successfully!', 'success');
+      if (fnErr) {
+        // Parse specific photo-related errors for better UX
+        if (fnErr.includes('before photo')) {
+          showToast('At least 1 before photo is required', 'error');
+        } else if (fnErr.includes('after photo')) {
+          showToast('At least 1 after photo is required', 'error');
+        } else if (fnErr.includes('must be "active"')) {
+          showToast('Job must be active to complete. Start the job first.', 'error');
+        } else if (fnErr.includes('start time')) {
+          showToast('Job must be started before completion.', 'error');
+        } else {
+          showToast(fnErr, 'error');
+        }
+        return;
+      }
+
+      showToast('Job submitted for review!', 'success');
       navigate('/job-complete');
     } catch (err: any) {
       showToast(err.message || 'Failed to complete job', 'error');
@@ -318,12 +390,16 @@ const JobCompletionForm: React.FC<JobCompletionFormProps> = ({
     }
   };
 
+
   const renderPhotoSlot = (type: 'before' | 'after') => {
     const canAdd = type === 'before' ? canAddBefore : canAddAfter;
     const pending = pendingPhotos.filter(p => p.type === type);
     const existing = existingPhotos.filter(p => p.type === type);
     const maxCount = type === 'before' ? PHOTO_CONFIG.MAX_BEFORE_PHOTOS : PHOTO_CONFIG.MAX_AFTER_PHOTOS;
     const totalCount = type === 'before' ? totalBeforeCount : totalAfterCount;
+
+    // ── LIFECYCLE GATE: Check if this photo type is uploadable ──
+    const isUploadable = type === 'before' ? canUploadBeforePhotos : canUploadAfterPhotos;
 
     return (
       <div className="space-y-3">
@@ -336,84 +412,110 @@ const JobCompletionForm: React.FC<JobCompletionFormProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
-          {/* Existing Photos */}
-          {existing.map(photo => (
-            <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-800">
-              <img src={photo.file_url} alt={type} className="w-full h-full object-cover" />
-              <Badge className="absolute top-1 right-1 bg-green-500/80 text-xs px-1">
-                <Check className="w-3 h-3" />
-              </Badge>
+        {/* ── LIFECYCLE LOCK: Show blocked state if prerequisites not met ── */}
+        {!isUploadable && !isCompleted && (
+          <div className="flex items-start gap-2.5 p-3 rounded-lg bg-gray-800/60 border border-gray-700/50">
+            <Lock className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+            <div className="text-xs text-gray-400">
+              <p className="font-medium text-gray-300">
+                {!isActive || !hasStartedAt
+                  ? 'Start the job first'
+                  : type === 'after'
+                  ? 'Upload before photos first'
+                  : 'Job must be active'}
+              </p>
+              <p className="mt-1 text-gray-500">
+                {!isActive || !hasStartedAt
+                  ? 'Photos can only be uploaded after the job has been started.'
+                  : 'Upload at least 1 before photo before adding after photos.'}
+              </p>
             </div>
-          ))}
+          </div>
+        )}
 
-          {/* Pending Photos */}
-          {pending.map(photo => (
-            <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-800">
-              <img src={photo.preview} alt={type} className="w-full h-full object-cover" />
-              
-              {photo.status === 'uploading' && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+        {/* Only render upload UI when lifecycle gate is passed */}
+        {(isUploadable || isCompleted) && (
+          <>
+            <div className="grid grid-cols-3 gap-2">
+              {/* Existing Photos */}
+              {existing.map(photo => (
+                <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-800">
+                  <img src={photo.file_url} alt={type} className="w-full h-full object-cover" />
+                  <Badge className="absolute top-1 right-1 bg-green-500/80 text-xs px-1">
+                    <Check className="w-3 h-3" />
+                  </Badge>
+                </div>
+              ))}
+
+              {/* Pending Photos */}
+              {pending.map(photo => (
+                <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-800">
+                  <img src={photo.preview} alt={type} className="w-full h-full object-cover" />
+                  
+                  {photo.status === 'uploading' && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    </div>
+                  )}
+                  
+                  {photo.status === 'uploaded' && (
+                    <Badge className="absolute top-1 right-1 bg-green-500/80 text-xs px-1">
+                      <Check className="w-3 h-3" />
+                    </Badge>
+                  )}
+                  
+                  {photo.status === 'pending' && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removePhoto(photo.id)}
+                      className="absolute top-1 right-1 w-5 h-5 bg-red-500/80 hover:bg-red-600 text-white rounded-full p-0"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+
+              {/* Add Photo Button — only when uploadable */}
+              {canAdd && !isCompleted && isUploadable && (
+                <div className={`aspect-square rounded-lg border-2 border-dashed ${
+                  type === 'before' ? 'border-amber-500/30 hover:border-amber-500/50' : 'border-green-500/30 hover:border-green-500/50'
+                } transition-colors`}>
+                  <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer gap-1">
+                    <Upload className={`w-5 h-5 ${type === 'before' ? 'text-amber-400/70' : 'text-green-400/70'}`} />
+                    <span className="text-xs text-gray-400">Add</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => e.target.files && handleFileSelect(type, e.target.files)}
+                    />
+                  </label>
                 </div>
               )}
-              
-              {photo.status === 'uploaded' && (
-                <Badge className="absolute top-1 right-1 bg-green-500/80 text-xs px-1">
-                  <Check className="w-3 h-3" />
-                </Badge>
-              )}
-              
-              {photo.status === 'pending' && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removePhoto(photo.id)}
-                  className="absolute top-1 right-1 w-5 h-5 bg-red-500/80 hover:bg-red-600 text-white rounded-full p-0"
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-              )}
             </div>
-          ))}
 
-          {/* Add Photo Button */}
-          {canAdd && !isCompleted && (
-            <div className={`aspect-square rounded-lg border-2 border-dashed ${
-              type === 'before' ? 'border-amber-500/30 hover:border-amber-500/50' : 'border-green-500/30 hover:border-green-500/50'
-            } transition-colors`}>
-              <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer gap-1">
-                <Upload className={`w-5 h-5 ${type === 'before' ? 'text-amber-400/70' : 'text-green-400/70'}`} />
-                <span className="text-xs text-gray-400">Add</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => e.target.files && handleFileSelect(type, e.target.files)}
-                />
-              </label>
-            </div>
-          )}
-        </div>
-
-        {/* Camera Button (Mobile) */}
-        {isMobile && canAdd && !isCompleted && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setCameraMode(type)}
-            className={`w-full ${
-              type === 'before' 
-                ? 'border-amber-500/30 text-amber-300 hover:bg-amber-900/20' 
-                : 'border-green-500/30 text-green-300 hover:bg-green-900/20'
-            }`}
-          >
-            <Camera className="w-4 h-4 mr-2" />
-            Take {type} Photo
-          </Button>
+            {/* Camera Button (Mobile) — only when uploadable */}
+            {isMobile && canAdd && !isCompleted && isUploadable && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCameraMode(type)}
+                className={`w-full ${
+                  type === 'before' 
+                    ? 'border-amber-500/30 text-amber-300 hover:bg-amber-900/20' 
+                    : 'border-green-500/30 text-green-300 hover:bg-green-900/20'
+                }`}
+              >
+                <Camera className="w-4 h-4 mr-2" />
+                Take {type} Photo
+              </Button>
+            )}
+          </>
         )}
       </div>
     );
@@ -455,6 +557,7 @@ const JobCompletionForm: React.FC<JobCompletionFormProps> = ({
               <p className="text-amber-200 font-medium">Confirmation Required</p>
               <p className="text-sm text-gray-300 mt-1">
                 These photos will be shared with the client and admin for job verification.
+                The job will be submitted for admin review (not marked as complete until approved).
               </p>
             </div>
           </div>
@@ -481,7 +584,7 @@ const JobCompletionForm: React.FC<JobCompletionFormProps> = ({
             ) : (
               <>
                 <Check className="w-4 h-4 mr-2" />
-                Confirm & Complete
+                Submit for Review
               </>
             )}
           </Button>
@@ -503,6 +606,50 @@ const JobCompletionForm: React.FC<JobCompletionFormProps> = ({
           showTimestamps={true}
           title="Work Documentation"
         />
+      </Card>
+    );
+  }
+
+  // ── NOT ACTIVE: Show lifecycle status message ──
+  if (!isActive && !isCompleted && status !== 'completed_pending_review') {
+    return (
+      <Card className="bg-gray-900 border border-gray-700/50 p-6">
+        <div className="flex items-start gap-3">
+          <Lock className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-lg font-semibold text-gray-300">Job Not Active</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Start the job to begin uploading photos and working towards completion.
+              Current status: <span className="text-gray-400 font-medium">{status}</span>
+            </p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  // ── PENDING REVIEW: Show waiting state ──
+  if (status === 'completed_pending_review') {
+    return (
+      <Card className="bg-gray-900 border border-amber-500/30 p-6">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-lg font-semibold text-amber-300">Awaiting Admin Review</h3>
+            <p className="text-sm text-gray-400 mt-1">
+              Your work has been submitted. An admin will review and approve shortly.
+            </p>
+          </div>
+        </div>
+        {existingPhotos.length > 0 && (
+          <div className="mt-4">
+            <BeforeAfterComparison 
+              photos={existingPhotos} 
+              showTimestamps={true}
+              title="Submitted Photos"
+            />
+          </div>
+        )}
       </Card>
     );
   }

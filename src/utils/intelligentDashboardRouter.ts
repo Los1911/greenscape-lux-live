@@ -97,14 +97,20 @@ export class IntelligentDashboardRouter {
 
       // ========================================
       // STEP 2: No landscaper record - check profiles table
+      // FIX (2026-03-18): profiles table uses `id` as primary key
+      // (= auth.uid()), NOT `user_id`.  The previous `.eq('user_id', ...)`
+      // never matched any row, causing admin users to always fall through
+      // to the 'client' default — which then redirected them to
+      // /client-dashboard and into the OnboardingGuard.
       // ========================================
       console.log('🔍 No landscaper record found, checking profiles table...');
 
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('role')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .maybeSingle();
+
 
       console.log('👤 Profile Data:', { 
         role: profileData?.role, 

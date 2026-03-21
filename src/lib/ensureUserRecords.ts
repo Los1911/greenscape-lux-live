@@ -18,6 +18,12 @@
 
 import { supabase } from './supabase';
 
+// Admin email allowlist - MUST match AuthContext.tsx, useRole.ts, AdminProtectedRoute.tsx
+const ADMIN_EMAILS = [
+  'admin.1@greenscapelux.com',
+  'bgreen@greenscapelux.com'
+];
+
 export interface EnsureUserRecordsInput {
   role?: 'client' | 'landscaper' | 'admin';
   firstName?: string;
@@ -64,10 +70,19 @@ export async function ensureUserRecords(
       };
     }
 
-    // Determine role from input or user metadata
-    const role = input.role || 
-                 (user.user_metadata?.role as string) || 
-                 'client';
+    // Determine role: admin email allowlist takes highest priority
+    // This ensures the database role matches what the frontend resolves,
+    // preventing "Admin access required" errors from edge functions.
+    let role: string;
+    if (user.email && ADMIN_EMAILS.includes(user.email)) {
+      role = 'admin';
+      console.log('[ensureUserRecords] Admin email detected, forcing role=admin');
+    } else {
+      role = input.role || 
+             (user.user_metadata?.role as string) || 
+             'client';
+    }
+
 
     console.log('[ensureUserRecords] Ensuring records for:', {
       userId: user.id,

@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { Toaster } from '@/components/ui/toaster';
+import { useAdminLifecycleToasts } from '@/hooks/useAdminLifecycleToasts';
+
 import {
   Menu,
   X,
   LogOut,
   LayoutDashboard,
   Briefcase,
-  DollarSign,
   Camera,
   Wallet,
   Shield,
@@ -27,15 +29,19 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
+
 /* ─── Admin module imports ────────────────────────────────── */
 
 import AdminRevenueSnapshot from '@/components/admin/AdminRevenueSnapshot';
 import AdminRevenueTrend from '@/components/admin/AdminRevenueTrend';
 import { LifecycleOperationsPanel } from '@/components/admin/LifecycleOperationsPanel';
+import { PaymentNotificationsFeed } from '@/components/admin/PaymentNotificationsFeed';
 
 import { LandscaperApprovalPanel } from '@/components/admin/LandscaperApprovalPanel';
-import { AdminJobPricingPanel } from '@/components/admin/AdminJobPricingPanel';
+// DEPRECATED: AdminJobPricingPanel — all pricing is now handled by LifecycleOperationsPanel (Operations Control Center)
+// import { AdminJobPricingPanel } from '@/components/admin/AdminJobPricingPanel';
 import { AdminJobsPanel } from '@/components/admin/AdminJobsPanel';
+
 import AdminJobPhotoReview from '@/components/admin/AdminJobPhotoReview';
 import AdminPayoutQueue from '@/components/admin/AdminPayoutQueue';
 import RemediationQueuePanel from '@/components/admin/RemediationQueuePanel';
@@ -49,6 +55,7 @@ import { ExpansionWaitlistManager } from '@/components/admin/ExpansionWaitlistMa
 import { EnvironmentVariablesDashboard } from '@/components/admin/EnvironmentVariablesDashboard';
 import { SystemHealthMonitor } from '@/components/admin/SystemHealthMonitor';
 import TestUserManager from '@/components/admin/TestUserManager';
+
 
 /* ─── Types ──────────────────────────────────────────────── */
 
@@ -90,13 +97,14 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Job Management',
     icon: Briefcase,
     items: [
-      { id: 'pricing', label: 'Job Pricing', icon: DollarSign },
+      // DEPRECATED: Job Pricing removed — pricing is now handled in Operations Control Center
       { id: 'jobs', label: 'Jobs Panel', icon: Briefcase },
       { id: 'photos', label: 'Photo Review', icon: Camera },
       { id: 'payouts', label: 'Payout Queue', icon: Wallet },
       { id: 'remediation', label: 'Remediation', icon: Shield },
     ],
   },
+
   {
     id: 'growth',
     label: 'Growth & Quality',
@@ -207,6 +215,10 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('lifecycle-ops');
+
+  // ── Realtime lifecycle toasts (new quotes, photo review) ──
+  useAdminLifecycleToasts();
+
 
 
   // Close sidebar on resize to desktop
@@ -348,8 +360,14 @@ export function AdminLayout() {
         <main className="flex-1 w-full overflow-x-hidden">
           {/* Responsive content wrapper: full-width on mobile, capped on ultrawide */}
           <div className="w-full max-w-screen-xl mx-auto">
+            {/* Real-time payment notifications — visible across all sections */}
+            <PaymentNotificationsFeed
+              onNotificationClick={() => setActiveSection('payouts')}
+            />
+
             <AdminRevenueSnapshot />
             <AdminRevenueTrend />
+
 
             {activeSection === 'lifecycle-ops' && (
               <LifecycleOperationsPanel
@@ -358,7 +376,8 @@ export function AdminLayout() {
             )}
             {activeSection === 'performance' && <PerformanceAnalyticsDashboard />}
             {activeSection === 'landscaper-list' && <LandscaperApprovalPanel />}
-            {activeSection === 'pricing' && <AdminJobPricingPanel />}
+            {/* DEPRECATED: Job Pricing page removed — Operations handles all pricing */}
+
             {activeSection === 'jobs' && <AdminJobsPanel />}
             {activeSection === 'photos' && <AdminJobPhotoReview />}
             {activeSection === 'payouts' && <AdminPayoutQueue />}
@@ -378,6 +397,8 @@ export function AdminLayout() {
 
       </div>
 
+      {/* ── Toast renderer for lifecycle awareness signals ── */}
+      <Toaster />
     </div>
   );
 }

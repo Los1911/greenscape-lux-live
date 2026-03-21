@@ -24,7 +24,9 @@ import { JobPhoto } from '@/types/jobPhoto';
 import { StructuredJobMessaging } from '@/components/messaging/StructuredJobMessaging';
 import BeforeAfterComparison from '@/components/photos/BeforeAfterComparison';
 import { supabase } from '@/lib/supabase';
+import { invokeEdgeFunction } from '@/lib/edgeFunctionClient';
 import { useAuth } from '@/contexts/AuthContext';
+
 import {
   deriveClientStage,
   deriveClientStepIndex,
@@ -506,22 +508,23 @@ export default function JobDetailsModal({ isOpen, onClose, job, onJobStatusChang
       // DIAGNOSTIC: log the job_id being sent to the edge function
       console.log('CHECKOUT_SESSION_JOB_ID', job.id);
 
-      // Create checkout session — edge function handles status transition
-      const { data: fnData, error: fnErr } = await supabase.functions.invoke(
+      // Create checkout session via invokeEdgeFunction (native fetch with JWT refresh)
+      // Avoids FunctionsFetchError when verify_jwt=true and JWT is near-expiry.
+      const { data: fnData, error: fnErrMsg } = await invokeEdgeFunction(
         'create-checkout-session',
-        { body: { job_id: job.id, price: job.price, client_user_id: user.id } }
+        { job_id: job.id, price: job.price, client_user_id: user.id }
       );
 
-      if (fnErr) throw new Error('Checkout error: ' + fnErr.message);
+      // invokeEdgeFunction returns { data, error: string | null }
+      if (fnErrMsg) throw new Error('Checkout error: ' + fnErrMsg);
 
-      const parsed = typeof fnData === 'string' ? JSON.parse(fnData) : fnData;
-
-      if (!parsed?.success || !parsed?.url) {
-        throw new Error(parsed?.error || 'No checkout URL returned');
+      if (!fnData?.success || !fnData?.url) {
+        throw new Error(fnData?.error || 'No checkout URL returned');
       }
 
       console.log('[JobDetailsModal] Redirecting to Stripe Checkout for job', job.id);
-      window.location.href = parsed.url;
+      window.location.href = fnData.url;
+
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       console.error('[JobDetailsModal] acceptEstimate error for job', job?.id, ':', message);
@@ -579,15 +582,17 @@ export default function JobDetailsModal({ isOpen, onClose, job, onJobStatusChang
   const isMessagingActive = useMemo(() => {
     if (!job?.status) return false;
     const stage = deriveClientStage(job.status);
-    return stage === 'in_progress';
+    return stage === 'active';
+
   }, [job?.status]);
 
   const hasPhotos = photos.length > 0;
   const showPhotosSection = useMemo(() => {
     if (!job?.status) return false;
     const stage = deriveClientStage(job.status);
-    return stage === 'completed' || stage === 'in_progress' || hasPhotos;
+    return stage === 'completed' || stage === 'active' || hasPhotos;
   }, [job?.status, hasPhotos]);
+
 
 
   const hasLandscaper = !!job?.landscaper_id;

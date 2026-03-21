@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '@/lib/supabase';
-import { User, ChevronDown, Check, Loader2, MapPin, AlertCircle, X } from 'lucide-react';
+import { User, ChevronDown, Check, CheckCircle, Loader2, MapPin, AlertCircle, X } from 'lucide-react';
+
 
 /* ─── Types ─────────────────────────────────────────────────── */
 
@@ -19,11 +20,14 @@ interface LandscaperAssignmentDropdownProps {
   jobId: string;
   jobStatus: string | null | undefined;
   currentLandscaperId: string | null | undefined;
+  /** Payment status from the jobs table — assignment requires 'paid' */
+  paymentStatus?: string | null | undefined;
   /** Called after successful assignment so parent can refetch */
   onAssigned?: () => void;
   /** Compact mode for inline table usage */
   compact?: boolean;
 }
+
 
 /* ─── Singleton cache so we don't re-fetch on every row ───── */
 
@@ -31,11 +35,14 @@ let _landscaperCache: ApprovedLandscaper[] | null = null;
 let _cacheTimestamp = 0;
 const CACHE_TTL_MS = 60_000; // 1 minute
 
-async function fetchApprovedLandscapers(): Promise<ApprovedLandscaper[]> {
+async function fetchApprovedLandscapers(forceRefresh = false): Promise<ApprovedLandscaper[]> {
   const now = Date.now();
-  if (_landscaperCache && now - _cacheTimestamp < CACHE_TTL_MS) {
+  if (!forceRefresh && _landscaperCache && now - _cacheTimestamp < CACHE_TTL_MS) {
+    console.log('[LandscaperDropdown] Using cached landscapers:', _landscaperCache.length);
     return _landscaperCache;
   }
+
+  console.log('[LandscaperDropdown] Fetching fresh landscapers from DB...');
 
   // 1. Fetch approved landscapers
   const { data: landscapers, error: lErr } = await supabase
@@ -48,6 +55,7 @@ async function fetchApprovedLandscapers(): Promise<ApprovedLandscaper[]> {
   if (!landscapers || landscapers.length === 0) {
     _landscaperCache = [];
     _cacheTimestamp = now;
+    console.log('[LandscaperDropdown] No approved landscapers found');
     return [];
   }
 
@@ -88,6 +96,7 @@ async function fetchApprovedLandscapers(): Promise<ApprovedLandscaper[]> {
 
   _landscaperCache = result;
   _cacheTimestamp = now;
+  console.log('[LandscaperDropdown] Fetched landscapers:', result.length);
   return result;
 }
 
@@ -97,15 +106,33 @@ export function invalidateLandscaperCache() {
   _cacheTimestamp = 0;
 }
 
-/* ─── Statuses that block assignment ──────────────────────── */
+/* ─── Assignment gating ────────────────────────────────────
+   Assignment is allowed when BOTH conditions are met:
+     1. job.status is in ASSIGNABLE_STATUSES
+     2. job.payment_status === 'paid'  (explicit payment confirmation)
+   
+   'priced' and 'available' are included so that rejected jobs
+   (which revert to 'priced') can be immediately reassigned
+   without requiring a status change.
+─────────────────────────────────────────────────────────── */
 
-const ASSIGNABLE_STATUSES = new Set(['scheduled']);
+const ASSIGNABLE_STATUSES = new Set(['scheduled', 'priced', 'available']);
+
+/* ─── Statuses where the landscaper is locked (no reassignment) ── */
 const LOCKED_STATUSES = new Set([
-  'in_progress',
+  'active',
   'completed_pending_review',
   'completed',
   'pending_review',
 ]);
+
+/* ─── Statuses that should transition to 'assigned' on assignment ─
+   When a landscaper is assigned to one of these statuses, the status
+   advances to 'assigned' so it moves into the Active Jobs bucket
+   in the Operations Control Center.
+──────────────────────────────────────────────────────────────────── */
+const TRANSITION_TO_ASSIGNED = new Set(['scheduled', 'priced', 'available']);
+
 
 /* ─── Portal-positioned dropdown menu coordinates ─────────── */
 
@@ -122,6 +149,7 @@ export function LandscaperAssignmentDropdown({
   jobId,
   jobStatus,
   currentLandscaperId,
+  paymentStatus,
   onAssigned,
   compact = false,
 }: LandscaperAssignmentDropdownProps) {
@@ -129,6 +157,7 @@ export function LandscaperAssignmentDropdown({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [openDirection, setOpenDirection] = useState<'down' | 'up'>('down');
   const [menuPos, setMenuPos] = useState<DropdownPosition>({ left: 0, width: 280 });
@@ -136,23 +165,40 @@ export function LandscaperAssignmentDropdown({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const canAssign = ASSIGNABLE_STATUSES.has(jobStatus || '');
+  /* ── Assignment gating ── */
+  const statusAllowed = ASSIGNABLE_STATUSES.has(jobStatus || '');
+  const paymentConfirmed = paymentStatus === 'paid';
+  const canAssign = statusAllowed && paymentConfirmed;
   const isLocked = LOCKED_STATUSES.has(jobStatus || '');
+  /* If status is right but payment isn't confirmed, show a "waiting for payment" hint */
+  const awaitingPayment = statusAllowed && !paymentConfirmed;
 
   // Load approved landscapers when dropdown opens
+  // Always force-refresh to avoid stale data after job state changes
   const loadLandscapers = useCallback(async () => {
-    if (landscapers.length > 0) return; // already loaded
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchApprovedLandscapers();
+      // Force refresh to ensure we always get fresh data
+      // This fixes the issue where the dropdown is empty after job rejection
+      const data = await fetchApprovedLandscapers(true);
+      console.log('[LandscaperDropdown] Loaded landscapers for dropdown:', data.length);
       setLandscapers(data);
     } catch (err: any) {
+      console.error('[LandscaperDropdown] Failed to load landscapers:', err);
       setError(err.message || 'Failed to load landscapers');
     } finally {
       setLoading(false);
     }
-  }, [landscapers.length]);
+  }, []);
+
+  /* ── Re-fetch landscapers when jobId or jobStatus changes ── */
+  useEffect(() => {
+    if (canAssign) {
+      // Invalidate cache when job context changes to ensure fresh data
+      invalidateLandscaperCache();
+    }
+  }, [jobId, jobStatus, canAssign]);
 
   /* ── Calculate where the portal menu should appear ─────── */
   const computePosition = useCallback(() => {
@@ -242,24 +288,41 @@ export function LandscaperAssignmentDropdown({
   const handleAssign = async (landscaper: ApprovedLandscaper) => {
     setSaving(true);
     setError(null);
+    setSuccessMsg(null);
     try {
+      // Build the update payload.
       // The DB constraint jobs_assignment_pairing_chk requires BOTH
       // assigned_to and landscaper_id to be set together (or both null).
       //   landscaper_id  → landscapers.id  (table PK)
       //   assigned_to    → landscapers.user_id  (auth.users FK)
+      const updatePayload: Record<string, unknown> = {
+        landscaper_id: landscaper.id,
+        assigned_to: landscaper.user_id,
+        updated_at: new Date().toISOString(),
+      };
+
+      // If the job is in a pre-assignment status (priced / available / scheduled),
+      // advance it to 'assigned' so it moves into the Active Jobs bucket.
+      if (TRANSITION_TO_ASSIGNED.has(jobStatus || '')) {
+        updatePayload.status = 'assigned';
+      }
+
       const { error: updateErr } = await supabase
         .from('jobs')
-        .update({
-          landscaper_id: landscaper.id,
-          assigned_to: landscaper.user_id,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', jobId);
 
       if (updateErr) throw updateErr;
 
+      // Brief success feedback before parent refetch removes this row
+      const assigneeName = [landscaper.first_name, landscaper.last_name].filter(Boolean).join(' ') || landscaper.email || 'Landscaper';
+      setSuccessMsg(`Assigned to ${assigneeName}`);
       setOpen(false);
-      onAssigned?.();
+
+      // Allow the success message to display briefly, then trigger parent refresh
+      setTimeout(() => {
+        onAssigned?.();
+      }, 600);
     } catch (err: any) {
       setError(err.message || 'Assignment failed');
     } finally {
@@ -270,6 +333,7 @@ export function LandscaperAssignmentDropdown({
   const handleUnassign = async () => {
     setSaving(true);
     setError(null);
+    setSuccessMsg(null);
     try {
       // Clear both fields together to satisfy jobs_assignment_pairing_chk
       const { error: updateErr } = await supabase
@@ -293,6 +357,7 @@ export function LandscaperAssignmentDropdown({
   };
 
 
+
   // Find current assignee display name
   const currentAssignee = landscapers.find(
     l => l.user_id === currentLandscaperId || l.id === currentLandscaperId
@@ -314,8 +379,18 @@ export function LandscaperAssignmentDropdown({
         </div>
       );
     }
-    return null; // Not scheduled → don't render anything
+    /* Status is assignable but payment_status is not 'paid' — show gated hint */
+    if (awaitingPayment) {
+      return (
+        <div className={`flex items-center gap-1.5 ${compact ? 'text-xs' : 'text-sm'} px-2 py-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5`}>
+          <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+          <span className="text-amber-300 truncate">Awaiting client payment</span>
+        </div>
+      );
+    }
+    return null; // Not in an assignable status → don't render anything
   }
+
 
   /* ── Portal menu content ── */
   const portalMenu = open
@@ -464,6 +539,14 @@ export function LandscaperAssignmentDropdown({
         <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
+      {/* Success feedback — brief green indicator after assignment */}
+      {successMsg && (
+        <div className={`flex items-center gap-1.5 mt-1 text-emerald-400 ${compact ? 'text-[10px]' : 'text-xs'}`}>
+          <CheckCircle className="w-3 h-3 flex-shrink-0" />
+          <span className="truncate">{successMsg}</span>
+        </div>
+      )}
+
       {/* Error */}
       {error && (
         <div className={`flex items-center gap-1.5 mt-1 text-red-400 ${compact ? 'text-[10px]' : 'text-xs'}`}>
@@ -471,6 +554,7 @@ export function LandscaperAssignmentDropdown({
           <span className="truncate">{error}</span>
         </div>
       )}
+
 
       {/* Dropdown renders via portal into document.body — escapes all stacking contexts */}
       {portalMenu}

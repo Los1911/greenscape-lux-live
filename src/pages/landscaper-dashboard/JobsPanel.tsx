@@ -11,6 +11,10 @@ import { useMobile } from '@/hooks/use-mobile';
 import { compressImage } from '@/utils/imageCompression';
 import { PHOTO_CONFIG, JobPhoto } from '@/types/jobPhoto';
 import { JOBS_COLUMNS, LANDSCAPERS_COLUMNS, safeString, safeNumber, safeBoolean } from '@/lib/databaseSchema';
+import { invokeJobExecution } from '@/lib/edgeFunctionClient';
+
+
+
 
 
 import { 
@@ -40,6 +44,7 @@ import {
   autoAddWorkAreaFromJob,
   WorkAreaPreferences as WorkAreaPrefsType
 } from '@/lib/workAreaPreferences';
+import { isLandscaperAvailable, UNAVAILABLE_ERROR_MESSAGE } from '@/lib/landscaperAvailability';
 
 function normalizeJobData(rawJob: Record<string, unknown>) {
   const adminPrice = safeNumber(rawJob, 'admin_price');
@@ -124,12 +129,21 @@ export default function JobsPanel() {
   const [workAreaPrefs, setWorkAreaPrefs] = useState<WorkAreaPrefsType>({ requestedAreas: [], excludedAreas: [] });
   const [hiddenJobCount, setHiddenJobCount] = useState(0);
 
+  // ── REJECT JOB MODAL STATE ──
+  const [rejectModalJobId, setRejectModalJobId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectNotes, setRejectNotes] = useState('');
+  const [rejectLoading, setRejectLoading] = useState(false);
+
   // Load landscaper profile including insurance status - use explicit columns
+  // Load landscaper profile including insurance + availability status
+  // AVAILABILITY ENFORCEMENT: The `available` column (boolean, default true)
+  // controls whether this landscaper can view marketplace jobs and accept new work.
   const loadLandscaperProfile = async (userId: string) => {
     try {
       const { data } = await supabase
         .from('landscapers')
-        .select('id, user_id, business_name, insurance_verified, approved')
+        .select('id, user_id, business_name, insurance_verified, approved, available')
         .eq('user_id', userId)
         .maybeSingle();
       return data;
@@ -138,6 +152,7 @@ export default function JobsPanel() {
       return null;
     }
   };
+
 
   const loadJobs = useCallback(async () => {
     try {
@@ -310,6 +325,17 @@ export default function JobsPanel() {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
 
+    // AVAILABILITY GATE: Block job acceptance if landscaper is unavailable.
+    // Uses centralized check from landscaperAvailability.ts
+    if (!isLandscaperAvailable(landscaperProfile)) {
+      toast({
+        title: "Unavailable",
+        description: UNAVAILABLE_ERROR_MESSAGE,
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Frontend check for insurance requirement
     const { canAccept, reason } = canLandscaperAcceptJob(job, landscaperProfile || {});
     if (!canAccept) {
@@ -320,6 +346,7 @@ export default function JobsPanel() {
       });
       return;
     }
+
 
     try {
       setActionLoading(jobId);
@@ -474,60 +501,61 @@ export default function JobsPanel() {
   try {
     setActionLoading(jobId);
 
-    console.log('[JobsPanel] Attempting job completion:', {
+    console.log('[JobsPanel] Attempting job completion:', { jobId, completionMethod });
+
+    // Uses direct fetch() via edgeFunctionClient to bypass supabase-js
+    // FunctionsFetchError issues with verify_jwt gateway interception
+    const { data, error: fnErr } = await invokeJobExecution({
+      action: 'complete',
       jobId,
-      completionMethod
     });
 
-    const { data, error } = await supabase.functions.invoke('job-execution', {
-      body: {
-        action: 'complete',
-        jobId
+    console.log('[JobsPanel] Edge Function Response:', { data, error: fnErr });
+
+    if (fnErr) {
+      // Check for photo validation errors in the error message
+      if (fnErr.includes('before photo')) {
+        toast({
+          title: "Before Photo Required",
+          description: "Please upload at least 1 before photo to complete this job.",
+          variant: "destructive"
+        });
+        return;
       }
-    });
-
-    // 🔥 Log full response
-    console.log('[JobsPanel] Edge Function Response:', {
-      data,
-      error
-    });
-
-    // Transport-level failure (non-2xx)
-    if (error) {
-      console.error('[JobsPanel] Edge function transport error:', error);
-      throw error; // DO NOT wrap in generic error
+      if (fnErr.includes('after photo')) {
+        toast({
+          title: "After Photo Required",
+          description: "Please upload at least 1 after photo to complete this job.",
+          variant: "destructive"
+        });
+        return;
+      }
+      throw new Error(fnErr);
     }
 
-    // Logical failure returned from function
-    if (!data?.success) {
-      console.error('[JobsPanel] Edge function logical failure:', data);
-
-      if (data?.validation) {
-        const { beforePhotos, afterPhotos } = data.validation;
-
-        if (beforePhotos === 0) {
-          toast({
-            title: "Before Photo Required",
-            description: "Please upload at least 1 before photo to complete this job.",
-            variant: "destructive"
-          });
-          return;
-        }
-
-        if (afterPhotos === 0) {
-          toast({
-            title: "After Photo Required",
-            description: "Please upload at least 1 after photo to complete this job.",
-            variant: "destructive"
-          });
-          return;
-        }
+    // Check for validation data in successful response with success: false
+    // (this shouldn't happen with the new client, but kept for safety)
+    if (data?.validation) {
+      const { beforePhotos, afterPhotos } = data.validation;
+      if (beforePhotos === 0) {
+        toast({
+          title: "Before Photo Required",
+          description: "Please upload at least 1 before photo to complete this job.",
+          variant: "destructive"
+        });
+        return;
       }
-
-      throw new Error(data?.error || 'Edge function returned failure');
+      if (afterPhotos === 0) {
+        toast({
+          title: "After Photo Required",
+          description: "Please upload at least 1 after photo to complete this job.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
-    // ✅ SUCCESS
+    // SUCCESS
     setJobs(prev =>
       prev.map(job =>
         job.id === jobId
@@ -543,8 +571,7 @@ export default function JobsPanel() {
 
     toast({
       title: "Job Submitted for Review!",
-      description:
-        "Your work has been submitted. An admin will review and approve shortly."
+      description: "Your work has been submitted. An admin will review and approve shortly."
     });
 
     loadJobs().catch(err =>
@@ -566,6 +593,8 @@ export default function JobsPanel() {
 
 
 
+
+
   // ── START JOB ──
   // Handles BOTH admin-assigned (status='scheduled', landscaper_id=uid)
   // AND self-accepted (status='assigned', assigned_to=uid) jobs.
@@ -574,6 +603,19 @@ export default function JobsPanel() {
   const handleStartJob = async (jobId: string) => {
     try {
       setActionLoading(jobId);
+
+      // LIFECYCLE ENFORCEMENT: Pre-flight status check
+      // Only 'assigned' or 'scheduled' jobs can be started
+      const job = jobs.find(j => j.id === jobId);
+      if (job && !['assigned', 'scheduled'].includes(job.status)) {
+        toast({
+          title: "Cannot Start Job",
+          description: `Job status is "${job.status}". Only assigned or scheduled jobs can be started.`,
+          variant: "destructive"
+        });
+        setActionLoading(null);
+        return;
+      }
 
       const startedAt = new Date().toISOString();
 
@@ -589,6 +631,7 @@ export default function JobsPanel() {
         })
         .eq('id', jobId)
         .or(`and(assigned_to.eq.${user?.id},status.eq.assigned),and(landscaper_id.eq.${user?.id},status.eq.scheduled)`);
+
 
       if (error) throw error;
 
@@ -635,6 +678,75 @@ export default function JobsPanel() {
     console.log('[JobsPanel] Job auto-started via geofencing, reloading jobs');
     loadJobs();
   }, [loadJobs]);
+
+  // ── REJECT JOB (pre-start) ──
+  // Opens the reject modal. Actual submission handled by handleConfirmReject.
+  const handleOpenRejectModal = (jobId: string) => {
+    setRejectModalJobId(jobId);
+    setRejectReason('');
+    setRejectNotes('');
+  };
+
+  // ── CONFIRM REJECT ──
+  // Calls job-execution edge function with action='reject'.
+  // Server validates: status must be 'scheduled' or 'assigned', user must be assigned.
+  // Result: job → status='priced', landscaper_id=null, assigned_to=null, is_available=true.
+  // The 'priced' status places the job in the admin "Needs Landscaper" bucket
+  // where it can be immediately reassigned (LandscaperAssignmentDropdown accepts 'priced').
+  // SAFETY: Does NOT modify payment_status, payout_status, or payout_amount.
+
+  const handleConfirmReject = async () => {
+    if (!rejectModalJobId || !rejectReason) return;
+
+    const fullReason = rejectNotes.trim()
+      ? `${rejectReason}: ${rejectNotes.trim()}`
+      : rejectReason;
+
+    try {
+      setRejectLoading(true);
+
+      const { data, error: fnErr } = await invokeJobExecution({
+        action: 'reject',
+        jobId: rejectModalJobId,
+        reason: fullReason,
+      });
+
+      if (fnErr) {
+        toast({
+          title: 'Reject Failed',
+          description: fnErr,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Remove job from local state immediately (it's no longer assigned to us)
+      setJobs(prev => prev.filter(j => j.id !== rejectModalJobId));
+
+      toast({
+        title: 'Job Rejected',
+        description: 'The job has been returned to the available queue.',
+      });
+
+      // Close modal
+      setRejectModalJobId(null);
+      setRejectReason('');
+      setRejectNotes('');
+
+      // Background refresh
+      loadJobs().catch(err => console.warn('[JobsPanel] Background refresh after reject failed:', err));
+    } catch (err: any) {
+      console.error('[JobsPanel] Reject error:', err);
+      toast({
+        title: 'Error',
+        description: err?.message || 'Failed to reject job',
+        variant: 'destructive',
+      });
+    } finally {
+      setRejectLoading(false);
+    }
+  };
+
 
   // Auth loading guard
   if (authLoading) {
@@ -865,6 +977,7 @@ export default function JobsPanel() {
                     onComplete={handleCompleteJob}
                     onManualStart={handleManualStartJob}
                     onJobAutoStarted={handleJobAutoStarted}
+                    onReject={handleOpenRejectModal}
                     isLoading={actionLoading === job.id}
                     isMyJob={true}
                   />
@@ -897,6 +1010,7 @@ export default function JobsPanel() {
                     onComplete={handleCompleteJob}
                     onManualStart={handleManualStartJob}
                     onJobAutoStarted={handleJobAutoStarted}
+                    onReject={handleOpenRejectModal}
                     isLoading={actionLoading === job.id}
                     isMyJob={true}
                   />
@@ -904,6 +1018,20 @@ export default function JobsPanel() {
               </div>
             </div>
           )}
+
+          {/* Empty state for My Jobs */}
+          {myJobsCount === 0 && (
+            <div className="flex flex-col items-center justify-center py-10 space-y-3">
+              <div className="w-14 h-14 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <Calendar className="h-7 w-7 text-blue-400/40" />
+              </div>
+              <h4 className="text-base font-medium text-emerald-300/80">No Active or Scheduled Jobs</h4>
+              <p className="text-emerald-300/50 text-sm text-center max-w-xs">
+                Accept available jobs above to get started. Jobs you accept will appear here.
+              </p>
+            </div>
+          )}
+
 
           {/* Empty state for My Jobs */}
           {myJobsCount === 0 && (
@@ -1023,9 +1151,118 @@ export default function JobsPanel() {
         </div>
       </section>
 
+
+      {/* ════════════════════════════════════════════════════════════════
+          REJECT JOB MODAL
+          ════════════════════════════════════════════════════════════════ */}
+      {rejectModalJobId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => {
+              if (!rejectLoading) {
+                setRejectModalJobId(null);
+                setRejectReason('');
+                setRejectNotes('');
+              }
+            }}
+          />
+
+          {/* Modal Card */}
+          <div className="relative w-full max-w-md bg-slate-900 border border-red-500/30 rounded-2xl shadow-2xl shadow-red-500/10 overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-red-500/20 bg-red-500/5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                  <XCircle className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Reject Job</h3>
+                  <p className="text-xs text-red-300/70">This job will be returned to the available queue</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4">
+              {/* Reason Select (required) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Reason <span className="text-red-400">*</span>
+                </label>
+                <select
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  disabled={rejectLoading}
+                  className="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-red-500/30 text-sm text-white focus:outline-none focus:border-red-500/60 focus:ring-1 focus:ring-red-500/30 disabled:opacity-50"
+                >
+                  <option value="">Select a reason...</option>
+                  <option value="Schedule conflict">Schedule conflict</option>
+                  <option value="Too far">Too far</option>
+                  <option value="Job not suitable">Job not suitable</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              {/* Notes Textarea (optional) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Additional Notes <span className="text-gray-500 text-xs">(optional)</span>
+                </label>
+                <textarea
+                  value={rejectNotes}
+                  onChange={(e) => setRejectNotes(e.target.value)}
+                  disabled={rejectLoading}
+                  placeholder="Any additional context..."
+                  rows={3}
+                  className="w-full px-3 py-2.5 rounded-xl bg-black/40 border border-red-500/30 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-500/60 focus:ring-1 focus:ring-red-500/30 resize-none disabled:opacity-50"
+                />
+              </div>
+
+              {/* Info notice */}
+              <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-500/5 border border-blue-500/20">
+                <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-300/70">
+                  The job will be unassigned from you and returned to the marketplace. No payment or payout changes will occur.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-700/50 bg-black/20 flex gap-3">
+              <button
+                onClick={() => {
+                  setRejectModalJobId(null);
+                  setRejectReason('');
+                  setRejectNotes('');
+                }}
+                disabled={rejectLoading}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-600 text-slate-300 text-sm font-medium hover:bg-slate-800 transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmReject}
+                disabled={rejectLoading || !rejectReason}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {rejectLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <XCircle className="w-4 h-4" />
+                )}
+                {rejectLoading ? 'Rejecting...' : 'Confirm Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+
 
 
 
@@ -1149,15 +1386,17 @@ function AvailableJobCard({ job, onAccept, onDecline, isLoading, requiresInsuran
 // Job Card Component for assigned/active/completed jobs
 // Enhanced with: scope visibility, price fix, photo guardrails, active banner
 
-function JobCard({ job, onAccept, onComplete, onManualStart, onJobAutoStarted, isLoading, isMyJob }: { 
+function JobCard({ job, onAccept, onComplete, onManualStart, onJobAutoStarted, onReject, isLoading, isMyJob }: { 
   job: any; 
   onAccept: (id: string, amount?: number) => void;
   onComplete: (id: string, method?: 'gps_verified' | 'manual_override') => void;
   onManualStart: (id: string) => void;
   onJobAutoStarted: () => void;
+  onReject?: (jobId: string) => void;
   isLoading: boolean;
   isMyJob: boolean;
 }) {
+
   const supabase = useSupabaseClient();
   const [landscaperId, setLandscaperId] = useState('');
   const [gpsUnavailable, setGpsUnavailable] = useState(false);
@@ -1466,14 +1705,29 @@ function JobCard({ job, onAccept, onComplete, onManualStart, onJobAutoStarted, i
                 </button>
               </>
             )}
+
+            {/* ── REJECT JOB BUTTON ── */}
+            {/* Shows alongside Start Job for scheduled/assigned jobs only (NOT active/completed) */}
+            {onReject && (
+              <button
+                onClick={() => onReject(job.id)}
+                disabled={isLoading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-red-300 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <XCircle className="w-4 h-4" />
+                Reject Job
+              </button>
+            )}
           </div>
         )}
+
 
 
         {/* Job Actions Panel - visible for scheduled (admin-assigned), assigned, active, flagged_review */}
         {['scheduled', 'assigned', 'active', 'flagged_review'].includes(job?.status) && isMyJob && (
 
-          <JobActionsPanel jobId={job.id} jobStatus={job.status} />
+          <JobActionsPanel jobId={job.id} jobStatus={job.status} startedAt={job.started_at} />
+
         )}
 
         {/* ── MARK AS COMPLETE BUTTON with Photo Guardrails ── */}
@@ -1605,7 +1859,8 @@ const getColorClasses = (color: string, isActive: boolean) => {
 
 
 // Job Actions Panel - UI shell for job workflow features with integrated messaging, photos, and add-ons
-function JobActionsPanel({ jobId, jobStatus }: { jobId: string; jobStatus: string }) {
+function JobActionsPanel({ jobId, jobStatus, startedAt }: { jobId: string; jobStatus: string; startedAt?: string }) {
+
   const supabase = useSupabaseClient();
   const { toast } = useToast();
   const { isMobile } = useMobile();
@@ -1724,6 +1979,15 @@ function JobActionsPanel({ jobId, jobStatus }: { jobId: string; jobStatus: strin
 
   const beforePhotos = existingPhotos.filter(p => p.type === 'before');
   const afterPhotos = existingPhotos.filter(p => p.type === 'after');
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LIFECYCLE GATES — Strict enforcement of photo upload prerequisites
+  // ═══════════════════════════════════════════════════════════════════════
+  // BEFORE PHOTOS: Only allowed when status === 'active' AND started_at exists
+  const canUploadBeforePhotos = jobStatus === 'active' && !!startedAt;
+  // AFTER PHOTOS: Only allowed when status === 'active' AND at least 1 before photo exists
+  const canUploadAfterPhotos = jobStatus === 'active' && !!startedAt && beforePhotos.length > 0;
+
 
 
   // Sanitize filename for Supabase Storage - remove special chars, spaces, unicode
@@ -2842,14 +3106,43 @@ function JobActionsPanel({ jobId, jobStatus }: { jobId: string; jobStatus: strin
                         </div>
                       )}
 
-                      {/* Before Photos Section */}
-                      {section.id === 'beforePhotos' && renderPhotoSection('before')}
+                      {/* Before Photos Section — LIFECYCLE GATE: requires active + started_at */}
+                      {section.id === 'beforePhotos' && (
+                        canUploadBeforePhotos ? renderPhotoSection('before') : (
+                          <div className="flex items-start gap-2.5 p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                            <Lock className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+                            <div className="text-xs text-gray-400">
+                              <p className="font-medium text-gray-300">Start the job first</p>
+                              <p className="mt-1 text-gray-500">Before photos can only be uploaded after the job has been started. Use the Start Job button above.</p>
+                            </div>
+                          </div>
+                        )
+                      )}
 
                       {/* Add-Ons Section */}
                       {section.id === 'addOns' && renderAddOnsSection()}
 
-                      {/* After Photos Section */}
-                      {section.id === 'afterPhotos' && renderPhotoSection('after')}
+                      {/* After Photos Section — LIFECYCLE GATE: requires active + started_at + before photos */}
+                      {section.id === 'afterPhotos' && (
+                        canUploadAfterPhotos ? renderPhotoSection('after') : (
+                          <div className="flex items-start gap-2.5 p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                            <Lock className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+                            <div className="text-xs text-gray-400">
+                              <p className="font-medium text-gray-300">
+                                {jobStatus !== 'active' || !startedAt
+                                  ? 'Start the job first'
+                                  : 'Upload before photos first'}
+                              </p>
+                              <p className="mt-1 text-gray-500">
+                                {jobStatus !== 'active' || !startedAt
+                                  ? 'After photos require the job to be started first.'
+                                  : `Upload at least 1 before photo before you can add after photos. Currently: ${beforePhotos.length} before photo${beforePhotos.length !== 1 ? 's' : ''}.`}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      )}
+
 
                       {/* Unable to Complete Section */}
                       {section.id === 'unableToComplete' && renderUnableToCompleteSection()}

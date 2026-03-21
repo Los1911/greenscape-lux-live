@@ -13,8 +13,9 @@ const getStatusIcon = (status: string) => {
   switch (status) {
     case 'completed': return <CheckCircle2 className="w-4 h-4" />;
     case 'cancelled': return <XCircle className="w-4 h-4" />;
-    case 'in_progress':
+    case 'active':
     case 'assigned': return <AlertCircle className="w-4 h-4" />;
+
     default: return <Clock className="w-4 h-4" />;
   }
 };
@@ -23,7 +24,7 @@ const getStatusColor = (status: string) => {
   switch (status) {
     case 'completed': return 'bg-green-900/30 text-green-400 border-green-500/30';
     case 'cancelled': return 'bg-red-900/30 text-red-400 border-red-500/30';
-    case 'in_progress':
+    case 'active':
     case 'assigned': return 'bg-yellow-900/30 text-yellow-400 border-yellow-500/30';
     default: return 'bg-blue-900/30 text-blue-400 border-blue-500/30';
   }
@@ -35,7 +36,7 @@ const getStatusText = (status: string) => {
     case 'available':
     case 'pending': return 'PENDING ACCEPTANCE';
     case 'assigned': return 'LANDSCAPER ASSIGNED';
-    case 'in_progress': return 'IN PROGRESS';
+    case 'active': return 'IN PROGRESS';
     case 'completed': return 'COMPLETED';
     case 'cancelled': return 'CANCELLED';
     default: return status.replace('_', ' ').toUpperCase();
@@ -164,9 +165,10 @@ export default function ClientHistory() {
                       </div>
                       {job?.service_type && <p className="text-sm text-gray-300 mb-2">Type: {job.service_type}</p>}
                       {job?.service_address && <p className="text-sm text-gray-400 mb-2">📍 {job.service_address}</p>}
-                      {job?.landscaper_email && (job?.status === 'assigned' || job?.status === 'accepted' || job?.status === 'in_progress' || job?.status === 'completed') && (
+                      {job?.landscaper_email && (job?.status === 'assigned' || job?.status === 'accepted' || job?.status === 'active' || job?.status === 'completed') && (
                         <p className="text-sm text-blue-400 mb-2">👤 Landscaper: {job.landscaper_email}</p>
                       )}
+
                       {job?.price != null && <div className="text-green-400 font-semibold">${(job.price || 0).toFixed(2)}</div>}
                     </div>
                   ))}

@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Job, RemediationStatus } from '@/types/job';
+import { calculatePayoutAmount } from '@/lib/payoutCalculation';
+
 import RemediationTimer from './RemediationTimer';
 import { StructuredJobMessaging } from '@/components/messaging/StructuredJobMessaging';
 import { useToast } from '@/hooks/use-toast';
@@ -119,9 +121,11 @@ export default function RemediationPanel({ job, onUpdate }: RemediationPanelProp
         .from('jobs')
         .update({
           status: 'completed',
-          remediation_status: 'completed' as RemediationStatus
+          remediation_status: 'completed' as RemediationStatus,
+          payout_amount: calculatePayoutAmount(job.price)
         })
         .eq('id', job.id);
+
 
       if (error) throw error;
 

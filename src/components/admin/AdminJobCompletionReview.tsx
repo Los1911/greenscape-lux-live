@@ -19,7 +19,8 @@ import {
   Loader2
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { useToast } from '@/hooks/use-toast';
+import { invokeJobExecution } from '@/lib/edgeFunctionClient';
+
 import { JobPhoto, groupPhotosByType } from '@/types/jobPhoto';
 import BeforeAfterComparison from '@/components/photos/BeforeAfterComparison';
 
@@ -159,15 +160,14 @@ export default function AdminJobCompletionReview({ className = '' }: AdminJobCom
   const handleApprove = async (jobId: string) => {
     setActionLoading(jobId);
     try {
-      const { data, error } = await supabase.functions.invoke('job-execution', {
-        body: {
-          action: 'admin_approve',
-          jobId
-        }
+      const { data, error: fnErr } = await invokeJobExecution({
+        action: 'admin_approve',
+        jobId
       });
 
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Failed to approve job');
+      if (fnErr) {
+        throw new Error(fnErr);
+      }
 
       toast({
         title: 'Job Approved',
@@ -201,16 +201,15 @@ export default function AdminJobCompletionReview({ className = '' }: AdminJobCom
 
     setActionLoading(jobId);
     try {
-      const { data, error } = await supabase.functions.invoke('job-execution', {
-        body: {
-          action: 'admin_reject',
-          jobId,
-          rejectionReason: reason
-        }
+      const { data, error: fnErr } = await invokeJobExecution({
+        action: 'admin_reject',
+        jobId,
+        rejectionReason: reason
       });
 
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Failed to reject job');
+      if (fnErr) {
+        throw new Error(fnErr);
+      }
 
       toast({
         title: 'Job Rejected',
@@ -235,6 +234,7 @@ export default function AdminJobCompletionReview({ className = '' }: AdminJobCom
       setActionLoading(null);
     }
   };
+
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';

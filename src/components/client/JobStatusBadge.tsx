@@ -20,7 +20,8 @@ interface JobStatusBadgeProps {
   showPrice?: boolean;
 }
 
-// Status → visual config, covering ALL 14 canonical statuses + legacy 'in_progress'
+// Status → visual config, covering ALL 14 canonical statuses
+
 const STATUS_CONFIG: Record<string, {
   label: string;
   description: string;
@@ -86,14 +87,8 @@ const STATUS_CONFIG: Record<string, {
     bgColor: 'bg-yellow-500/15',
     borderColor: 'border-yellow-500/30',
     icon: Play
-  },
-  in_progress: {
-    label: 'In Progress',
-    description: 'Work is currently being performed',
-    color: 'text-yellow-300',
-    bgColor: 'bg-yellow-500/15',
-    borderColor: 'border-yellow-500/30',
-    icon: Play
+
+
   },
   pending_review: {
     label: 'In Progress',

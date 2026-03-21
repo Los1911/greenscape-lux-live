@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/lib/supabase';
+import { invokeEdgeFunction } from '@/lib/edgeFunctionClient';
 import { DollarSign, Play, Pause, RefreshCw, AlertTriangle, Settings, Users, TrendingUp } from 'lucide-react';
+
 
 interface Landscaper {
   id: string;
@@ -130,9 +132,10 @@ export default function PayoutManagementPanel() {
       } else if (action === 'payout') {
         // Trigger manual payouts
         for (const id of selectedIds) {
-          await supabase.functions.invoke('process-payout', { body: { landscaper_id: id } });
+          await invokeEdgeFunction('process-payout', { landscaper_id: id });
         }
       }
+
       await fetchData();
       setSelectedIds([]);
     } catch (error) {

@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { CreditCard, DollarSign, Wallet, TrendingUp, Calendar, Clock } from 'lucide-react';
 import { PaymentMethodModal } from './PaymentMethodModal';
 import { supabase } from '@/lib/supabase';
+import { invokeEdgeFunction } from '@/lib/edgeFunctionClient';
 import { useAuth } from '@/contexts/AuthContext';
+
 
 interface BillingSummary {
   totalSpent: number;
@@ -77,12 +79,10 @@ export const PaymentSummaryCard: React.FC<PaymentSummaryCardProps> = ({
           firstName: profile?.first_name || '',
           lastName: profile?.last_name || ''
         };
-        
-        const { data: createResult, error: createError } = await supabase.functions.invoke('create-stripe-customer', {
-          body: createPayload
-        });
+        const { data: createResult, error: createError } = await invokeEdgeFunction('create-stripe-customer', createPayload);
 
         if (createError || !createResult?.success) {
+
           setBillingSummary({
             totalSpent: 0,
             pendingAmount: 0,

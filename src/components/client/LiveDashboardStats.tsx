@@ -11,9 +11,12 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
+
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { supabase } from '@/lib/supabase';
+import { invokeEdgeFunction } from '@/lib/edgeFunctionClient';
 import { useAuth } from '@/contexts/AuthContext';
+
 
 // ─── Types ────────────────────────────────────────────────────
 interface PricedJob {
@@ -165,36 +168,22 @@ export function LiveDashboardStats() {
       setAcceptInfo(null);
 
       try {
-        const { data: fnData, error: fnErr } = await supabase.functions.invoke(
+        // Use invokeEdgeFunction (native fetch with JWT refresh) instead of
+        // supabase.functions.invoke() to avoid FunctionsFetchError when
+        // verify_jwt=true and JWT is near-expiry.
+        const { data: fnData, error: fnErrMsg } = await invokeEdgeFunction(
           'create-checkout-session',
           {
-            body: {
-              job_id: jobId,
-              price: jobPrice,
-              client_user_id: user.id,
-            },
-          }
+            job_id: jobId,
+            price: jobPrice,
+            client_user_id: user.id,
+          },
         );
 
-        if (fnErr) {
-          // ── 409 Conflict = already paid / duplicate attempt ──
-          const httpStatus = (fnErr as any)?.context?.status;
-          if (httpStatus === 409) {
-            console.log('[LiveDashboardStats] 409 Conflict — payment already processed for job', jobId);
-            setPricedJobs(prev => prev.filter(j => j.id !== jobId));
-            setAcceptInfo('Payment already processed — syncing...');
-            setTimeout(() => setAcceptInfo(null), 4000);
-            setAcceptingJobId(null);
-            fetchPricedJobs().catch(() => {});
-            return;
-          }
-          throw new Error('Checkout session error: ' + fnErr.message);
-        }
-
-        const parsed = typeof fnData === 'string' ? JSON.parse(fnData) : fnData;
-
-        if (!parsed?.success || !parsed?.url) {
-          if (parsed?.error?.includes('already been paid') || parsed?.error?.includes('not available')) {
+        // invokeEdgeFunction returns { data, error: string | null }
+        if (fnErrMsg) {
+          // Check for "already paid" style messages
+          if (fnErrMsg.includes('already been paid') || fnErrMsg.includes('not available')) {
             console.log('[LiveDashboardStats] Backend confirmed already paid — refetching');
             setPricedJobs(prev => prev.filter(j => j.id !== jobId));
             setAcceptInfo('Payment already processed — syncing...');
@@ -203,11 +192,25 @@ export function LiveDashboardStats() {
             fetchPricedJobs().catch(() => {});
             return;
           }
-          throw new Error(parsed?.error || 'No checkout URL returned');
+          throw new Error('Checkout session error: ' + fnErrMsg);
+        }
+
+        if (!fnData?.success || !fnData?.url) {
+          if (fnData?.error?.includes('already been paid') || fnData?.error?.includes('not available')) {
+            console.log('[LiveDashboardStats] Backend confirmed already paid — refetching');
+            setPricedJobs(prev => prev.filter(j => j.id !== jobId));
+            setAcceptInfo('Payment already processed — syncing...');
+            setTimeout(() => setAcceptInfo(null), 4000);
+            setAcceptingJobId(null);
+            fetchPricedJobs().catch(() => {});
+            return;
+          }
+          throw new Error(fnData?.error || 'No checkout URL returned');
         }
 
         console.log('[LiveDashboardStats] Redirecting to Stripe Checkout for job', jobId);
-        window.location.href = parsed.url;
+        window.location.href = fnData.url;
+
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         console.error('[LiveDashboardStats] acceptEstimate error for job', jobId, ':', message);

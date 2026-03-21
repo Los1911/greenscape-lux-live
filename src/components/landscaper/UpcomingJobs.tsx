@@ -7,6 +7,8 @@ import { Job } from "@/types/job"
 import PhotoUploadModal from "./PhotoUploadModal"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/components/SharedUI/Toast"
+import { calculatePayoutAmount } from "@/lib/payoutCalculation"
+
 
 
 interface UpcomingJobsProps {
@@ -132,6 +134,9 @@ export default function UpcomingJobs({
     setActionLoading(jobId)
     
     const completedAt = new Date().toISOString()
+    // Look up the job price for payout calculation
+    const targetJob = localJobs.find(j => j.id === jobId)
+    const payoutAmount = calculatePayoutAmount(targetJob?.price)
     
     try {
       const { error } = await supabase
@@ -139,7 +144,8 @@ export default function UpcomingJobs({
         .update({ 
           status: 'completed',
           completed_at: completedAt,
-          completion_method: 'manual_override'
+          completion_method: 'manual_override',
+          payout_amount: payoutAmount
         })
         .eq('id', jobId)
 
@@ -170,6 +176,7 @@ export default function UpcomingJobs({
       setActionLoading("")
     }
   }
+
 
   const handlePhotoUploadSuccess = async () => {
     if (selectedJobId) {

@@ -1,6 +1,6 @@
 import * as React from "react"
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
-import { Check } from "lucide-react"
+import { Circle } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -11,16 +11,17 @@ const Checkbox = React.forwardRef<
   <CheckboxPrimitive.Root
     ref={ref}
     className={cn(
-      "peer h-4 w-4 shrink-0 rounded-sm border border-primary/60",
+      "peer h-5 w-5 shrink-0 rounded-full border border-white/30",
       // Focus states - GreenScape Lux branded emerald glow with dark offset
       "focus-visible:outline-none",
       "focus-visible:ring-2 focus-visible:ring-emerald-400/60",
       "focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+      // Checked state - green brand
+      "data-[state=checked]:bg-green-500 data-[state=checked]:border-green-400",
       // States
       "disabled:cursor-not-allowed disabled:opacity-50",
-      "data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
       // Transitions & touch optimization
-      "transition-colors duration-200",
+      "transition-all duration-200",
       "[-webkit-tap-highlight-color:transparent]",
       className
     )}
@@ -29,10 +30,11 @@ const Checkbox = React.forwardRef<
     <CheckboxPrimitive.Indicator
       className={cn("flex items-center justify-center text-current")}
     >
-      <Check className="h-3.5 w-3.5 transition-transform duration-200" />
+      <Circle className="h-2 w-2 fill-white text-white transition-transform duration-200" />
     </CheckboxPrimitive.Indicator>
   </CheckboxPrimitive.Root>
 ))
 Checkbox.displayName = CheckboxPrimitive.Root.displayName
 
 export { Checkbox }
+

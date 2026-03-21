@@ -5,7 +5,8 @@ interface OfflineJob {
   service_type: string
   address: string
   scheduled_date: string
-  status: 'pending' | 'in_progress' | 'completed'
+  status: 'pending' | 'active' | 'completed'
+
   description?: string
   notes?: string
   priority: 'low' | 'medium' | 'high'

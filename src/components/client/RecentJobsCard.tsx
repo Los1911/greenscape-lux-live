@@ -91,7 +91,8 @@ function StatusIndicator({ status, price }: { status: string; price?: number }) 
           bg: 'bg-purple-500/15',
           label: 'Scheduled'
         };
-      case 'in_progress':
+      case 'active':
+
         return { 
           icon: Play, 
           color: 'text-yellow-400', 

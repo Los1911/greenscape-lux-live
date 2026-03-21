@@ -15,6 +15,12 @@ interface SimpleProtectedRouteProps {
 /**
  * SimpleProtectedRoute - Protects routes based on authentication and role
  * 
+ * FIX (2026-03-18): Now waits for `roleResolved` from AuthContext before
+ * making any redirect decisions.  Previously, a 1.5 s timeout could fire
+ * before the authoritative DB-based role resolution completed, causing
+ * admins to be misrouted to /client-dashboard (and then into the
+ * OnboardingGuard screen) when opening the app in incognito.
+ *
  * NOTE: Client onboarding is handled by OnboardingGuard which wraps ClientDashboardV2.
  * This component does NOT check onboarding status - the Guard is the sole authority.
  */
@@ -22,7 +28,7 @@ export default function SimpleProtectedRoute({
   children, 
   requiredRole 
 }: SimpleProtectedRouteProps) {
-  const { user, role, loading, session } = useAuth();
+  const { user, role, loading, session, roleResolved } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const hasRedirected = useRef(false);
@@ -43,25 +49,40 @@ export default function SimpleProtectedRoute({
     }
   }, [loading, session]);
 
-  // Timeout for role loading - prevents infinite spinner (1.5s for fast recovery)
+  // ──────────────────────────────────────────────────────────────────
+  // FIX (2026-03-18): Increased timeout from 1.5 s → 4 s AND the
+  // timeout now checks sessionStorage for a cached role (written by
+  // AuthContext on every successful resolution).  This mirrors the
+  // approach already used in RoleRouter and prevents admins from
+  // being mis-routed when the DB queries take longer than expected.
+  // ──────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!loading && user && !role && !roleTimeout) {
+    if (!loading && user && !roleResolved && !roleTimeout) {
       const timer = setTimeout(() => {
-        console.warn('[SimpleProtectedRoute] Role timeout - proceeding without role');
+        console.warn('[SimpleProtectedRoute] Role resolution timeout (4 s) — using fallback');
         setRoleTimeout(true);
-      }, 1500);
+      }, 4000);
       return () => clearTimeout(timer);
     }
-  }, [loading, user, role, roleTimeout]);
+  }, [loading, user, roleResolved, roleTimeout]);
 
-  // Handle role mismatch redirect
+  // Handle role mismatch redirect — only after role is authoritatively resolved
   useEffect(() => {
-    if (!loading && user && role && requiredRole && role !== requiredRole && !hasRedirected.current && !passwordResetRequired) {
+    if (
+      !loading &&
+      roleResolved &&
+      user &&
+      role &&
+      requiredRole &&
+      role !== requiredRole &&
+      !hasRedirected.current &&
+      !passwordResetRequired
+    ) {
       hasRedirected.current = true;
-      console.log(`[SimpleProtectedRoute] Role mismatch: ${role} vs ${requiredRole}`);
+      console.log(`[SimpleProtectedRoute] Role mismatch: ${role} vs ${requiredRole} — redirecting`);
       dashboardRouter.navigateToRoleDashboard(navigate, { replace: true });
     }
-  }, [loading, user, role, requiredRole, navigate, passwordResetRequired]);
+  }, [loading, roleResolved, user, role, requiredRole, navigate, passwordResetRequired]);
 
   // Loading state - show spinner with consistent styling
   if (loading) {
@@ -87,8 +108,13 @@ export default function SimpleProtectedRoute({
     return <Navigate to={getPasswordResetRedirectUrl()} replace state={{ from: location }} />;
   }
 
-  // Waiting for role (not timed out yet)
-  if (!role && !roleTimeout) {
+  // ──────────────────────────────────────────────────────────────────
+  // FIX (2026-03-18): Wait for roleResolved (or timeout) before
+  // rendering children or checking for mismatches.  This prevents
+  // the brief window where role=null could slip through and cause
+  // downstream components to make wrong assumptions.
+  // ──────────────────────────────────────────────────────────────────
+  if (!roleResolved && !roleTimeout) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-[#020b06] to-black">
         <div className="text-center">
@@ -99,7 +125,38 @@ export default function SimpleProtectedRoute({
     );
   }
 
-  // Role mismatch - show redirect message
+  // If we timed out and still don't have a role, try sessionStorage fallback
+  if (!role && roleTimeout) {
+    let cachedRole: string | null = null;
+    try {
+      cachedRole = sessionStorage.getItem('user_role');
+    } catch {
+      // sessionStorage unavailable
+    }
+
+    // If cached role matches required role, allow through
+    if (cachedRole && requiredRole && cachedRole === requiredRole) {
+      console.log(`[SimpleProtectedRoute] Timeout fallback — cached role "${cachedRole}" matches required "${requiredRole}", allowing`);
+      return <>{children}</>;
+    }
+
+    // If cached role exists but doesn't match, redirect to the correct dashboard
+    if (cachedRole && requiredRole && cachedRole !== requiredRole) {
+      console.log(`[SimpleProtectedRoute] Timeout fallback — cached role "${cachedRole}" mismatches required "${requiredRole}", redirecting`);
+      const routeMap: Record<string, string> = {
+        admin: '/admin-dashboard',
+        landscaper: '/landscaper-dashboard',
+        client: '/client-dashboard',
+      };
+      return <Navigate to={routeMap[cachedRole] || '/client-dashboard'} replace />;
+    }
+
+    // No cached role at all — render children and hope for the best
+    console.warn('[SimpleProtectedRoute] Timeout with no cached role — rendering children');
+    return <>{children}</>;
+  }
+
+  // Role mismatch - show redirect message (the useEffect above will navigate)
   if (requiredRole && role && role !== requiredRole) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-[#020b06] to-black">
@@ -115,3 +172,4 @@ export default function SimpleProtectedRoute({
   // NOTE: For client routes, OnboardingGuard handles onboarding checks
   return <>{children}</>;
 }
+

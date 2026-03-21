@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase';
+import { invokeEdgeFunction } from '@/lib/edgeFunctionClient';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { DollarSign, User, Clock, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
@@ -95,13 +97,11 @@ export const CommissionPayoutTracker: React.FC = () => {
         .from('payouts')
         .update({ status: 'processing' })
         .eq('id', payoutId);
-
       // Call edge function to process payout
-      const { data, error } = await supabase.functions.invoke('process-payout', {
-        body: { payoutId }
-      });
+      const { data, error } = await invokeEdgeFunction('process-payout', { payoutId });
 
-      if (error) throw error;
+      if (error) throw new Error(error);
+
       
       // Refresh data
       fetchPayouts();

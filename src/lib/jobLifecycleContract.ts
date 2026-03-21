@@ -243,8 +243,8 @@ export const LANDSCAPER_TAB_STATUSES: Record<LandscaperTab, JobStatus[]> = {
 export const LANDSCAPER_ACTIONS = {
   /** Landscaper can accept the job */
   canAccept:    [JOB_STATUSES.AVAILABLE, JOB_STATUSES.PRICED, JOB_STATUSES.SCHEDULED] as JobStatus[],
-  /** Landscaper can start the job */
-  canStart:     [JOB_STATUSES.ASSIGNED] as JobStatus[],
+  /** Landscaper can start the job (both self-accepted and admin-assigned) */
+  canStart:     [JOB_STATUSES.ASSIGNED, JOB_STATUSES.SCHEDULED] as JobStatus[],
   /** Landscaper can mark the job complete */
   canComplete:  [JOB_STATUSES.ACTIVE] as JobStatus[],
   /** Landscaper can send messages */
@@ -256,6 +256,43 @@ export const LANDSCAPER_ACTIONS = {
     JOB_STATUSES.BLOCKED,
   ] as JobStatus[],
 };
+
+// ---------------------------------------------------------------------------
+// PAYOUT LIFECYCLE CONSTANTS
+// ---------------------------------------------------------------------------
+
+/**
+ * Payout status values that are eligible for admin payout release.
+ * Must match release-job-payout edge function PAYOUT_ELIGIBLE_STATUSES.
+ */
+export const PAYOUT_RELEASABLE_STATUSES = ['pending', 'ready', 'ready_for_release'] as const;
+
+/**
+ * Full payout eligibility check for a job.
+ * All four conditions must be true for payout release.
+ */
+export function isPayoutEligible(job: {
+  status?: string | null;
+  payment_status?: string | null;
+  client_paid?: boolean | null;
+  payout_status?: string | null;
+  payout_amount?: number | null;
+}): { eligible: boolean; reason: string } {
+  if (job.status !== 'completed') {
+    return { eligible: false, reason: 'Job must be completed (admin approved). Current: ' + (job.status || 'unknown') };
+  }
+  if (job.payment_status !== 'paid' && job.client_paid !== true) {
+    return { eligible: false, reason: 'Client payment not confirmed.' };
+  }
+  if (!job.payout_status || !PAYOUT_RELEASABLE_STATUSES.includes(job.payout_status as any)) {
+    return { eligible: false, reason: 'Payout status must be pending/ready. Current: ' + (job.payout_status || 'none') };
+  }
+  if (!job.payout_amount || job.payout_amount <= 0) {
+    return { eligible: false, reason: 'Payout amount must be greater than $0.' };
+  }
+  return { eligible: true, reason: 'Eligible for payout release.' };
+}
+
 
 
 

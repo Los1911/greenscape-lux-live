@@ -23,11 +23,13 @@ import { LandscaperAssignmentDropdown } from '@/components/admin/LandscaperAssig
 ---------------------------------------- */
 
 interface Job {
+
   id: string;
   service_type: string;
   service_name?: string;
   lifecycle: AdminBucket;
   status: string;
+  payment_status?: string | null;
   assigned_to?: string | null;
   landscaper_id?: string | null;
   landscaper_email?: string | null;
@@ -35,6 +37,7 @@ interface Job {
   price?: number | null;
   created_at: string;
 }
+
 
 interface ColumnConfig {
   id: string;
@@ -283,8 +286,8 @@ export function AdminJobsTable({ jobs, onJobClick, onJobUpdated }: AdminJobsTabl
                     </td>
                   )}
                   {visibleColumns.some(c => c.id === 'landscaper') && (
-                    <td className="py-3 px-4" onClick={job.status === 'scheduled' ? (e) => e.stopPropagation() : undefined}>
-                      {job.status === 'scheduled' ? (
+                    <td className="py-3 px-4" onClick={['priced', 'available', 'scheduled'].includes(job.status) ? (e) => e.stopPropagation() : undefined}>
+                      {['priced', 'available', 'scheduled'].includes(job.status) ? (
                         <LandscaperAssignmentDropdown
                           jobId={job.id}
                           jobStatus={job.status}

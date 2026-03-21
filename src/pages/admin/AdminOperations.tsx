@@ -17,6 +17,7 @@ import {
   FileWarning,
 } from 'lucide-react'
 
+
 /* ─── Helpers ──────────────────────────────────────────────── */
 
 const log = (msg: string, data?: any) => {
@@ -78,10 +79,8 @@ export default function AdminOperations() {
         supabase
           .from('jobs')
           .select('id', { count: 'exact' })
-          .eq('status', 'active'),
-        // SCHEMA ALIGNMENT: jobs table uses 'payout_status', NOT 'payment_status'
+          .in('status', ['assigned', 'scheduled', 'active']),
         supabase.from('jobs').select('price').neq('payout_status', 'not_ready'),
-
         supabase
           .from('landscapers')
           .select('id', { count: 'exact' })
@@ -160,7 +159,6 @@ export default function AdminOperations() {
           Operations
         </h1>
         <div className="flex items-center gap-3">
-          {/* Desktop search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500/50" />
             <input
@@ -203,7 +201,6 @@ export default function AdminOperations() {
       >
         {hasAttentionItems ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Pending Approvals */}
             {stats.pendingApprovals > 0 && (
               <button
                 type="button"
@@ -230,7 +227,6 @@ export default function AdminOperations() {
               </button>
             )}
 
-            {/* Flagged Jobs */}
             {stats.flaggedJobs > 0 && (
               <button
                 type="button"
@@ -285,7 +281,6 @@ export default function AdminOperations() {
           Quick Actions
         </h2>
 
-        {/* Mobile search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500/50" />
           <input
@@ -297,7 +292,6 @@ export default function AdminOperations() {
           />
         </div>
 
-        {/* Action buttons — stacked full-width on mobile */}
         <div className="flex flex-col gap-2">
           <Button
             onClick={() => loadStats()}

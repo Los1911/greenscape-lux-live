@@ -26,11 +26,13 @@ const RadioGroupItem = React.forwardRef<
     <RadioGroupPrimitive.Item
       ref={ref}
       className={cn(
-        "aspect-square h-4 w-4 rounded-full border border-primary/60 text-primary",
+        "aspect-square h-5 w-5 shrink-0 rounded-full border border-white/30",
         // Focus states - GreenScape Lux branded emerald glow with dark offset
         "focus-visible:outline-none",
         "focus-visible:ring-2 focus-visible:ring-emerald-400/60",
         "focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+        // Checked state - green brand
+        "data-[state=checked]:bg-green-500 data-[state=checked]:border-green-400",
         // States
         "disabled:cursor-not-allowed disabled:opacity-50",
         // Transitions & touch optimization
@@ -41,11 +43,11 @@ const RadioGroupItem = React.forwardRef<
       {...props}
     >
       <RadioGroupPrimitive.Indicator className="flex items-center justify-center">
-        <Circle className="h-2.5 w-2.5 fill-current text-current animate-in scale-in-0 duration-200" />
+        <Circle className="h-2 w-2 fill-white text-white animate-in scale-in-0 duration-200" />
       </RadioGroupPrimitive.Indicator>
     </RadioGroupPrimitive.Item>
   )
 })
-RadioGroupItem.displayName = RadioGroupPrimitive.Item.displayName
+
 
 export { RadioGroup, RadioGroupItem }

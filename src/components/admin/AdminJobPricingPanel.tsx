@@ -1,4 +1,12 @@
+/**
+ * @deprecated DEPRECATED — DO NOT USE
+ * All pricing, assignment, photo approval, and payout logic has been consolidated
+ * into LifecycleOperationsPanel (Operations Control Center).
+ * This file is kept temporarily for safety. It will be deleted in a future cleanup pass.
+ * Last active import removed from AdminLayout.tsx on 2026-03-18.
+ */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+
 import { supabase } from '@/lib/supabase'
 import { useRealtimePatch, patchArray } from '@/hooks/useRealtimePatch'
 import { AdminOverridePanel } from '@/components/admin/AdminOverridePanel'
@@ -72,6 +80,7 @@ interface Job {
   service_type?: string | null
   selected_services?: string[] | null
   status?: string | null
+  payment_status?: string | null
   price?: number | null
   priced_at?: string | null
   priced_by?: string | null
@@ -83,6 +92,7 @@ interface Job {
   created_at: string
   admin_notes?: string | null
 }
+
 
 
 // ============================================================================
@@ -424,9 +434,11 @@ function ReadOnlyJobDetails({ job, onAssigned }: { job: Job; onAssigned?: () => 
           <LandscaperAssignmentDropdown
             jobId={job.id}
             jobStatus={job.status}
+            paymentStatus={job.payment_status}
             currentLandscaperId={job.landscaper_id}
             onAssigned={onAssigned}
           />
+
         </div>
       )}
 
@@ -820,6 +832,7 @@ export function AdminJobPricingPanel() {
           service_type,
           selected_services,
           status,
+          payment_status,
           price,
           priced_at,
           priced_by,
@@ -832,6 +845,7 @@ export function AdminJobPricingPanel() {
           admin_notes
         `)
         .order('created_at', { ascending: false })
+
 
       const jobsData = (data || []) as Job[]
       setJobs(jobsData)

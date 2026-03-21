@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Card } from '@/components/ui/card';
+import { invokeJobExecution } from '@/lib/edgeFunctionClient';
+
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, Trash2, ChevronDown, ArrowUpDown } from 'lucide-react';
@@ -40,7 +41,7 @@ export default function AdminJobManager() {
   // ✅ UPDATED — lifecycle now uses edge function
   const handleStatusChange = async (jobId: string, newStatus: string) => {
     try {
-      let action: string | null = null;
+      let action: 'admin_approve' | 'admin_reject' | null = null;
 
       if (newStatus === 'completed') {
         action = 'admin_approve';
@@ -48,18 +49,23 @@ export default function AdminJobManager() {
 
       if (!action) return;
 
-      const { data, error } = await supabase.functions.invoke('job-execution', {
-        body: { action, jobId }
+      const { data, error: fnErr } = await invokeJobExecution({
+        action,
+        jobId,
       });
 
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Failed to update job');
+      if (fnErr) {
+        throw new Error(fnErr);
+      }
 
       fetchJobs();
     } catch (error) {
       console.error('Error updating job status:', error);
     }
   };
+
+
+
 
   const handleDeleteJob = async (jobId: string) => {
     if (!confirm('Are you sure you want to delete this job?')) return;

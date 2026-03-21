@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
-
+import { invokeEdgeFunction } from '@/lib/edgeFunctionClient';
 import { supabase } from '@/lib/supabase';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { useRealtimePatch, patchArray, RealtimeEventType } from '@/hooks/useRealtimePatch';
 
@@ -160,7 +161,8 @@ function JobStatusIndicator({ status }: { status: string }) {
           bg: 'bg-blue-500/20',
           label: 'Scheduled'
         };
-      case 'in_progress':
+      case 'active':
+
         return { 
           icon: Circle, 
           color: 'text-amber-400', 
@@ -224,6 +226,10 @@ export function MyJobsSection() {
   // Neutral info banner for 409 "already paid" — auto-clears
   const [actionInfo, setActionInfo] = useState<string | null>(null);
 
+  // ── Post-payment redirect banners ─────────────────────────
+  const [paymentSuccessBanner, setPaymentSuccessBanner] = useState<string | null>(null);
+  const [paymentCancelBanner, setPaymentCancelBanner] = useState<string | null>(null);
+
   const loadJobs = useCallback(async () => {
     if (!user?.id) return;
     
@@ -233,11 +239,17 @@ export function MyJobsSection() {
 
       const userEmail = user.email || '';
 
-      // Build OR conditions for the query
-      const orConditions: string[] = [`user_id.eq.${user.id}`];
+      // Build OR conditions matching ALL client identity columns in the jobs table
+      // This aligns with the jobs_select RLS policy which checks client_user_id, user_id, client_id, and client_email
+      const orConditions: string[] = [
+        `user_id.eq.${user.id}`,
+        `client_user_id.eq.${user.id}`,
+        `client_id.eq.${user.id}`
+      ];
       if (userEmail) {
         orConditions.push(`client_email.eq.${userEmail}`);
       }
+
 
       // Use explicit column selection instead of select('*')
       const { data: jobsData, error: queryError } = await supabase
@@ -415,7 +427,8 @@ export function MyJobsSection() {
   }, [jobs, loadUnreadCounts]);
 
   // ── Stripe payment return: verify checkout and refresh jobs ──
-  // FLOW: redirect back → optimistic update → verify → refetch → poll
+  // Handles BOTH ?payment=success and ?payment=cancelled query params
+  // set by the Stripe Checkout success_url / cancel_url.
   const paymentVerifiedRef = useRef(false);
   useEffect(() => {
     if (paymentVerifiedRef.current) return;
@@ -424,21 +437,55 @@ export function MyJobsSection() {
     const paymentStatus = params.get('payment');
     const jobId = params.get('job_id');
 
-    if (paymentStatus !== 'success' || !jobId) return;
+    if (!paymentStatus || !jobId) return;
 
     // Mark immediately so React re-renders / StrictMode double-invoke
     // cannot trigger a second call.
     paymentVerifiedRef.current = true;
 
+    // ── CANCELLED: user clicked "Back" on Stripe Checkout ──
+    if (paymentStatus === 'cancelled') {
+      console.log('[MyJobsSection] Stripe checkout cancelled for job', jobId);
+      setPaymentCancelBanner('Checkout was cancelled. You can accept the estimate again when ready.');
+      // Auto-dismiss after 8 seconds
+      setTimeout(() => setPaymentCancelBanner(null), 8000);
+      // Clean URL params
+      window.history.replaceState({}, '', window.location.pathname);
+
+      // PART 2: Trigger payment follow-up email (fire-and-forget)
+      // Edge function handles safety: skips if already paid, deduplicates within 30 min
+      invokeEdgeFunction('send-payment-followup', { job_id: jobId })
+        .then(({ data, error: fnErr }) => {
+          if (fnErr) {
+            console.warn('[MyJobsSection] Payment followup email error:', fnErr);
+          } else if (data?.skipped) {
+            console.log('[MyJobsSection] Payment followup skipped:', data.reason);
+          } else {
+            console.log('[MyJobsSection] Payment followup email sent to:', data?.recipient);
+          }
+        })
+        .catch((err: unknown) => {
+          console.warn('[MyJobsSection] Payment followup call failed:', err);
+        });
+
+      return;
+    }
+
+
+    // ── SUCCESS: payment completed ──
+    if (paymentStatus !== 'success') return;
+
     console.log('[MyJobsSection] Stripe redirect detected — verifying payment for job', jobId);
 
+    // Show success banner immediately
+    setPaymentSuccessBanner('Payment successful! Your service has been scheduled.');
+    // Auto-dismiss after 10 seconds
+    setTimeout(() => setPaymentSuccessBanner(null), 10000);
+
     // ── OPTIMISTIC UPDATE: immediately hide Accept button ──
-    // Set payment_status='paid' locally so the isPayable filter excludes
-    // this job BEFORE the DB confirms. This eliminates the visual gap
-    // between redirect and webhook/verify completion.
     setJobs(prev => prev.map(j =>
       j.id === jobId
-        ? { ...j, payment_status: 'paid' }
+        ? { ...j, payment_status: 'paid', status: 'scheduled' }
         : j
     ));
 
@@ -450,10 +497,9 @@ export function MyJobsSection() {
           console.warn('[MyJobsSection] No authenticated user for payment verification');
           return;
         }
-
-        const { data, error: fnErr } = await supabase.functions.invoke(
+        const { data, error: fnErr } = await invokeEdgeFunction(
           'verify-checkout-session',
-          { body: { job_id: jobId, client_user_id: clientUserId } }
+          { job_id: jobId, client_user_id: clientUserId }
         );
 
         if (fnErr) {
@@ -466,25 +512,20 @@ export function MyJobsSection() {
         console.error('[MyJobsSection] Payment verification failed:', err);
       } finally {
         // Clean payment params from URL to prevent re-fire on navigation
-        const cleanUrl = window.location.pathname;
-        window.history.replaceState({}, '', cleanUrl);
+        window.history.replaceState({}, '', window.location.pathname);
 
         // ── REFETCH WAVE 1: immediate ──
-        // Fetch latest DB state. If webhook already fired, this picks it up.
         loadJobs().catch(err =>
           console.warn('[MyJobsSection] Post-payment job refresh failed:', err)
         );
 
         // ── REFETCH WAVE 2: delayed 3s ──
-        // Webhook typically fires within 1-5s of Stripe payment.
-        // This catches the common case where webhook fires after verify returns.
         setTimeout(() => {
           console.log('[MyJobsSection] Post-payment poll (3s)');
           loadJobs().catch(() => {});
         }, 3000);
 
         // ── REFETCH WAVE 3: delayed 8s ──
-        // Safety net for slow webhook delivery.
         setTimeout(() => {
           console.log('[MyJobsSection] Post-payment poll (8s)');
           loadJobs().catch(() => {});
@@ -495,11 +536,8 @@ export function MyJobsSection() {
 
 
 
+
   // ── Accept estimate handler ─────────────────────────────────
-  // FIX: Accept primitive jobId + jobPrice to guarantee the exact row-level
-  // id is forwarded to create-checkout-session. Passing the full job object
-  // risks stale-object references if the jobs array is patched between render
-  // and click.
   const handleAcceptEstimate = useCallback(async (jobId: string, jobPrice: number | undefined, e: React.MouseEvent) => {
     e.stopPropagation(); // Don't open the detail modal
     if (!user?.id || actionJobId) return;
@@ -515,50 +553,26 @@ export function MyJobsSection() {
     console.log('[MyJobsSection] ACCEPT_CLICK job_id:', jobId, 'payment_status:', targetJob?.payment_status);
 
     setActionJobId(jobId);
-
     setActionError(null);
     setActionInfo(null);
 
     try {
-      // Call edge function to create Stripe Checkout Session
-      const { data: fnData, error: fnErr } = await supabase.functions.invoke(
+      // FIX: Use invokeEdgeFunction (native fetch) instead of supabase.functions.invoke()
+      const { data: fnData, error: fnErrMsg } = await invokeEdgeFunction(
         'create-checkout-session',
         {
-          body: {
-            job_id: jobId,
-            price: jobPrice,
-            client_user_id: user.id,
-          },
-        }
+          job_id: jobId,
+          price: jobPrice,
+          client_user_id: user.id,
+          site_url: window.location.origin,
+        },
       );
 
-      if (fnErr) {
-        // ── 409 Conflict = already paid / duplicate attempt ──
-        // supabase.functions.invoke() puts the Response in fnErr.context
-        // when the edge function returns a non-2xx status code.
-        // 409 is NOT a user error — it means payment already went through.
-        const httpStatus = (fnErr as any)?.context?.status;
-        if (httpStatus === 409) {
-          console.log('[MyJobsSection] 409 Conflict — payment already processed for job', jobId);
-          // Optimistic: hide Accept button immediately
-          setJobs(prev => prev.map(j =>
-            j.id === jobId ? { ...j, payment_status: 'paid' } : j
-          ));
-          setActionInfo('Payment already processed — syncing...');
-          setTimeout(() => setActionInfo(null), 4000);
-          setActionJobId(null);
-          // Refetch to get authoritative DB state
-          loadJobs().catch(() => {});
-          return;
-        }
-        throw new Error('Checkout session error: ' + fnErr.message);
-      }
 
-      const parsed = typeof fnData === 'string' ? JSON.parse(fnData) : fnData;
-
-      if (!parsed?.success || !parsed?.url) {
-        // If response body indicates "already paid" — same treatment as 409
-        if (parsed?.error?.includes('already been paid') || parsed?.error?.includes('not available')) {
+      // invokeEdgeFunction returns { data, error: string | null }
+      if (fnErrMsg) {
+        // Check for "already paid" style messages
+        if (fnErrMsg.includes('already been paid') || fnErrMsg.includes('not available')) {
           console.log('[MyJobsSection] Backend confirmed already paid — refetching');
           setJobs(prev => prev.map(j =>
             j.id === jobId ? { ...j, payment_status: 'paid' } : j
@@ -569,13 +583,17 @@ export function MyJobsSection() {
           loadJobs().catch(() => {});
           return;
         }
-        throw new Error(parsed?.error || 'No checkout URL returned');
+        throw new Error(fnErrMsg);
+      }
+
+      if (!fnData?.success || !fnData?.url) {
+        throw new Error(fnData?.error || 'No checkout URL returned');
       }
 
       console.log('[MyJobsSection] Redirecting to Stripe Checkout for job', jobId);
 
       // Redirect to Stripe Checkout
-      window.location.href = parsed.url;
+      window.location.href = fnData.url;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       console.error('[MyJobsSection] acceptEstimate error for job', jobId, ':', message);
@@ -594,9 +612,8 @@ export function MyJobsSection() {
     }
   }, [user?.id, actionJobId, jobs, loadJobs]);
 
-
-
   const handleRejectEstimate = useCallback(async (job: LocalJob, e: React.MouseEvent) => {
+
     e.stopPropagation(); // Don't open the detail modal
     if (!user?.id || actionJobId) return;
 
@@ -730,6 +747,28 @@ export function MyJobsSection() {
             </div>
           ) : (
             <div className="space-y-3">
+              {/* ── Payment success banner ────────────────────── */}
+              {paymentSuccessBanner && (
+                <div className="p-3 bg-emerald-900/40 border border-emerald-500/40 rounded-xl text-emerald-200 text-sm flex items-center gap-2 animate-in fade-in duration-300">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span className="font-medium">{paymentSuccessBanner}</span>
+                  <button onClick={() => setPaymentSuccessBanner(null)} className="ml-auto text-emerald-400 hover:text-emerald-300">
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* ── Payment cancelled banner ──────────────────── */}
+              {paymentCancelBanner && (
+                <div className="p-3 bg-amber-900/30 border border-amber-500/30 rounded-xl text-amber-200 text-sm flex items-center gap-2 animate-in fade-in duration-300">
+                  <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+                  <span>{paymentCancelBanner}</span>
+                  <button onClick={() => setPaymentCancelBanner(null)} className="ml-auto text-amber-400 hover:text-amber-300">
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
               {/* ── Action error banner ──────────────────────── */}
               {actionError && (
                 <div className="p-3 bg-red-900/30 border border-red-500/30 rounded-xl text-red-300 text-sm flex items-start gap-2">

@@ -1,10 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { invokeJobExecution, invokeEdgeFunction } from '@/lib/edgeFunctionClient';
+import { isPayoutEligible, PAYOUT_RELEASABLE_STATUSES } from '@/lib/jobLifecycleContract';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 import { LandscaperAssignmentDropdown } from '@/components/admin/LandscaperAssignmentDropdown';
+
 import {
   DollarSign,
   RefreshCw,
@@ -25,11 +32,33 @@ import {
   ZoomIn,
   ChevronLeft,
   ChevronRight,
+  Save,
+  FileText,
+  Tag,
+  Layers,
+  Mail,
+  Eye,
+  CreditCard,
+  Clock,
 } from 'lucide-react';
+
+
+/* ─────────────────────────────────────────────────────────────
+   Constants
+───────────────────────────────────────────────────────────── */
+const MINIMUM_PRICE_DOLLARS = 1.00;
 
 /* ─────────────────────────────────────────────────────────────
    Types
 ───────────────────────────────────────────────────────────── */
+
+type ActiveFilter =
+  | 'quotes_pending'
+  | 'needs_landscaper'
+  | 'active'
+  | 'photo_approval'
+  | 'awaiting_payout'
+  | 'payouts_completed';
 
 interface QuoteRequest {
   id: string;
@@ -52,6 +81,9 @@ interface Job {
   status: string | null;
   price: number | null;
   admin_price: number | null;
+  admin_notes: string | null;
+  payment_status: string | null;
+  payment_amount_cents: number | null;
   customer_name: string | null;
   client_email: string | null;
   landscaper_id: string | null;
@@ -63,6 +95,7 @@ interface Job {
   payout_released_at: string | null;
   before_photo_url: string | null;
   after_photo_url: string | null;
+  selected_services: string[] | null;
   created_at: string;
 }
 
@@ -119,73 +152,24 @@ const truncate = (s: string | null | undefined, max = 30) => {
 };
 
 /* ─────────────────────────────────────────────────────────────
-   Section Wrapper (collapsible card)
+   Filter config
 ───────────────────────────────────────────────────────────── */
 
-function LifecycleSection({
-  title,
-  icon: Icon,
-  count,
-  color,
-  bgColor,
-  borderColor,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  icon: React.ElementType;
-  count: number;
+const FILTER_CONFIG: Record<ActiveFilter, {
+  label: string;
+  shortLabel: string;
   color: string;
-  bgColor: string;
-  borderColor: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <Card className={`bg-black/40 backdrop-blur border ${borderColor} w-full min-w-0`}>
-      <button
-        type="button"
-        onClick={() => setOpen((p) => !p)}
-        className="w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 sm:py-4 text-left"
-      >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className={`w-8 h-8 rounded-lg ${bgColor} flex items-center justify-center flex-shrink-0`}>
-            <Icon className={`w-4 h-4 ${color}`} />
-          </div>
-          <h3 className={`text-sm sm:text-base font-semibold ${color} truncate`}>{title}</h3>
-          <Badge className={`${bgColor} ${color} text-xs px-2 py-0.5 flex-shrink-0`}>
-            {count}
-          </Badge>
-        </div>
-        {open ? (
-          <ChevronUp className="w-4 h-4 text-gray-500 flex-shrink-0" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
-        )}
-      </button>
-      {open && (
-        <CardContent className="px-3 sm:px-5 pb-4 pt-0">
-          {children}
-        </CardContent>
-      )}
-    </Card>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────
-   Empty State
-───────────────────────────────────────────────────────────── */
-
-function EmptyState({ icon: Icon, message }: { icon: React.ElementType; message: string }) {
-  return (
-    <div className="text-center py-8">
-      <Icon className="w-10 h-10 text-gray-600 mx-auto mb-2" />
-      <p className="text-gray-500 text-sm">{message}</p>
-    </div>
-  );
-}
+  bg: string;
+  border: string;
+  icon: React.ElementType;
+}> = {
+  quotes_pending:     { label: 'Quotes Pending',     shortLabel: 'Quotes',   color: 'text-amber-400',   bg: 'bg-amber-500/15',   border: 'border-amber-500/30',   icon: DollarSign },
+  needs_landscaper:   { label: 'Needs Landscaper',   shortLabel: 'Assign',   color: 'text-cyan-400',    bg: 'bg-cyan-500/15',    border: 'border-cyan-500/30',    icon: UserPlus },
+  active:             { label: 'Active Jobs',        shortLabel: 'Active',   color: 'text-purple-400',  bg: 'bg-purple-500/15',  border: 'border-purple-500/30',  icon: Play },
+  photo_approval:     { label: 'Photo Approval',     shortLabel: 'Photos',   color: 'text-orange-400',  bg: 'bg-orange-500/15',  border: 'border-orange-500/30',  icon: Camera },
+  awaiting_payout:    { label: 'Awaiting Payout',    shortLabel: 'Payout',   color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', icon: Wallet },
+  payouts_completed:  { label: 'Payouts Completed',  shortLabel: 'Paid',     color: 'text-green-400',   bg: 'bg-green-500/15',   border: 'border-green-500/30',   icon: CheckCircle },
+};
 
 /* ─────────────────────────────────────────────────────────────
    Photo Lightbox Modal
@@ -203,98 +187,44 @@ function PhotoLightbox({
   onJumpTo: (index: number) => void;
 }) {
   if (!state.open || state.photos.length === 0) return null;
-
   const current = state.photos[state.currentIndex];
   const hasPrev = state.currentIndex > 0;
   const hasNext = state.currentIndex < state.photos.length - 1;
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="relative max-w-4xl w-full mx-4 flex flex-col items-center"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-sm" onClick={onClose}>
+      <div className="relative max-w-4xl w-full mx-4 flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
         <div className="w-full flex items-center justify-between mb-3 px-1">
           <div className="flex items-center gap-2">
             <span className="text-white font-medium text-sm">{state.jobCustomer}</span>
-            <Badge className={`text-[10px] px-2 py-0.5 ${
-              current?.type === 'before'
-                ? 'bg-blue-500/20 text-blue-300'
-                : 'bg-emerald-500/20 text-emerald-300'
-            }`}>
+            <Badge className={`text-[10px] px-2 py-0.5 ${current?.type === 'before' ? 'bg-blue-500/20 text-blue-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
               {current?.type === 'before' ? 'Before' : 'After'}
             </Badge>
-            <span className="text-gray-500 text-xs">
-              {state.currentIndex + 1} of {state.photos.length}
-            </span>
+            <span className="text-gray-500 text-xs">{state.currentIndex + 1} of {state.photos.length}</span>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-          >
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
             <X className="w-4 h-4 text-white" />
           </button>
         </div>
-
-        {/* Image */}
         <div className="relative w-full flex items-center justify-center" style={{ maxHeight: '75vh' }}>
           {hasPrev && (
-            <button
-              onClick={() => onNavigate('prev')}
-              className="absolute left-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center transition-colors"
-            >
+            <button onClick={() => onNavigate('prev')} className="absolute left-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center transition-colors">
               <ChevronLeft className="w-5 h-5 text-white" />
             </button>
           )}
-
-          <img
-            src={current?.url}
-            alt={current?.caption || `${current?.type} photo`}
-            className="max-h-[75vh] max-w-full rounded-lg object-contain shadow-2xl"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = '';
-              (e.target as HTMLImageElement).alt = 'Failed to load image';
-              (e.target as HTMLImageElement).className = 'hidden';
-            }}
-          />
-
+          <img src={current?.url} alt={current?.caption || `${current?.type} photo`} className="max-h-[75vh] max-w-full rounded-lg object-contain shadow-2xl" />
           {hasNext && (
-            <button
-              onClick={() => onNavigate('next')}
-              className="absolute right-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center transition-colors"
-            >
+            <button onClick={() => onNavigate('next')} className="absolute right-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center transition-colors">
               <ChevronRight className="w-5 h-5 text-white" />
             </button>
           )}
         </div>
-
-        {/* Caption */}
-        {current?.caption && (
-          <p className="text-gray-300 text-sm mt-3 text-center">{current.caption}</p>
-        )}
-
-        {/* Thumbnail strip */}
+        {current?.caption && <p className="text-gray-300 text-sm mt-3 text-center">{current.caption}</p>}
         {state.photos.length > 1 && (
           <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-2 px-1">
             {state.photos.map((photo, idx) => (
-              <button
-                key={idx}
-                onClick={() => onJumpTo(idx)}
-                className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
-                  idx === state.currentIndex
-                    ? 'border-orange-400 ring-1 ring-orange-400/50'
-                    : 'border-gray-700 hover:border-gray-500 opacity-60 hover:opacity-100'
-                }`}
-              >
-                <img
-                  src={photo.url}
-                  alt={`Thumbnail ${idx + 1}`}
-                  className="w-full h-full object-cover"
-                />
+              <button key={idx} onClick={() => onJumpTo(idx)} className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${idx === state.currentIndex ? 'border-orange-400 ring-1 ring-orange-400/50' : 'border-gray-700 hover:border-gray-500 opacity-60 hover:opacity-100'}`}>
+                <img src={photo.url} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
               </button>
             ))}
           </div>
@@ -303,7 +233,6 @@ function PhotoLightbox({
     </div>
   );
 }
-
 
 /* ─────────────────────────────────────────────────────────────
    Main Component
@@ -315,6 +244,7 @@ export function LifecycleOperationsPanel({
   onNavigateToSection?: (sectionId: string) => void;
 }) {
   const { user } = useAuth();
+  const { toast } = useToast();
 
   // ── Data state ──────────────────────────────────────────
   const [quoteRequests, setQuoteRequests] = useState<QuoteRequest[]>([]);
@@ -326,12 +256,17 @@ export function LifecycleOperationsPanel({
   const [payoutLoading, setPayoutLoading] = useState<string | null>(null);
   const [photoActionLoading, setPhotoActionLoading] = useState<string | null>(null);
 
+  // ── Interactive state ───────────────────────────────────
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('quotes_pending');
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [priceInput, setPriceInput] = useState('');
+  const [notesInput, setNotesInput] = useState('');
+  const [saving, setSaving] = useState(false);
+  const lastInitJobRef = useRef<string | null>(null);
+
   // ── Lightbox state ──────────────────────────────────────
   const [lightbox, setLightbox] = useState<LightboxState>({
-    open: false,
-    photos: [],
-    currentIndex: 0,
-    jobCustomer: '',
+    open: false, photos: [], currentIndex: 0, jobCustomer: '',
   });
 
   // ── Fetch all data ──────────────────────────────────────
@@ -339,22 +274,20 @@ export function LifecycleOperationsPanel({
     setLoading(true);
     setError(null);
     try {
-      // 1. Quote requests (pending only)
       const { data: qr, error: qrErr } = await supabase
         .from('quote_requests')
         .select('id, name, email, phone, property_address, services, preferred_date, comments, status, created_at')
         .in('status', ['pending', 'contacted'])
         .order('created_at', { ascending: false });
-
       if (qrErr) throw qrErr;
       setQuoteRequests((qr || []) as QuoteRequest[]);
 
-      // 2. Jobs (all non-cancelled) — now includes photo URL columns
       const { data: jobsData, error: jobsErr } = await supabase
         .from('jobs')
         .select(`
           id, service_type, service_name, service_address, status,
-          price, admin_price, customer_name, client_email,
+          price, admin_price, admin_notes, payment_status, payment_amount_cents,
+          customer_name, client_email, selected_services,
           landscaper_id, scheduled_date, preferred_date,
           completed_at, payout_status, payout_amount,
           payout_released_at, before_photo_url, after_photo_url,
@@ -362,44 +295,32 @@ export function LifecycleOperationsPanel({
         `)
         .neq('status', 'cancelled')
         .order('created_at', { ascending: false });
-
       if (jobsErr) throw jobsErr;
       const allJobs = (jobsData || []) as Job[];
       setJobs(allJobs);
 
-      // 3. Fetch landscaper profiles for jobs that have landscaper_id
       const landscaperIds = [...new Set(allJobs.map((j) => j.landscaper_id).filter(Boolean))] as string[];
       if (landscaperIds.length > 0) {
         const { data: lsData } = await supabase
           .from('landscapers')
           .select('id, user_id, first_name, last_name, email, business_name')
           .in('user_id', landscaperIds);
-
         const profileMap = new Map<string, LandscaperProfile>();
         for (const ls of lsData || []) {
-          profileMap.set(ls.user_id, {
-            user_id: ls.user_id,
-            first_name: ls.first_name,
-            last_name: ls.last_name,
-            email: ls.email,
-            business_name: ls.business_name,
-          });
+          profileMap.set(ls.user_id, { user_id: ls.user_id, first_name: ls.first_name, last_name: ls.last_name, email: ls.email, business_name: ls.business_name });
         }
         setLandscaperProfiles(profileMap);
       }
 
-      // 4. Fetch job_photos for completed_pending_review jobs
       const reviewJobIds = allJobs
-        .filter((j) => j.status === 'completed_pending_review')
+        .filter((j) => j.status === 'completed_pending_review' || j.status === 'flagged_review')
         .map((j) => j.id);
-
       if (reviewJobIds.length > 0) {
         const { data: photosData } = await supabase
           .from('job_photos')
           .select('id, job_id, file_url, type, caption, uploaded_at, sort_order')
           .in('job_id', reviewJobIds)
           .order('sort_order', { ascending: true });
-
         const photoMap = new Map<string, JobPhoto[]>();
         for (const photo of (photosData || []) as JobPhoto[]) {
           const existing = photoMap.get(photo.job_id) || [];
@@ -418,82 +339,104 @@ export function LifecycleOperationsPanel({
     }
   }, []);
 
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ── Realtime subscription for jobs table ─────────────────
+  // Auto-refreshes when any external process (webhook, other admin,
+  // landscaper action) changes a job row.
   useEffect(() => {
-    fetchData();
+    const channel = supabase
+      .channel('ops-jobs-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'jobs' },
+        (payload) => {
+          console.log('[LifecycleOps] Realtime event:', payload.eventType, payload.new);
+          // Re-fetch all data to keep counts and lists in sync.
+          // We use a small debounce to avoid rapid-fire re-fetches when
+          // multiple columns on the same row are updated in quick succession.
+          fetchData();
+        }
+      )
+      .subscribe((status) => {
+        console.log('[LifecycleOps] Realtime subscription status:', status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchData]);
 
-  // ── Derived data ────────────────────────────────────────
-  const needsLandscaper = jobs.filter(
-    (j) => j.status === 'scheduled' && !j.landscaper_id
-  );
-  const activeJobs = jobs.filter(
-    (j) => j.status === 'scheduled' && !!j.landscaper_id
-  );
-  const photoApprovalQueue = jobs.filter(
-    (j) => j.status === 'completed_pending_review'
-  );
-  const readyForPayout = jobs.filter(
-    (j) => j.status === 'completed' && j.payout_status === 'ready_for_release'
-  );
-  const paidJobs = jobs.filter((j) => j.payout_status === 'paid');
 
-  // ── Photo helpers ───────────────────────────────────────
-  const getAllPhotosForJob = (job: Job): { url: string; type: string; caption?: string | null }[] => {
-    const photos: { url: string; type: string; caption?: string | null }[] = [];
 
-    // First: photos from job_photos table (multi-photo support)
-    const tablePhotos = jobPhotosMap.get(job.id) || [];
-    for (const p of tablePhotos) {
-      if (p.file_url) {
-        photos.push({ url: p.file_url, type: p.type, caption: p.caption });
+  // ── Clear selection when switching filters ───────────────
+  useEffect(() => {
+    setSelectedJob(null);
+    setPriceInput('');
+    setNotesInput('');
+    lastInitJobRef.current = null;
+  }, [activeFilter]);
+
+  // ── Initialize form when selecting a job ────────────────
+  useEffect(() => {
+    const id = selectedJob?.id || null;
+    if (id !== lastInitJobRef.current) {
+      lastInitJobRef.current = id;
+      if (selectedJob) {
+        setPriceInput(selectedJob.price?.toString() || selectedJob.admin_price?.toString() || '');
+        setNotesInput(selectedJob.admin_notes || '');
+      } else {
+        setPriceInput('');
+        setNotesInput('');
       }
     }
+  }, [selectedJob?.id]);
 
-    // Second: inline photo URLs from jobs table (fallback / legacy)
-    if (job.before_photo_url && !photos.some((p) => p.url === job.before_photo_url)) {
-      photos.push({ url: job.before_photo_url, type: 'before', caption: null });
+  /* ── Derived data ──────────────────────────────────────── */
+  const pendingQuoteJobs = jobs.filter((j) => j.status === 'pending' || j.status === 'quoted');
+  const needsLandscaper = jobs.filter((j) => j.status === 'priced' || j.status === 'available' || j.status === 'scheduled');
+  const activeJobs = jobs.filter((j) => j.status === 'assigned' || j.status === 'active');
+  const photoApprovalQueue = jobs.filter((j) => j.status === 'completed_pending_review' || j.status === 'flagged_review');
+  // "Awaiting Payout" = completed jobs whose payout has NOT been released yet.
+  // ALIGNED WITH release-job-payout edge function:
+  //   - status must be 'completed'
+  //   - payout_status must be in PAYOUT_RELEASABLE_STATUSES ['pending', 'ready', 'ready_for_release']
+  //   - payment_status must be 'paid'
+  //   - payout_amount must be > 0
+  // Show ALL completed jobs with non-terminal payout_status so admin can see what needs attention,
+  // but only enable the Release button for fully eligible jobs.
+  const readyForPayout = jobs.filter((j) =>
+    j.status === 'completed'
+    && j.payout_status != null
+    && j.payout_status !== 'paid'
+    && j.payout_status !== 'released'
+  );
+  const paidJobs = jobs.filter((j) => j.payout_status === 'paid' || j.payout_status === 'released');
+
+
+
+  const filterCounts: Record<ActiveFilter, number> = {
+    quotes_pending: quoteRequests.length + pendingQuoteJobs.length,
+    needs_landscaper: needsLandscaper.length,
+    active: activeJobs.length,
+    photo_approval: photoApprovalQueue.length,
+    awaiting_payout: readyForPayout.length,
+    payouts_completed: paidJobs.length,
+  };
+
+  const getFilteredJobs = (): Job[] => {
+    switch (activeFilter) {
+      case 'quotes_pending': return pendingQuoteJobs;
+      case 'needs_landscaper': return needsLandscaper;
+      case 'active': return activeJobs;
+      case 'photo_approval': return photoApprovalQueue;
+      case 'awaiting_payout': return readyForPayout;
+      case 'payouts_completed': return paidJobs;
+      default: return [];
     }
-    if (job.after_photo_url && !photos.some((p) => p.url === job.after_photo_url)) {
-      photos.push({ url: job.after_photo_url, type: 'after', caption: null });
-    }
-
-    return photos;
   };
 
-  const openLightbox = (job: Job, startIndex = 0) => {
-    const photos = getAllPhotosForJob(job);
-    if (photos.length === 0) return;
-    setLightbox({
-      open: true,
-      photos,
-      currentIndex: Math.min(startIndex, photos.length - 1),
-      jobCustomer: job.customer_name || job.client_email || 'Unknown',
-    });
-  };
-
-  const handleLightboxNavigate = (direction: 'prev' | 'next') => {
-    setLightbox((prev) => ({
-      ...prev,
-      currentIndex:
-        direction === 'next'
-          ? Math.min(prev.currentIndex + 1, prev.photos.length - 1)
-          : Math.max(prev.currentIndex - 1, 0),
-    }));
-  };
-
-  const handleLightboxJumpTo = (index: number) => {
-    setLightbox((prev) => ({
-      ...prev,
-      currentIndex: Math.max(0, Math.min(index, prev.photos.length - 1)),
-    }));
-  };
-
-
-  const closeLightbox = () => {
-    setLightbox((prev) => ({ ...prev, open: false }));
-  };
-
-  // ── Landscaper name helper ──────────────────────────────
+  // ── Helpers ─────────────────────────────────────────────
   const getLandscaperName = (landscaperId: string | null) => {
     if (!landscaperId) return '—';
     const profile = landscaperProfiles.get(landscaperId);
@@ -502,55 +445,167 @@ export function LifecycleOperationsPanel({
     return name || profile.email || truncate(landscaperId, 12);
   };
 
-  // ── Payout release handler ──────────────────────────────
+  const getAllPhotosForJob = (job: Job): { url: string; type: string; caption?: string | null }[] => {
+    const photos: { url: string; type: string; caption?: string | null }[] = [];
+    const tablePhotos = jobPhotosMap.get(job.id) || [];
+    for (const p of tablePhotos) {
+      if (p.file_url) photos.push({ url: p.file_url, type: p.type, caption: p.caption });
+    }
+    if (job.before_photo_url && !photos.some((p) => p.url === job.before_photo_url)) {
+      photos.push({ url: job.before_photo_url, type: 'before', caption: null });
+    }
+    if (job.after_photo_url && !photos.some((p) => p.url === job.after_photo_url)) {
+      photos.push({ url: job.after_photo_url, type: 'after', caption: null });
+    }
+    return photos;
+  };
+
+  const openLightbox = (job: Job, startIndex = 0) => {
+    const photos = getAllPhotosForJob(job);
+    if (photos.length === 0) return;
+    setLightbox({ open: true, photos, currentIndex: Math.min(startIndex, photos.length - 1), jobCustomer: job.customer_name || job.client_email || 'Unknown' });
+  };
+
+  // ── Action handlers ─────────────────────────────────────
+
+  const handleJobSelect = (job: Job) => {
+    setSelectedJob((prev) => prev?.id === job.id ? prev : job);
+  };
+
+  const handleSavePrice = async () => {
+    if (!selectedJob) return;
+    const price = parseFloat(priceInput);
+    if (isNaN(price) || price <= 0 || price < MINIMUM_PRICE_DOLLARS) return;
+
+    setSaving(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const adminId = userData.user?.id || null;
+
+      const { data: updatedRows, error: jobError } = await supabase
+        .from('jobs')
+        .update({
+          price,
+          priced_at: new Date().toISOString(),
+          priced_by: adminId,
+          admin_notes: notesInput.trim() || null,
+          status: 'priced',
+        })
+        .eq('id', selectedJob.id)
+        .select('id, client_email, customer_name, service_name, service_type');
+
+      if (jobError) throw jobError;
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error('Price update was blocked by database security policy.');
+      }
+
+      await supabase
+        .from('quotes')
+        .update({ approved_amount: price, approved_at: new Date().toISOString(), status: 'approved', updated_at: new Date().toISOString() })
+        .eq('job_id', selectedJob.id);
+
+      // Send lifecycle email to client
+      const pricedJob = updatedRows[0];
+      if (pricedJob?.client_email) {
+        try {
+          await invokeEdgeFunction('unified-email', {
+            type: 'admin_alert',
+            to: pricedJob.client_email,
+            data: {
+              subject: 'Your GreenScape Lux quote is ready',
+              title: 'Your Quote is Ready',
+              message: `Hello ${pricedJob.customer_name || 'Valued Customer'},<br/><br/>Your service quote is ready.<br/><br/><strong>Service:</strong> ${pricedJob.service_name || pricedJob.service_type || 'Landscaping Service'}<br/><strong>Price:</strong> $${price.toFixed(2)}<br/><br/>Log in to confirm and schedule your service.`,
+            },
+          });
+        } catch (emailErr: any) {
+          console.error('Lifecycle email failed:', emailErr?.message);
+        }
+      }
+
+
+      toast({ title: 'Price saved', description: `Job priced at $${price.toFixed(2)}. Client can now pay.` });
+      setSelectedJob(null);
+      await fetchData();
+    } catch (err: any) {
+      toast({ title: 'Error saving price', description: err.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+  // handleReleasePayout — calls release-job-payout edge function.
+  // This creates a real Stripe transfer, updates payout_status → 'paid',
+  // sets stripe_transfer_id, inserts into payouts ledger, and sends email.
   const handleReleasePayout = async (jobId: string) => {
     if (!user) return;
     setPayoutLoading(jobId);
     try {
-      const { data, error: fnErr } = await supabase.functions.invoke('release-job-payout', {
-        body: { jobId, adminUserId: user.id },
+      const { data, error: fnError } = await invokeEdgeFunction('release-job-payout', {
+        jobId,
+        adminUserId: user.id,
       });
-      if (fnErr) throw fnErr;
-      if (data && !data.success) throw new Error(data.error || 'Payout release failed');
-      console.log(`[LifecycleOps] Payout released for job ${jobId}`);
+
+      if (fnError) {
+        throw new Error(fnError);
+      }
+
+      const amount = data?.amount ? `$${Number(data.amount).toFixed(2)}` : '';
+      const transferId = data?.transferId ? ` (${data.transferId})` : '';
+      toast({
+        title: 'Payout released',
+        description: `Payout${amount ? ' of ' + amount : ''} released successfully.${transferId}`,
+      });
+      setSelectedJob(null);
       await fetchData();
     } catch (err: any) {
-      console.error('[LifecycleOps] Payout error:', err);
-      alert(err.message || 'Failed to release payout');
+      toast({ title: 'Payout error', description: err.message, variant: 'destructive' });
     } finally {
       setPayoutLoading(null);
     }
   };
 
-  // ── Photo approval handler ──────────────────────────────
+  // handlePhotoApproval — calls job-execution edge function with admin_approve / admin_reject.
+  // Approve: sets status → 'completed', calculates payout_amount, sets payout_status.
+  // Reject: sets status → 'active' (returns to landscaper), records rejection_reason.
   const handlePhotoApproval = async (jobId: string, action: 'approve' | 'reject') => {
     if (!user) return;
+    let rejectionReason: string | undefined;
+    if (action === 'reject') {
+      const reason = window.prompt('Rejection reason (required):');
+      if (!reason || reason.trim().length === 0) return;
+      rejectionReason = reason.trim();
+    }
     setPhotoActionLoading(`${jobId}-${action}`);
     try {
-      const newStatus = action === 'approve' ? 'completed' : 'scheduled';
-      const updatePayload: Record<string, unknown> = { status: newStatus };
+      const edgeAction = action === 'approve' ? 'admin_approve' : 'admin_reject';
+      const { data, error: fnError } = await invokeJobExecution({
+        action: edgeAction,
+        jobId,
+        ...(rejectionReason ? { rejectionReason } : {}),
+      });
 
-      if (action === 'approve') {
-        updatePayload.payout_status = 'ready_for_release';
+      if (fnError) {
+        throw new Error(fnError);
       }
 
-      const { error: updateErr } = await supabase
-        .from('jobs')
-        .update(updatePayload)
-        .eq('id', jobId);
-
-      if (updateErr) throw updateErr;
-      console.log(`[LifecycleOps] Photo ${action}d for job ${jobId} → status: ${newStatus}`);
+      toast({
+        title: action === 'approve' ? 'Photos approved' : 'Photos rejected',
+        description: action === 'approve'
+          ? `Job approved. Payout status: ${data?.job?.payout_status || 'set'}.`
+          : `Job returned to landscaper for rework.`,
+      });
+      setSelectedJob(null);
       await fetchData();
     } catch (err: any) {
-      console.error(`[LifecycleOps] Photo ${action} error:`, err);
-      alert(err.message || `Failed to ${action} photos`);
+      toast({ title: `Photo ${action} error`, description: err.message, variant: 'destructive' });
     } finally {
       setPhotoActionLoading(null);
     }
   };
 
-  // ── Loading / Error states ──────────────────────────────
+
+
+
+  // ── Loading / Error ─────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -559,870 +614,628 @@ export function LifecycleOperationsPanel({
       </div>
     );
   }
-
   if (error) {
     return (
       <div className="text-center py-16">
         <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
         <p className="text-red-400 mb-4">{error}</p>
-        <Button onClick={fetchData} variant="outline" className="border-emerald-500/30 text-emerald-300">
-          Retry
-        </Button>
+        <Button onClick={fetchData} variant="outline" className="border-emerald-500/30 text-emerald-300">Retry</Button>
       </div>
     );
   }
+
+  const filteredJobs = getFilteredJobs();
+  const fc = FILTER_CONFIG[activeFilter];
 
   /* ─────────────────────────────────────────────────────────
      Render
   ───────────────────────────────────────────────────────── */
   return (
     <div className="space-y-4 sm:space-y-5 px-3 sm:px-4 lg:px-6 pb-8">
-      {/* ── Summary Bar ─────────────────────────────────── */}
-      {/* ── Summary Bar (hidden on mobile — stat cards provide navigation) */}
-      <div className="hidden md:flex items-center justify-between gap-3 pt-2">
-        <h2 className="text-sm sm:text-base font-semibold text-gray-200">
-          Operations Control Center
-        </h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={fetchData}
-          className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
-        >
-          <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-          Refresh
+      {/* ── Header ──────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-3 pt-2">
+        <h2 className="text-sm sm:text-base font-semibold text-gray-200">Operations Control Center</h2>
+        <Button variant="outline" size="sm" onClick={fetchData} className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10">
+          <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
         </Button>
       </div>
 
-      {/* ── Quick Stats ─────────────────────────────────── */}
+      {/* ── Quick Stats (clickable) ─────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {[
-          { label: 'Quotes Pending', count: quoteRequests.length, color: 'text-amber-400', bg: 'bg-amber-500/15' },
-          { label: 'Needs Landscaper', count: needsLandscaper.length, color: 'text-cyan-400', bg: 'bg-cyan-500/15' },
-          { label: 'Active Jobs', count: activeJobs.length, color: 'text-purple-400', bg: 'bg-purple-500/15' },
-          { label: 'Photo Approval', count: photoApprovalQueue.length, color: 'text-orange-400', bg: 'bg-orange-500/15' },
-          { label: 'Awaiting Payout', count: readyForPayout.length, color: 'text-emerald-400', bg: 'bg-emerald-500/15' },
-          { label: 'Payouts Completed', count: paidJobs.length, color: 'text-green-400', bg: 'bg-green-500/15' },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className={`${s.bg} border border-gray-800 rounded-xl p-3 sm:p-4 text-center h-full flex flex-col justify-center`}
-          >
-            <div className={`text-xl sm:text-2xl font-bold ${s.color}`}>{s.count}</div>
-            <div className="text-[10px] sm:text-xs text-gray-400 mt-0.5 truncate">{s.label}</div>
-          </div>
-        ))}
+        {(Object.keys(FILTER_CONFIG) as ActiveFilter[]).map((key) => {
+          const cfg = FILTER_CONFIG[key];
+          const count = filterCounts[key];
+          const isActive = activeFilter === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setActiveFilter(key)}
+              className={`${cfg.bg} border rounded-xl p-3 sm:p-4 text-center h-full flex flex-col justify-center transition-all ${
+                isActive
+                  ? `${cfg.border} ring-2 ring-offset-1 ring-offset-gray-950 ring-current scale-[1.02]`
+                  : 'border-gray-800 hover:border-gray-600'
+              }`}
+            >
+              <div className={`text-xl sm:text-2xl font-bold ${cfg.color}`}>{count}</div>
+              <div className="text-[10px] sm:text-xs text-gray-400 mt-0.5 truncate">{cfg.shortLabel}</div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* ── Lifecycle Status Pill Bar ──────────────────────────────────────
-           HIDDEN on mobile (<768px) via `hidden md:flex`.
-           Visible on tablet/desktop only. Stat cards above already serve
-           as the mobile-friendly lifecycle summary.
-      ──────────────────────────────────────────────────────────────────── */}
-      <div className="hidden md:flex w-full items-center gap-2 overflow-x-auto">
-        {[
-          { label: 'Quotes Pending', count: quoteRequests.length, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/25' },
-          { label: 'Needs Landscaper', count: needsLandscaper.length, color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/25' },
-          { label: 'Active', count: activeJobs.length, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/25' },
-          { label: 'Pending Review', count: photoApprovalQueue.length, color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/25' },
-          { label: 'Ready for Payout', count: readyForPayout.length, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/25' },
-          { label: 'Completed', count: paidJobs.length, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/25' },
-        ].map((item) => (
-          <span
-            key={item.label}
-            className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${item.bg} ${item.border} ${item.color}`}
-          >
-            {item.label}
-            <span className={`${item.bg} px-1.5 py-0.5 rounded-md text-[10px] font-bold`}>
-              {item.count}
-            </span>
-          </span>
-        ))}
+      {/* ── Filter Pill Bar ─────────────────────────────── */}
+      <div className="flex w-full items-center gap-2 overflow-x-auto pb-1">
+        {(Object.keys(FILTER_CONFIG) as ActiveFilter[]).map((key) => {
+          const cfg = FILTER_CONFIG[key];
+          const count = filterCounts[key];
+          const isActive = activeFilter === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setActiveFilter(key)}
+              className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                isActive
+                  ? `${cfg.bg} ${cfg.border} ${cfg.color} ring-1 ring-current`
+                  : 'bg-gray-800/50 border-gray-700/50 text-gray-500 hover:text-gray-300 hover:border-gray-600'
+              }`}
+            >
+              {cfg.label}
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${isActive ? cfg.bg : 'bg-gray-700/50'}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
+      {/* ══════════════════════════════════════════════════
+         MAIN CONTENT: Job List + Action Panel
+      ══════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
-
-
-      {/* ═══════════════════════════════════════════════════
-         SECTION 1 — Quote Pricing Queue
-      ═══════════════════════════════════════════════════ */}
-      <LifecycleSection
-        title="Quote Pricing Queue"
-        icon={DollarSign}
-        count={quoteRequests.length}
-        color="text-amber-400"
-        bgColor="bg-amber-500/15"
-        borderColor="border-amber-500/20"
-      >
-        {quoteRequests.length === 0 ? (
-          <EmptyState icon={DollarSign} message="No pending quotes — all caught up" />
-        ) : (
-          <>
-            {/* Mobile cards */}
-            <div className="lg:hidden space-y-2">
-              {quoteRequests.map((qr) => (
-                <div
-                  key={qr.id}
-                  className="p-3 rounded-lg border border-amber-500/15 bg-black/30 hover:bg-amber-500/5 transition-colors cursor-pointer"
-                  onClick={() => onNavigateToSection?.('pricing')}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <span className="font-medium text-white text-sm truncate">{qr.name}</span>
-                    <Badge className="bg-amber-500/20 text-amber-300 text-[10px] flex-shrink-0">Pending</Badge>
-                  </div>
-                  <p className="text-xs text-gray-400 truncate flex items-center gap-1">
-                    <MapPin className="w-3 h-3 flex-shrink-0" />
-                    {qr.property_address}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate mt-1">
-                    {qr.services?.join(', ') || '—'}
-                  </p>
-                  <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
-                    <span>{formatDate(qr.preferred_date)}</span>
-                    <span>{formatDate(qr.created_at)}</span>
-                  </div>
-                </div>
-              ))}
+        {/* ── LEFT: Job List ──────────────────────────── */}
+        <div className="lg:col-span-3">
+          <Card className={`bg-black/40 backdrop-blur border ${activeFilter ? fc.border : 'border-gray-800'} w-full min-w-0`}>
+            <div className="flex items-center gap-2.5 px-4 sm:px-5 py-3 border-b border-gray-800/50">
+              <div className={`w-7 h-7 rounded-lg ${fc.bg} flex items-center justify-center flex-shrink-0`}>
+                {React.createElement(fc.icon, { className: `w-3.5 h-3.5 ${fc.color}` })}
+              </div>
+              <h3 className={`text-sm font-semibold ${fc.color} truncate`}>{fc.label}</h3>
+              <Badge className={`${fc.bg} ${fc.color} text-xs px-2 py-0.5 flex-shrink-0`}>{filteredJobs.length}</Badge>
             </div>
-
-            {/* Desktop table */}
-            <div className="hidden lg:block overflow-visible rounded-xl border border-amber-500/15">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-black/60 border-b border-amber-500/15">
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Customer</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Address</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Service</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Preferred Date</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Notes</th>
-                      <th className="text-right py-2.5 px-4 text-xs font-medium text-gray-400">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+            <CardContent className="px-3 sm:px-4 py-3">
+              {/* Quote requests (only in quotes_pending filter) */}
+              {activeFilter === 'quotes_pending' && quoteRequests.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2 px-1">Quote Requests</p>
+                  <div className="space-y-1.5">
                     {quoteRequests.map((qr) => (
-                      <tr
-                        key={qr.id}
-                        className="border-b border-amber-500/10 hover:bg-amber-500/5 transition-colors"
-                      >
-                        <td className="py-2.5 px-4">
-                          <div className="min-w-0">
-                            <span className="text-white text-sm font-medium block truncate">{qr.name}</span>
-                            <span className="text-gray-500 text-xs block truncate">{qr.email}</span>
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-4 text-gray-300 text-sm max-w-[200px] truncate">
-                          {truncate(qr.property_address, 35)}
-                        </td>
-                        <td className="py-2.5 px-4 text-gray-300 text-sm max-w-[180px] truncate">
-                          {qr.services?.join(', ') || '—'}
-                        </td>
-                        <td className="py-2.5 px-4 text-gray-400 text-sm">
-                          {formatDate(qr.preferred_date)}
-                        </td>
-                        <td className="py-2.5 px-4 text-gray-500 text-xs max-w-[160px] truncate">
-                          {qr.comments || '—'}
-                        </td>
-                        <td className="py-2.5 px-4 text-right">
-                          <Button
-                            size="sm"
-                            onClick={() => onNavigateToSection?.('pricing')}
-                            className="bg-amber-600 hover:bg-amber-700 text-xs h-7 px-3"
-                          >
-                            <DollarSign className="w-3 h-3 mr-1" />
-                            Price
-                          </Button>
-                        </td>
-                      </tr>
+                      <div key={qr.id} className="p-3 rounded-lg border border-amber-500/15 bg-black/30 text-sm">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <span className="font-medium text-white truncate">{qr.name}</span>
+                          <Badge className="bg-amber-500/20 text-amber-300 text-[10px] flex-shrink-0">Quote</Badge>
+                        </div>
+                        <p className="text-xs text-gray-400 truncate flex items-center gap-1"><MapPin className="w-3 h-3 flex-shrink-0" />{qr.property_address}</p>
+                        <p className="text-xs text-gray-500 truncate mt-0.5">{qr.services?.join(', ') || '—'}</p>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-      </LifecycleSection>
-
-      {/* ═══════════════════════════════════════════════════
-         SECTION 2 — Needs Landscaper
-      ═══════════════════════════════════════════════════ */}
-      <LifecycleSection
-        title="Needs Landscaper"
-        icon={UserPlus}
-        count={needsLandscaper.length}
-        color="text-cyan-400"
-        bgColor="bg-cyan-500/15"
-        borderColor="border-cyan-500/20"
-      >
-        {needsLandscaper.length === 0 ? (
-          <EmptyState icon={UserPlus} message="All scheduled jobs have landscapers assigned" />
-        ) : (
-          <>
-            {/* Mobile cards */}
-            <div className="lg:hidden space-y-2">
-              {needsLandscaper.map((job) => (
-                <div
-                  key={job.id}
-                  className="p-3 rounded-lg border border-cyan-500/15 bg-black/30"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <span className="font-medium text-white text-sm truncate">
-                      {job.customer_name || job.client_email || 'Unknown'}
-                    </span>
-                    <span className="text-emerald-400 text-xs font-medium flex-shrink-0">
-                      {formatCurrency(job.admin_price || job.price)}
-                    </span>
                   </div>
-                  <p className="text-xs text-gray-400 truncate flex items-center gap-1">
-                    <MapPin className="w-3 h-3 flex-shrink-0" />
-                    {job.service_address || '—'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1 truncate">
-                    {job.service_name || job.service_type || '—'}
-                  </p>
-                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    {formatDate(job.scheduled_date || job.preferred_date)}
-                  </div>
-                  <div className="mt-2.5 pt-2 border-t border-cyan-500/15" onClick={(e) => e.stopPropagation()}>
-                    <LandscaperAssignmentDropdown
-                      jobId={job.id}
-                      jobStatus={job.status}
-                      currentLandscaperId={job.landscaper_id}
-                      onAssigned={fetchData}
-                    />
-                  </div>
+                  {pendingQuoteJobs.length > 0 && (
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mt-4 mb-2 px-1">Jobs Needing Price</p>
+                  )}
                 </div>
-              ))}
-            </div>
+              )}
 
-            {/* Desktop table */}
-            <div className="hidden lg:block overflow-visible rounded-xl border border-cyan-500/15">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-black/60 border-b border-cyan-500/15">
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Customer</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Address</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Service</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Scheduled</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Price</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400" style={{ minWidth: '220px' }}>
-                        Assign Landscaper
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {needsLandscaper.map((job) => (
-                      <tr
-                        key={job.id}
-                        className="border-b border-cyan-500/10 hover:bg-cyan-500/5 transition-colors"
-                      >
-                        <td className="py-2.5 px-4">
-                          <span className="text-white text-sm font-medium block truncate max-w-[160px]">
-                            {job.customer_name || job.client_email || '—'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-4 text-gray-300 text-sm max-w-[200px] truncate">
-                          {truncate(job.service_address, 35)}
-                        </td>
-                        <td className="py-2.5 px-4 text-gray-300 text-sm truncate max-w-[160px]">
-                          {job.service_name || job.service_type || '—'}
-                        </td>
-                        <td className="py-2.5 px-4 text-gray-400 text-sm">
-                          {formatDate(job.scheduled_date || job.preferred_date)}
-                        </td>
-                        <td className="py-2.5 px-4 text-emerald-400 text-sm font-medium">
-                          {formatCurrency(job.admin_price || job.price)}
-                        </td>
-                        <td className="py-2.5 px-4" onClick={(e) => e.stopPropagation()}>
-                          <LandscaperAssignmentDropdown
-                            jobId={job.id}
-                            jobStatus={job.status}
-                            currentLandscaperId={job.landscaper_id}
-                            onAssigned={fetchData}
-                            compact
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-      </LifecycleSection>
-
-      {/* ═══════════════════════════════════════════════════
-         SECTION 3 — Active Jobs
-      ═══════════════════════════════════════════════════ */}
-      <LifecycleSection
-        title="Active Jobs"
-        icon={Play}
-        count={activeJobs.length}
-        color="text-purple-400"
-        bgColor="bg-purple-500/15"
-        borderColor="border-purple-500/20"
-      >
-        {activeJobs.length === 0 ? (
-          <EmptyState icon={Play} message="No active jobs at this time" />
-        ) : (
-          <>
-            {/* Mobile cards */}
-            <div className="lg:hidden space-y-2">
-              {activeJobs.map((job) => (
-                <div
-                  key={job.id}
-                  className="p-3 rounded-lg border border-purple-500/15 bg-black/30"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <span className="font-medium text-white text-sm truncate">
-                      {job.customer_name || job.client_email || 'Unknown'}
-                    </span>
-                    <Badge className="bg-purple-500/20 text-purple-300 text-[10px] flex-shrink-0">Active</Badge>
-                  </div>
-                  <p className="text-xs text-gray-400 truncate flex items-center gap-1">
-                    <MapPin className="w-3 h-3 flex-shrink-0" />
-                    {job.service_address || '—'}
-                  </p>
-                  <div className="flex items-center gap-1 text-xs text-purple-300 mt-1">
-                    <User className="w-3 h-3" />
-                    {getLandscaperName(job.landscaper_id)}
-                  </div>
-                  <div className="flex items-center justify-between mt-1.5 text-xs text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      {formatDate(job.scheduled_date || job.preferred_date)}
-                    </span>
-                    <span>{job.service_name || job.service_type || '—'}</span>
-                  </div>
+              {/* Job list */}
+              {filteredJobs.length === 0 && (activeFilter !== 'quotes_pending' || quoteRequests.length === 0) ? (
+                <div className="text-center py-10">
+                  {React.createElement(fc.icon, { className: `w-10 h-10 ${fc.color} mx-auto mb-2 opacity-40` })}
+                  <p className="text-gray-500 text-sm">No jobs in this category</p>
                 </div>
-              ))}
-            </div>
-
-            {/* Desktop table */}
-            <div className="hidden lg:block overflow-visible rounded-xl border border-purple-500/15">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-black/60 border-b border-purple-500/15">
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Customer</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Address</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Landscaper</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Scheduled</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Service</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeJobs.map((job) => (
-                      <tr
+              ) : (
+                <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
+                  {filteredJobs.map((job) => {
+                    const isSelected = selectedJob?.id === job.id;
+                    return (
+                      <button
                         key={job.id}
-                        className="border-b border-purple-500/10 hover:bg-purple-500/5 transition-colors"
+                        type="button"
+                        onClick={() => handleJobSelect(job)}
+                        className={`w-full text-left p-3 rounded-lg border transition-all min-w-0 ${
+                          isSelected
+                            ? `${fc.bg} ${fc.border} border-l-4`
+                            : 'bg-gray-800/30 border-gray-700/50 hover:bg-gray-800/50 hover:border-gray-600'
+                        }`}
                       >
-                        <td className="py-2.5 px-4">
-                          <span className="text-white text-sm font-medium block truncate max-w-[160px]">
-                            {job.customer_name || job.client_email || '—'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-4 text-gray-300 text-sm max-w-[200px] truncate">
-                          {truncate(job.service_address, 35)}
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <span className="text-purple-300 text-sm block truncate max-w-[160px]">
-                            {getLandscaperName(job.landscaper_id)}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-4 text-gray-400 text-sm">
-                          {formatDate(job.scheduled_date || job.preferred_date)}
-                        </td>
-                        <td className="py-2.5 px-4 text-gray-300 text-sm truncate max-w-[160px]">
-                          {job.service_name || job.service_type || '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-      </LifecycleSection>
-
-      {/* ═══════════════════════════════════════════════════
-         SECTION 4 — Photo Approval (with photo thumbnails)
-      ═══════════════════════════════════════════════════ */}
-      <LifecycleSection
-        title="Photo Approval"
-        icon={Camera}
-        count={photoApprovalQueue.length}
-        color="text-orange-400"
-        bgColor="bg-orange-500/15"
-        borderColor="border-orange-500/20"
-        defaultOpen={false}
-      >
-        {photoApprovalQueue.length === 0 ? (
-          <EmptyState icon={Camera} message="No jobs pending photo review" />
-        ) : (
-          <>
-            {/* Mobile cards */}
-            <div className="lg:hidden space-y-3">
-              {photoApprovalQueue.map((job) => {
-                const photos = getAllPhotosForJob(job);
-                return (
-                  <div
-                    key={job.id}
-                    className="p-3 rounded-lg border border-orange-500/15 bg-black/30"
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <span className="font-medium text-white text-sm truncate">
-                        {job.customer_name || job.client_email || 'Unknown'}
-                      </span>
-                      <Badge className="bg-orange-500/20 text-orange-300 text-[10px] flex-shrink-0">Review</Badge>
-                    </div>
-                    <p className="text-xs text-gray-400 truncate flex items-center gap-1">
-                      <MapPin className="w-3 h-3 flex-shrink-0" />
-                      {job.service_address || '—'}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1 truncate">
-                      {job.service_name || job.service_type || '—'}
-                    </p>
-                    <div className="flex items-center gap-1 text-xs text-purple-300 mt-1">
-                      <User className="w-3 h-3" />
-                      {getLandscaperName(job.landscaper_id)}
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                      <Calendar className="w-3 h-3" />
-                      Completed: {formatDate(job.completed_at)}
-                    </div>
-
-                    {/* Photo thumbnails — mobile */}
-                    <div className="mt-2.5 pt-2 border-t border-orange-500/10">
-                      {photos.length > 0 ? (
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                          {photos.map((photo, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => openLightbox(job, idx)}
-                              className="relative flex-shrink-0 w-[72px] h-[72px] rounded-lg overflow-hidden border border-orange-500/20 hover:border-orange-400 transition-all group"
-                            >
-                              <img
-                                src={photo.url}
-                                alt={`${photo.type} photo ${idx + 1}`}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                }}
-                              />
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                                <ZoomIn className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                              </div>
-                              <span className={`absolute bottom-0 left-0 right-0 text-[9px] font-medium text-center py-0.5 ${
-                                photo.type === 'before' ? 'bg-blue-600/80 text-blue-100' : 'bg-emerald-600/80 text-emerald-100'
-                              }`}>
-                                {photo.type === 'before' ? 'Before' : 'After'}
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="font-medium text-gray-200 truncate text-sm">
+                                {job.service_name || job.service_type || 'Unnamed Service'}
                               </span>
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-gray-600 text-xs py-1">
-                          <ImageIcon className="w-3.5 h-3.5" />
-                          <span>No photos uploaded</span>
-                        </div>
-                      )}
-                    </div>
+                              {/* PART 1: "Pending Payment" label for priced + unpaid jobs */}
+                              {job.status === 'priced' && job.payment_status !== 'paid' && (
+                                <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px] px-1.5 py-0 flex-shrink-0 flex items-center gap-1">
+                                  <CreditCard className="w-2.5 h-2.5" />
+                                  Pending Payment
+                                </Badge>
+                              )}
+                            </div>
 
-                    {/* Action buttons — mobile */}
-                    <div className="mt-2.5 pt-2 border-t border-orange-500/15 flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => handlePhotoApproval(job.id, 'approve')}
-                        disabled={photoActionLoading === `${job.id}-approve`}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-xs h-8"
-                      >
-                        {photoActionLoading === `${job.id}-approve` ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1" />
-                        ) : (
-                          <CheckCircle className="w-3.5 h-3.5 mr-1" />
-                        )}
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handlePhotoApproval(job.id, 'reject')}
-                        disabled={photoActionLoading === `${job.id}-reject`}
-                        className="flex-1 border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs h-8"
-                      >
-                        {photoActionLoading === `${job.id}-reject` ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1" />
-                        ) : (
-                          <XCircle className="w-3.5 h-3.5 mr-1" />
-                        )}
-                        Reject
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Desktop table */}
-            <div className="hidden lg:block overflow-visible rounded-xl border border-orange-500/15">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-black/60 border-b border-orange-500/15">
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Customer</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Address</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Service</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Landscaper</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Photos</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Completed At</th>
-                      <th className="text-right py-2.5 px-4 text-xs font-medium text-gray-400">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {photoApprovalQueue.map((job) => {
-                      const photos = getAllPhotosForJob(job);
-                      return (
-                        <tr
-                          key={job.id}
-                          className="border-b border-orange-500/10 hover:bg-orange-500/5 transition-colors"
-                        >
-                          <td className="py-2.5 px-4">
-                            <span className="text-white text-sm font-medium block truncate max-w-[140px]">
+                            <span className="text-xs text-gray-500 block truncate">
                               {job.customer_name || job.client_email || '—'}
                             </span>
-                          </td>
-                          <td className="py-2.5 px-4 text-gray-300 text-sm max-w-[160px] truncate">
-                            {truncate(job.service_address, 28)}
-                          </td>
-                          <td className="py-2.5 px-4 text-gray-300 text-sm truncate max-w-[120px]">
-                            {job.service_name || job.service_type || '—'}
-                          </td>
-                          <td className="py-2.5 px-4">
-                            <span className="text-purple-300 text-sm block truncate max-w-[120px]">
-                              {getLandscaperName(job.landscaper_id)}
-                            </span>
-                          </td>
-                          {/* Photos column */}
-                          <td className="py-2.5 px-4">
-                            {photos.length > 0 ? (
-                              <div className="flex items-center gap-1.5">
-                                {photos.slice(0, 4).map((photo, idx) => (
-                                  <button
-                                    key={idx}
-                                    onClick={() => openLightbox(job, idx)}
-                                    className="relative flex-shrink-0 w-[52px] h-[52px] rounded-md overflow-hidden border border-orange-500/20 hover:border-orange-400 hover:ring-1 hover:ring-orange-400/40 transition-all group cursor-pointer"
-                                    title={`${photo.type} photo — click to enlarge`}
-                                  >
-                                    <img
-                                      src={photo.url}
-                                      alt={`${photo.type} photo`}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.style.display = 'none';
-                                        const parent = target.parentElement;
-                                        if (parent && !parent.querySelector('.fallback-icon')) {
-                                          const fallback = document.createElement('div');
-                                          fallback.className = 'fallback-icon w-full h-full flex items-center justify-center bg-gray-800';
-                                          fallback.innerHTML = '<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
-                                          parent.appendChild(fallback);
-                                        }
-                                      }}
-                                    />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                                      <ZoomIn className="w-3.5 h-3.5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                    <span className={`absolute bottom-0 left-0 right-0 text-[8px] font-semibold text-center leading-tight py-px ${
-                                      photo.type === 'before' ? 'bg-blue-600/80 text-blue-100' : 'bg-emerald-600/80 text-emerald-100'
-                                    }`}>
-                                      {photo.type === 'before' ? 'Before' : 'After'}
-                                    </span>
-                                  </button>
-                                ))}
-                                {photos.length > 4 && (
-                                  <button
-                                    onClick={() => openLightbox(job, 4)}
-                                    className="flex-shrink-0 w-[52px] h-[52px] rounded-md border border-orange-500/20 bg-orange-500/10 hover:bg-orange-500/20 transition-colors flex items-center justify-center cursor-pointer"
-                                  >
-                                    <span className="text-orange-300 text-xs font-bold">+{photos.length - 4}</span>
-                                  </button>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 text-gray-600 text-xs">
-                                <ImageIcon className="w-3.5 h-3.5" />
-                                <span>No photos uploaded</span>
-                              </div>
+                            {job.service_address && (
+                              <span className="text-xs text-gray-600 block truncate mt-0.5 flex items-center gap-1">
+                                <MapPin className="w-3 h-3 flex-shrink-0" />{truncate(job.service_address, 40)}
+                              </span>
                             )}
-                          </td>
-                          <td className="py-2.5 px-4 text-gray-400 text-sm">
-                            {formatDate(job.completed_at)}
-                          </td>
-                          <td className="py-2.5 px-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handlePhotoApproval(job.id, 'approve')}
-                                disabled={photoActionLoading === `${job.id}-approve`}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-xs h-7 px-3"
-                              >
-                                {photoActionLoading === `${job.id}-approve` ? (
-                                  <RefreshCw className="w-3 h-3 animate-spin mr-1" />
-                                ) : (
-                                  <CheckCircle className="w-3 h-3 mr-1" />
-                                )}
-                                Approve
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handlePhotoApproval(job.id, 'reject')}
-                                disabled={photoActionLoading === `${job.id}-reject`}
-                                className="border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs h-7 px-3"
-                              >
-                                {photoActionLoading === `${job.id}-reject` ? (
-                                  <RefreshCw className="w-3 h-3 animate-spin mr-1" />
-                                ) : (
-                                  <XCircle className="w-3 h-3 mr-1" />
-                                )}
-                                Reject
-                              </Button>
+                            <div className="flex items-center gap-3 mt-1">
+                              {job.price != null && (
+                                <span className="text-xs text-emerald-400 font-medium">{formatCurrency(job.price)}</span>
+                              )}
+                              {job.landscaper_id && (
+                                <span className="text-xs text-purple-400 flex items-center gap-1">
+                                  <User className="w-3 h-3" />{getLandscaperName(job.landscaper_id)}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-gray-600">{formatDate(job.created_at)}</span>
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-      </LifecycleSection>
-
-      {/* ═══════════════════════════════════════════════════
-         SECTION 5 — Ready for Payout
-      ═══════════════════════════════════════════════════ */}
-      <LifecycleSection
-        title="Completed — Awaiting Payout"
-        icon={Wallet}
-        count={readyForPayout.length}
-        color="text-emerald-400"
-        bgColor="bg-emerald-500/15"
-        borderColor="border-emerald-500/20"
-      >
-        {readyForPayout.length === 0 ? (
-          <EmptyState icon={Wallet} message="No jobs awaiting payout release" />
-        ) : (
-          <>
-            {/* Mobile cards */}
-            <div className="lg:hidden space-y-2">
-              {readyForPayout.map((job) => (
-                <div
-                  key={job.id}
-                  className="p-3 rounded-lg border border-emerald-500/15 bg-black/30"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <span className="font-medium text-white text-sm truncate">
-                      {job.customer_name || job.client_email || 'Unknown'}
-                    </span>
-                    <span className="text-emerald-400 text-sm font-bold flex-shrink-0">
-                      {formatCurrency(job.payout_amount)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs text-purple-300 mt-1">
-                    <User className="w-3 h-3" />
-                    {getLandscaperName(job.landscaper_id)}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1 truncate">
-                    {job.service_name || job.service_type || '—'}
-                  </p>
-                  <div className="mt-2.5 pt-2 border-t border-emerald-500/15">
-                    <Button
-                      size="sm"
-                      onClick={() => handleReleasePayout(job.id)}
-                      disabled={payoutLoading === job.id}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-xs h-8"
-                    >
-                      {payoutLoading === job.id ? (
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                      ) : (
-                        <DollarSign className="w-3.5 h-3.5 mr-1.5" />
-                      )}
-                      Release Payout
-                    </Button>
-                  </div>
+                          </div>
+                          <ChevronRight className={`w-4 h-4 flex-shrink-0 mt-1 ${isSelected ? fc.color : 'text-gray-600'}`} />
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-            {/* Desktop table */}
-            <div className="hidden lg:block overflow-visible rounded-xl border border-emerald-500/15">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-black/60 border-b border-emerald-500/15">
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Customer</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Landscaper</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Service</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Payout Amount</th>
-                      <th className="text-right py-2.5 px-4 text-xs font-medium text-gray-400">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {readyForPayout.map((job) => (
-                      <tr
-                        key={job.id}
-                        className="border-b border-emerald-500/10 hover:bg-emerald-500/5 transition-colors"
+        {/* ── RIGHT: Action Panel ────────────────────── */}
+        <div className="lg:col-span-2">
+          <Card className={`bg-black/40 backdrop-blur border ${selectedJob ? fc.border : 'border-gray-800'} w-full min-w-0 sticky top-4`}>
+            <div className="flex items-center gap-2.5 px-4 sm:px-5 py-3 border-b border-gray-800/50">
+              <div className={`w-7 h-7 rounded-lg ${selectedJob ? fc.bg : 'bg-gray-800'} flex items-center justify-center flex-shrink-0`}>
+                {selectedJob
+                  ? React.createElement(fc.icon, { className: `w-3.5 h-3.5 ${fc.color}` })
+                  : <Eye className="w-3.5 h-3.5 text-gray-500" />
+                }
+              </div>
+              <h3 className={`text-sm font-semibold truncate ${selectedJob ? fc.color : 'text-gray-500'}`}>
+                {selectedJob ? (selectedJob.service_name || selectedJob.service_type || 'Job Details') : 'Select a Job'}
+              </h3>
+            </div>
+            <CardContent className="px-3 sm:px-4 py-4 max-h-[700px] overflow-y-auto">
+              {!selectedJob ? (
+                <div className="text-center py-12">
+                  <Eye className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-500 text-sm">Click a job from the list</p>
+                  <p className="text-gray-600 text-xs mt-1">The action panel will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* ── Job Details Card ──────────────── */}
+                  <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700 space-y-2.5">
+                    <h4 className="text-xs font-semibold text-gray-400 flex items-center gap-1.5 pb-2 border-b border-gray-700/50">
+                      <FileText className="w-3.5 h-3.5" /> Job Details
+                    </h4>
+                    <div className="flex items-start gap-2 text-sm">
+                      <Tag className="w-3.5 h-3.5 text-blue-400/70 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <span className="text-gray-500 text-[10px] block">Service</span>
+                        <span className="text-gray-200 text-sm">{selectedJob.service_name || selectedJob.service_type || '—'}</span>
+                      </div>
+                    </div>
+                    {selectedJob.selected_services && selectedJob.selected_services.length > 0 && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <Layers className="w-3.5 h-3.5 text-purple-400/70 mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-gray-500 text-[10px] block mb-1">Selected Services</span>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedJob.selected_services.map((s, i) => (
+                              <Badge key={i} className="bg-emerald-500/20 text-emerald-300 text-[10px] px-1.5 py-0">{s}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {selectedJob.customer_name && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <User className="w-3.5 h-3.5 text-gray-400/70 mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-gray-500 text-[10px] block">Customer</span>
+                          <span className="text-gray-200 text-sm">{selectedJob.customer_name}</span>
+                        </div>
+                      </div>
+                    )}
+                    {selectedJob.client_email && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <Mail className="w-3.5 h-3.5 text-cyan-400/70 mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-gray-500 text-[10px] block">Email</span>
+                          <span className="text-gray-200 text-sm break-all">{selectedJob.client_email}</span>
+                        </div>
+                      </div>
+                    )}
+                    {selectedJob.service_address && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <MapPin className="w-3.5 h-3.5 text-orange-400/70 mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-gray-500 text-[10px] block">Address</span>
+                          <span className="text-gray-200 text-sm">{selectedJob.service_address}</span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-start gap-2 text-sm">
+                      <Calendar className="w-3.5 h-3.5 text-amber-400/70 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <span className="text-gray-500 text-[10px] block">Created</span>
+                        <span className="text-gray-200 text-sm">{formatDate(selectedJob.created_at)}</span>
+                      </div>
+                    </div>
+                    {selectedJob.price != null && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <DollarSign className="w-3.5 h-3.5 text-emerald-400/70 mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-gray-500 text-[10px] block">Current Price</span>
+                          <span className="text-emerald-400 text-sm font-medium">{formatCurrency(selectedJob.price)}</span>
+                        </div>
+                      </div>
+                    )}
+                    {selectedJob.landscaper_id && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <User className="w-3.5 h-3.5 text-purple-400/70 mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-gray-500 text-[10px] block">Landscaper</span>
+                          <span className="text-purple-300 text-sm">{getLandscaperName(selectedJob.landscaper_id)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ═══ PRICING PANEL (quotes_pending) ═══ */}
+                  {activeFilter === 'quotes_pending' && (
+                    <div className="p-3 rounded-lg bg-amber-900/20 border border-amber-700/30 space-y-3">
+                      <h4 className="text-sm font-semibold text-amber-400 flex items-center gap-2 pb-2 border-b border-amber-700/30">
+                        <DollarSign className="w-4 h-4" />
+                        Set Price
+                        {selectedJob.price != null && selectedJob.price > 0 && (
+                          <span className="text-xs text-gray-500 font-normal ml-auto">Current: {formatCurrency(selectedJob.price)}</span>
+                        )}
+                      </h4>
+                      <div>
+                        <label className="text-sm text-gray-400 mb-1.5 block">Price ($)</label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={priceInput}
+                            onChange={(e) => { if (/^\d*\.?\d*$/.test(e.target.value)) setPriceInput(e.target.value); }}
+                            placeholder="0.00"
+                            className="bg-gray-800/50 border-gray-700 pl-9 text-lg font-medium"
+                            autoComplete="off"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1 italic">Starting price. Final may adjust after landscaper review.</p>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-400 mb-1.5 block">Admin Notes (optional)</label>
+                        <Textarea
+                          value={notesInput}
+                          onChange={(e) => setNotesInput(e.target.value)}
+                          placeholder="Notes about pricing decision..."
+                          className="bg-gray-800/50 border-gray-700 min-h-[70px] text-sm resize-none"
+                        />
+                      </div>
+                      {Number(priceInput) > 0 && Number(priceInput) < MINIMUM_PRICE_DOLLARS && (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
+                          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                          <span className="text-xs text-red-300">Minimum price is ${MINIMUM_PRICE_DOLLARS.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <Button
+                        onClick={handleSavePrice}
+                        disabled={saving || !priceInput || Number(priceInput) <= 0 || Number(priceInput) < MINIMUM_PRICE_DOLLARS}
+                        className="w-full bg-amber-600 hover:bg-amber-700 h-11 text-base font-medium"
                       >
-                        <td className="py-2.5 px-4">
-                          <span className="text-white text-sm font-medium block truncate max-w-[160px]">
-                            {job.customer_name || job.client_email || '—'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <span className="text-purple-300 text-sm block truncate max-w-[160px]">
-                            {getLandscaperName(job.landscaper_id)}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-4 text-gray-300 text-sm truncate max-w-[160px]">
-                          {job.service_name || job.service_type || '—'}
-                        </td>
-                        <td className="py-2.5 px-4 text-emerald-400 text-sm font-bold">
-                          {formatCurrency(job.payout_amount)}
-                        </td>
-                        <td className="py-2.5 px-4 text-right">
+                        {saving ? <RefreshCw className="mr-2 w-4 h-4 animate-spin" /> : <Save className="mr-2 w-4 h-4" />}
+                        {saving ? 'Saving...' : 'Save Price'}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* ═══ ASSIGNMENT PANEL (needs_landscaper) ═══ */}
+                  {activeFilter === 'needs_landscaper' && (() => {
+                    const isPendingPayment = selectedJob.status === 'priced' && selectedJob.payment_status !== 'paid';
+                    return (
+                    <div className="p-3 rounded-lg bg-cyan-900/20 border border-cyan-700/30 space-y-3">
+                      <h4 className="text-sm font-semibold text-cyan-400 flex items-center gap-2 pb-2 border-b border-cyan-700/30">
+                        <UserPlus className="w-4 h-4" />
+                        Assign Landscaper
+                      </h4>
+
+                      {/* PART 1: Pending Payment blocker — shown when priced + unpaid */}
+                      {isPendingPayment && (
+                        <div className="flex items-start gap-2.5 px-3 py-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                          <Clock className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-amber-300">Pending Payment</p>
+                            <p className="text-xs text-amber-200/70 mt-0.5">
+                              Client has not yet paid for this job. Assignment is blocked until payment is confirmed.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Assignment dropdown — only useful when payment is confirmed */}
+                      {!isPendingPayment && (
+                        <>
+                          <p className="text-xs text-gray-500">Select an approved landscaper to assign this job.</p>
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <LandscaperAssignmentDropdown
+                              jobId={selectedJob.id}
+                              jobStatus={selectedJob.status}
+                              paymentStatus={selectedJob.payment_status}
+                              currentLandscaperId={selectedJob.landscaper_id}
+                              onAssigned={() => { setSelectedJob(null); fetchData(); }}
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-2">
+                        <Calendar className="w-3 h-3" />
+                        <span>Scheduled: {formatDate(selectedJob.scheduled_date || selectedJob.preferred_date)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-emerald-400">
+                        <DollarSign className="w-3 h-3" />
+                        <span>Price: {formatCurrency(selectedJob.admin_price || selectedJob.price)}</span>
+                      </div>
+                    </div>
+                    );
+                  })()}
+
+
+                  {/* ═══ ACTIVE JOB TRACKING (active) ═══ */}
+                  {activeFilter === 'active' && (
+                    <div className="p-3 rounded-lg bg-purple-900/20 border border-purple-700/30 space-y-3">
+                      <h4 className="text-sm font-semibold text-purple-400 flex items-center gap-2 pb-2 border-b border-purple-700/30">
+                        <Play className="w-4 h-4" />
+                        Job Tracking
+                      </h4>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Badge className={`text-xs ${selectedJob.status === 'active' ? 'bg-yellow-500/20 text-yellow-300' : 'bg-purple-500/20 text-purple-300'}`}>
+                          {selectedJob.status === 'active' ? 'In Progress' : 'Assigned'}
+                        </Badge>
+                      </div>
+                      {selectedJob.landscaper_id && (
+                        <div className="flex items-center gap-2 text-sm text-purple-300">
+                          <User className="w-4 h-4" />
+                          <span>{getLandscaperName(selectedJob.landscaper_id)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <Calendar className="w-3 h-3" />
+                        <span>Scheduled: {formatDate(selectedJob.scheduled_date || selectedJob.preferred_date)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-emerald-400">
+                        <DollarSign className="w-3 h-3" />
+                        <span>Price: {formatCurrency(selectedJob.admin_price || selectedJob.price)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ═══ PHOTO APPROVAL (photo_approval) ═══ */}
+                  {activeFilter === 'photo_approval' && (() => {
+                    const photos = getAllPhotosForJob(selectedJob);
+                    return (
+                      <div className="p-3 rounded-lg bg-orange-900/20 border border-orange-700/30 space-y-3">
+                        <h4 className="text-sm font-semibold text-orange-400 flex items-center gap-2 pb-2 border-b border-orange-700/30">
+                          <Camera className="w-4 h-4" />
+                          Photo Review
+                        </h4>
+                        {selectedJob.landscaper_id && (
+                          <div className="flex items-center gap-2 text-sm text-purple-300">
+                            <User className="w-4 h-4" />
+                            <span>{getLandscaperName(selectedJob.landscaper_id)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <Calendar className="w-3 h-3" />
+                          <span>Completed: {formatDate(selectedJob.completed_at)}</span>
+                        </div>
+
+                        {/* Photo thumbnails */}
+                        {photos.length > 0 ? (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {photos.map((photo, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => openLightbox(selectedJob, idx)}
+                                className="relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border border-orange-500/20 hover:border-orange-400 transition-all group"
+                              >
+                                <img src={photo.url} alt={`${photo.type} photo`} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                                  <ZoomIn className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                                <span className={`absolute bottom-0 left-0 right-0 text-[9px] font-medium text-center py-0.5 ${photo.type === 'before' ? 'bg-blue-600/80 text-blue-100' : 'bg-emerald-600/80 text-emerald-100'}`}>
+                                  {photo.type === 'before' ? 'Before' : 'After'}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-gray-600 text-xs py-2">
+                            <ImageIcon className="w-3.5 h-3.5" />
+                            <span>No photos uploaded</span>
+                          </div>
+                        )}
+
+                        {/* Approve / Reject buttons */}
+                        <div className="flex gap-2 pt-2">
                           <Button
                             size="sm"
-                            onClick={() => handleReleasePayout(job.id)}
-                            disabled={payoutLoading === job.id}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-xs h-7 px-3"
+                            onClick={() => handlePhotoApproval(selectedJob.id, 'approve')}
+                            disabled={photoActionLoading === `${selectedJob.id}-approve`}
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-sm h-9"
                           >
-                            {payoutLoading === job.id ? (
-                              <RefreshCw className="w-3 h-3 animate-spin mr-1" />
-                            ) : (
-                              <DollarSign className="w-3 h-3 mr-1" />
-                            )}
-                            Release
+                            {photoActionLoading === `${selectedJob.id}-approve`
+                              ? <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                              : <CheckCircle className="w-3.5 h-3.5 mr-1.5" />}
+                            Approve
                           </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-      </LifecycleSection>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handlePhotoApproval(selectedJob.id, 'reject')}
+                            disabled={photoActionLoading === `${selectedJob.id}-reject`}
+                            className="flex-1 border-red-500/30 text-red-400 hover:bg-red-500/10 text-sm h-9"
+                          >
+                            {photoActionLoading === `${selectedJob.id}-reject`
+                              ? <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                              : <XCircle className="w-3.5 h-3.5 mr-1.5" />}
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
-      {/* ═══════════════════════════════════════════════════
-         SECTION 6 — Paid Jobs
-      ═══════════════════════════════════════════════════ */}
-      <LifecycleSection
-        title="Payouts Completed"
-        icon={CheckCircle}
-        count={paidJobs.length}
-        color="text-green-400"
-        bgColor="bg-green-500/15"
-        borderColor="border-green-500/20"
-        defaultOpen={false}
-      >
-        {paidJobs.length === 0 ? (
-          <EmptyState icon={CheckCircle} message="No completed payouts yet" />
-        ) : (
-          <>
-            {/* Mobile cards */}
-            <div className="lg:hidden space-y-2">
-              {paidJobs.map((job) => (
-                <div
-                  key={job.id}
-                  className="p-3 rounded-lg border border-green-500/15 bg-black/30"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <span className="font-medium text-white text-sm truncate">
-                      {job.customer_name || job.client_email || 'Unknown'}
-                    </span>
-                    <span className="text-green-400 text-sm font-bold flex-shrink-0">
-                      {formatCurrency(job.payout_amount)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs text-purple-300 mt-1">
-                    <User className="w-3 h-3" />
-                    {getLandscaperName(job.landscaper_id)}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1 truncate">
-                    {job.service_name || job.service_type || '—'}
-                  </p>
-                  <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                    <Calendar className="w-3 h-3" />
-                    Paid: {formatDate(job.payout_released_at)}
-                  </div>
+                  {/* ═══ PAYOUT RELEASE (awaiting_payout) ═══ */}
+                  {activeFilter === 'awaiting_payout' && (() => {
+                    // Run the canonical eligibility check from lifecycle contract
+                    const eligibility = isPayoutEligible({
+                      status: selectedJob.status,
+                      payment_status: selectedJob.payment_status,
+                      payout_status: selectedJob.payout_status,
+                      payout_amount: selectedJob.payout_amount,
+                    });
+                    const payoutStatusReleasable = (PAYOUT_RELEASABLE_STATUSES as readonly string[]).includes(selectedJob.payout_status || '');
+                    const paymentConfirmed = selectedJob.payment_status === 'paid';
+                    const hasPayoutAmount = (selectedJob.payout_amount ?? 0) > 0;
+
+                    return (
+                      <div className="p-3 rounded-lg bg-emerald-900/20 border border-emerald-700/30 space-y-3">
+                        <h4 className="text-sm font-semibold text-emerald-400 flex items-center gap-2 pb-2 border-b border-emerald-700/30">
+                          <Wallet className="w-4 h-4" />
+                          Payout Status
+                        </h4>
+                        {selectedJob.landscaper_id && (
+                          <div className="flex items-center gap-2 text-sm text-purple-300">
+                            <User className="w-4 h-4" />
+                            <span>{getLandscaperName(selectedJob.landscaper_id)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 text-emerald-400 text-lg font-bold">
+                          <DollarSign className="w-5 h-5" />
+                          <span>{formatCurrency(selectedJob.payout_amount)}</span>
+                        </div>
+
+                        {/* Eligibility checklist — shows each condition */}
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex items-center gap-2 text-xs">
+                            {selectedJob.status === 'completed'
+                              ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                              : <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
+                            <span className={selectedJob.status === 'completed' ? 'text-gray-300' : 'text-red-300'}>
+                              Job completed {selectedJob.status !== 'completed' && `(current: ${selectedJob.status})`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            {paymentConfirmed
+                              ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                              : <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
+                            <span className={paymentConfirmed ? 'text-gray-300' : 'text-red-300'}>
+                              Client payment confirmed {!paymentConfirmed && `(current: ${selectedJob.payment_status || 'none'})`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            {payoutStatusReleasable
+                              ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                              : <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
+                            <span className={payoutStatusReleasable ? 'text-gray-300' : 'text-red-300'}>
+                              Payout status releasable {!payoutStatusReleasable && `(current: ${selectedJob.payout_status || 'none'})`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            {hasPayoutAmount
+                              ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                              : <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
+                            <span className={hasPayoutAmount ? 'text-gray-300' : 'text-red-300'}>
+                              Payout amount set {!hasPayoutAmount && '($0)'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Blocking reason banner */}
+                        {!eligibility.eligible && (
+                          <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
+                            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                            <span className="text-xs text-red-300">{eligibility.reason}</span>
+                          </div>
+                        )}
+
+                        <Button
+                          onClick={() => handleReleasePayout(selectedJob.id)}
+                          disabled={payoutLoading === selectedJob.id || !eligibility.eligible}
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 h-11 text-base font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {payoutLoading === selectedJob.id
+                            ? <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                            : <DollarSign className="w-4 h-4 mr-2" />}
+                          {payoutLoading === selectedJob.id
+                            ? 'Processing...'
+                            : eligibility.eligible
+                              ? 'Release Payout'
+                              : 'Not Eligible'}
+                        </Button>
+                      </div>
+                    );
+                  })()}
+
+
+                  {/* ═══ PAYOUT COMPLETED (payouts_completed) ═══ */}
+                  {activeFilter === 'payouts_completed' && (
+                    <div className="p-3 rounded-lg bg-green-900/20 border border-green-700/30 space-y-3">
+                      <h4 className="text-sm font-semibold text-green-400 flex items-center gap-2 pb-2 border-b border-green-700/30">
+                        <CheckCircle className="w-4 h-4" />
+                        Payout Completed
+                      </h4>
+                      {selectedJob.landscaper_id && (
+                        <div className="flex items-center gap-2 text-sm text-purple-300">
+                          <User className="w-4 h-4" />
+                          <span>{getLandscaperName(selectedJob.landscaper_id)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-green-400 text-lg font-bold">
+                        <DollarSign className="w-5 h-5" />
+                        <span>{formatCurrency(selectedJob.payout_amount)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <Calendar className="w-3 h-3" />
+                        <span>Released: {formatDate(selectedJob.payout_released_at)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-
-            {/* Desktop table */}
-            <div className="hidden lg:block overflow-visible rounded-xl border border-green-500/15">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-black/60 border-b border-green-500/15">
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Customer</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Landscaper</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Service</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Payout Amount</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-400">Released</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paidJobs.map((job) => (
-                      <tr
-                        key={job.id}
-                        className="border-b border-green-500/10 hover:bg-green-500/5 transition-colors"
-                      >
-                        <td className="py-2.5 px-4">
-                          <span className="text-white text-sm font-medium block truncate max-w-[160px]">
-                            {job.customer_name || job.client_email || '—'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <span className="text-purple-300 text-sm block truncate max-w-[160px]">
-                            {getLandscaperName(job.landscaper_id)}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-4 text-gray-300 text-sm truncate max-w-[160px]">
-                          {job.service_name || job.service_type || '—'}
-                        </td>
-                        <td className="py-2.5 px-4 text-green-400 text-sm font-bold">
-                          {formatCurrency(job.payout_amount)}
-                        </td>
-                        <td className="py-2.5 px-4 text-gray-400 text-sm">
-                          {formatDate(job.payout_released_at)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-      </LifecycleSection>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* ── Photo Lightbox Modal ─────────────────────────── */}
       <PhotoLightbox
         state={lightbox}
-        onClose={closeLightbox}
-        onNavigate={handleLightboxNavigate}
-        onJumpTo={handleLightboxJumpTo}
+        onClose={() => setLightbox((p) => ({ ...p, open: false }))}
+        onNavigate={(dir) => setLightbox((p) => ({ ...p, currentIndex: dir === 'next' ? Math.min(p.currentIndex + 1, p.photos.length - 1) : Math.max(p.currentIndex - 1, 0) }))}
+        onJumpTo={(idx) => setLightbox((p) => ({ ...p, currentIndex: Math.max(0, Math.min(idx, p.photos.length - 1)) }))}
       />
-
     </div>
   );
 }

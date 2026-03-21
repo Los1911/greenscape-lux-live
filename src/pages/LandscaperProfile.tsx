@@ -209,7 +209,8 @@ export default function LandscaperProfile() {
                   <p><span className="text-green-400">Address:</span> {job?.address || 'TBA'}</p>
                   <p><span className="text-green-400">Price:</span> ${job?.price || 0}</p>
                   <p><span className="text-green-400">Status:</span> {job?.status || 'pending'}</p>
-                  <div className="mt-4"><h3 className="text-lg font-semibold mb-2">Upload Job Photos</h3><JobCompletionForm jobId={job?.id} status={job?.status} beforeUrl={job?.before_photo_url} afterUrl={job?.after_photo_url} /></div>
+                  <div className="mt-4"><h3 className="text-lg font-semibold mb-2">Upload Job Photos</h3><JobCompletionForm jobId={job?.id} status={job?.status} startedAt={job?.started_at} beforeUrl={job?.before_photo_url} afterUrl={job?.after_photo_url} /></div>
+
                 </li>
               ))}
             </ul>

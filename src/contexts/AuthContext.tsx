@@ -250,14 +250,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           // ============================================================
+          // ============================================================
           // STEP 1: ENSURE USER RECORDS EXIST *BEFORE* ROLE RESOLUTION
           // This guarantees the landscapers/clients row is present so
           // getUserRole() finds it on the very first login after signup.
+          //
+          // FIX (2026-03-18): Pass the ACTUAL user_metadata role to
+          // ensureUserRecords instead of collapsing admin → client via
+          // a ternary.  Previously the ternary
+          //   `userMetaRole === 'landscaper' ? 'landscaper' : 'client'`
+          // always sent 'client' for admins, which could cause the RPC
+          // to overwrite profiles.role from 'admin' to 'client'.
+          // ensureUserRecords already has its own admin-email override,
+          // but passing the correct role from metadata is the right
+          // thing to do for admins whose email is NOT in the hardcoded
+          // allowlist.
           // ============================================================
           const userMetaRole = sess.user.user_metadata?.role as string || 'client';
           try {
             const ensureResult = await ensureUserRecords({ 
-              role: userMetaRole === 'landscaper' ? 'landscaper' : 'client',
+              role: (userMetaRole === 'landscaper' || userMetaRole === 'admin')
+                ? userMetaRole as 'landscaper' | 'admin'
+                : 'client',
               firstName: sess.user.user_metadata?.first_name,
               lastName: sess.user.user_metadata?.last_name,
               phone: sess.user.user_metadata?.phone
@@ -270,6 +284,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } catch (ensureErr) {
             log('ENSURE', `❌ User records ensure exception: ${ensureErr}`);
           }
+
 
           // ============================================================
           // STEP 2: AUTHORITATIVE ROLE RESOLUTION

@@ -25,7 +25,8 @@ interface OfflineJob {
   service_type: string
   address: string
   scheduled_date: string
-  status: 'pending' | 'in_progress' | 'completed'
+  status: 'pending' | 'active' | 'completed'
+
   description?: string
   notes?: string
   priority: 'low' | 'medium' | 'high'
@@ -107,10 +108,12 @@ export const OfflineJobManager: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-500'
-      case 'in_progress': return 'bg-blue-500'
+      case 'active': return 'bg-blue-500'
       case 'completed': return 'bg-green-500'
       default: return 'bg-gray-500'
     }
+  }
+
   }
 
   const getSyncStatusIcon = (syncStatus: string) => {
@@ -222,15 +225,15 @@ export const OfflineJobManager: React.FC = () => {
                 <Button
                   onClick={() => updateJobStatus(selectedJob.id, 'pending')}
                   variant={selectedJob.status === 'pending' ? 'default' : 'outline'}
-                  className={`w-full ${selectedJob.status === 'pending' ? 'bg-green-500 text-white' : 'border-green-500/50 text-green-200 hover:bg-green-500/20'}`}
-                >
-                  Pending
                 </Button>
                 <Button
-                  onClick={() => updateJobStatus(selectedJob.id, 'in_progress')}
-                  variant={selectedJob.status === 'in_progress' ? 'default' : 'outline'}
-                  className={`w-full ${selectedJob.status === 'in_progress' ? 'bg-green-500 text-white' : 'border-green-500/50 text-green-200 hover:bg-green-500/20'}`}
+                  onClick={() => updateJobStatus(selectedJob.id, 'active')}
+                  variant={selectedJob.status === 'active' ? 'default' : 'outline'}
+                  className={`w-full ${selectedJob.status === 'active' ? 'bg-green-500 text-white' : 'border-green-500/50 text-green-200 hover:bg-green-500/20'}`}
                 >
+                  In Progress
+                </Button>
+
                   In Progress
                 </Button>
                 <Button

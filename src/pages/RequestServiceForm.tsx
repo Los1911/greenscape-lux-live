@@ -113,7 +113,7 @@ const validateField = (value: string, validation: ValidationRule): string | null
 // =============================================================================
 
 const FormError: React.FC<{ error: string }> = ({ error }) => (
-  <div className="text-red-400 text-sm mt-1">{error}</div>
+  <div className="text-red-400 text-sm mt-1.5 font-medium">{error}</div>
 );
 
 // =============================================================================
@@ -671,7 +671,7 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
 
           <div className="flex flex-col items-center gap-4">
             <RefreshCw className="h-8 w-8 text-emerald-400 animate-spin" />
-            <p className="text-gray-400">Loading...</p>
+            <p className="text-white/50 text-sm">Loading...</p>
           </div>
         </div>
       </LayoutWrapper>
@@ -687,8 +687,8 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
 
           <div className="flex flex-col items-center gap-4">
             <RefreshCw className="h-8 w-8 text-emerald-400 animate-spin" />
-            <p className="text-gray-400">
-              {mode === 'client' ? 'Loading your information...' : 'Loading estimate request form...'}
+            <p className="text-white/50 text-sm">
+              {mode === 'client' ? 'Loading your information...' : 'Loading estimate form...'}
             </p>
           </div>
         </div>
@@ -716,14 +716,14 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
         w-full and max-w-full prevent iOS auto-reflow issues
       */}
       <div className={cn(
-        "relative z-10 flex flex-col w-full max-w-full items-center px-4",
+        "relative z-10 flex flex-col w-full max-w-full items-center px-4 sm:px-6",
 
         // Mobile: 100dvh for iOS Safari | Desktop: 100vh for stability
         "min-h-[100dvh] md:min-h-screen",
         // On mobile: align to top with padding; on desktop: center vertically
         mode === 'client' 
-          ? "pt-20 pb-8 md:pt-24 md:justify-center" 
-          : "pt-8 pb-8 md:py-8 md:justify-center"
+          ? "pt-20 pb-10 md:pt-24 md:justify-center" 
+          : "pt-8 pb-10 md:py-8 md:justify-center"
       )}>
 
 
@@ -747,34 +747,41 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
         </div>
 
         {/* Trust Indicators */}
-        <div className="w-full max-w-4xl mb-6">
+        <div className="w-full max-w-4xl mb-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center gap-3 bg-gray-900/50 border border-green-500/20 rounded-lg p-4">
-              <MapPin className="w-8 h-8 text-green-400 flex-shrink-0" />
+            <div className="flex items-center gap-3 bg-white/[0.02] border border-green-400/20 rounded-2xl p-5 transition-all duration-150 hover:bg-white/5 hover:border-green-400/30 active:bg-white/10 active:scale-[0.98]">
+              <div className="p-2.5 bg-emerald-500/10 rounded-xl">
+                <MapPin className="w-6 h-6 text-emerald-400" />
+              </div>
               <div>
-                <p className="text-white font-medium text-sm">Property Evaluation</p>
-                <p className="text-gray-400 text-xs">We assess your specific site</p>
+                <p className="text-white font-semibold text-sm">Property Evaluation</p>
+                <p className="text-white/50 text-xs mt-0.5">We assess your specific site</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 bg-gray-900/50 border border-green-500/20 rounded-lg p-4">
-              <ClipboardCheck className="w-8 h-8 text-green-400 flex-shrink-0" />
+            <div className="flex items-center gap-3 bg-white/[0.02] border border-green-400/20 rounded-2xl p-5 transition-all duration-150 hover:bg-white/5 hover:border-green-400/30 active:bg-white/10 active:scale-[0.98]">
+              <div className="p-2.5 bg-emerald-500/10 rounded-xl">
+                <ClipboardCheck className="w-6 h-6 text-emerald-400" />
+              </div>
               <div>
-                <p className="text-white font-medium text-sm">Professional Review</p>
-                <p className="text-gray-400 text-xs">Expert estimate within 24-48 hrs</p>
+                <p className="text-white font-semibold text-sm">Professional Review</p>
+                <p className="text-white/50 text-xs mt-0.5">Expert estimate within 24-48 hrs</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 bg-gray-900/50 border border-green-500/20 rounded-lg p-4">
-              <Users className="w-8 h-8 text-green-400 flex-shrink-0" />
+            <div className="flex items-center gap-3 bg-white/[0.02] border border-green-400/20 rounded-2xl p-5 transition-all duration-150 hover:bg-white/5 hover:border-green-400/30 active:bg-white/10 active:scale-[0.98]">
+              <div className="p-2.5 bg-emerald-500/10 rounded-xl">
+                <Users className="w-6 h-6 text-emerald-400" />
+              </div>
               <div>
-                <p className="text-white font-medium text-sm">Tailored Pricing</p>
-                <p className="text-gray-400 text-xs">Based on your property needs</p>
+                <p className="text-white font-semibold text-sm">Tailored Pricing</p>
+                <p className="text-white/50 text-xs mt-0.5">Based on your property needs</p>
               </div>
             </div>
           </div>
         </div>
 
-        <Card className="w-full max-w-4xl bg-black/95 border-2 border-green-500 shadow-2xl shadow-green-500/30 backdrop-blur-sm">
-          <CardHeader className="text-center space-y-4">
+        <Card className="w-full max-w-4xl bg-black/90 border border-green-400/20 shadow-2xl shadow-emerald-500/10 backdrop-blur-xl rounded-2xl hover:border-green-400/30 transition-colors duration-300">
+
+          <CardHeader className="text-center space-y-4 px-6 sm:px-8 pt-8">
             {/* Progress Indicator - Mobile-first */}
             <div className="mb-2">
               <QuoteFormProgress 
@@ -784,27 +791,29 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
               />
             </div>
             
-            <CardTitle className="text-3xl sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-green-600 mb-2">
-              Request a Professional Landscaping Estimate
+            <CardTitle className="text-2xl sm:text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-emerald-500 mb-2 leading-tight">
+              Get Your Landscaping Estimate
             </CardTitle>
-            <p className="text-gray-300 text-base sm:text-lg max-w-2xl mx-auto">
-              Tell us about your property and service needs. Our team will evaluate your site and provide a detailed estimate within 24-48 hours.
+            <p className="text-white/50 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+              Tell us about your property and we'll prepare a detailed estimate within 24-48 hours.
             </p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-6 sm:px-8 pb-8">
 
             {/* Enhanced Error Display */}
             {(errors.submit || submissionError) && (
-              <div className="mb-6 p-4 bg-red-900/30 border-2 border-red-500 rounded-lg shadow-lg shadow-red-500/20">
+              <div className="mb-8 p-5 bg-red-500/10 border border-red-500/20 rounded-2xl">
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div className="p-2 bg-red-500/10 rounded-xl">
+                    <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                  </div>
                   <div className="flex-1">
-                    <p className="text-red-300 font-medium">
+                    <p className="text-red-300 font-medium text-sm">
                       {errors.submit || submissionError?.message || 'An error occurred'}
                     </p>
                     {/* Show error code and details in dev mode */}
                     {isDev && submissionError && (
-                      <div className="mt-2 p-2 bg-red-950/50 rounded text-xs font-mono text-red-400">
+                      <div className="mt-3 p-3 bg-red-950/50 rounded-xl text-xs font-mono text-red-400">
                         <p>Code: {submissionError.code || 'N/A'}</p>
                         {submissionError.details && <p>Details: {submissionError.details}</p>}
                         <p>Auth Error: {submissionError.isAuthError ? 'Yes' : 'No'}</p>
@@ -814,7 +823,7 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
                     )}
                     {/* Show retry suggestion if applicable */}
                     {submissionError?.isRetryable && (
-                      <p className="text-red-400/80 text-sm mt-2">
+                      <p className="text-red-400/70 text-sm mt-2">
                         {submissionError.isAuthError 
                           ? 'Please sign out and sign back in, then try again.'
                           : 'Please try again in a moment.'}
@@ -825,7 +834,7 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-8">
 
               {/* ============================================================= */}
               {/* CONTACT INFORMATION SECTION */}
@@ -833,64 +842,73 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
               
               {mode === 'guest' ? (
                 // GUEST MODE: Full contact section, always visible
-                <div className="space-y-4">
-                  <h3 className="text-green-400 font-semibold text-lg border-b border-green-500/30 pb-2">
+                <div className="space-y-5">
+                  <h3 className="text-emerald-400 font-semibold text-base border-b border-white/[0.06] pb-3">
                     Contact Information
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
-                      <Label htmlFor="name" className="text-green-400 font-semibold">Full Name *</Label>
+                      <Label htmlFor="name" className="text-white/70 font-medium text-sm">Full Name *</Label>
                       <Input
                         id="name"
                         type="text"
                         value={formData.name}
                         onChange={(e) => handleChange('name', e.target.value)}
-                        className={`bg-gray-900/80 text-white ${errors.name ? 'border-red-500' : 'border-green-500'}`}
+                        className={cn(
+                          "mt-2 bg-white/[0.04] text-white rounded-xl border transition-all duration-200",
+                          errors.name ? 'border-red-500/60' : 'border-white/[0.08] focus:border-emerald-500/50'
+                        )}
                         placeholder="Enter your full name"
                       />
                       {errors.name && <FormError error={errors.name} />}
                     </div>
 
                     <div>
-                      <Label htmlFor="email" className="text-green-400 font-semibold">Email Address *</Label>
+                      <Label htmlFor="email" className="text-white/70 font-medium text-sm">Email Address *</Label>
                       <Input
                         id="email"
                         type="email"
                         value={formData.email}
                         onChange={(e) => handleChange('email', e.target.value)}
-                        className={`bg-gray-900/80 text-white ${errors.email ? 'border-red-500' : 'border-green-500'}`}
+                        className={cn(
+                          "mt-2 bg-white/[0.04] text-white rounded-xl border transition-all duration-200",
+                          errors.email ? 'border-red-500/60' : 'border-white/[0.08] focus:border-emerald-500/50'
+                        )}
                         placeholder="you@example.com"
                       />
                       {errors.email && <FormError error={errors.email} />}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
-                      <Label htmlFor="phone" className="text-green-400 font-semibold">Phone Number</Label>
+                      <Label htmlFor="phone" className="text-white/70 font-medium text-sm">Phone Number</Label>
                       <Input
                         id="phone"
                         type="tel"
                         value={formData.phone}
                         onChange={(e) => handleChange('phone', e.target.value)}
-                        className={`bg-gray-900/80 text-white ${errors.phone ? 'border-red-500' : 'border-green-500'}`}
+                        className={cn(
+                          "mt-2 bg-white/[0.04] text-white rounded-xl border transition-all duration-200",
+                          errors.phone ? 'border-red-500/60' : 'border-white/[0.08] focus:border-emerald-500/50'
+                        )}
                         placeholder="(123) 456-7890"
                       />
                       {errors.phone && <FormError error={errors.phone} />}
                     </div>
 
                     <div>
-                      <Label htmlFor="date" className="text-green-400 font-semibold">Preferred Start Date</Label>
+                      <Label htmlFor="date" className="text-white/70 font-medium text-sm">Preferred Start Date</Label>
                       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
                             className={cn(
-                              "w-full justify-start text-left font-normal bg-gray-900/80 border-green-500 text-white hover:bg-gray-800/80 hover:text-white",
-                              !formData.date && "text-gray-400"
+                              "mt-2 w-full justify-start text-left font-normal bg-white/[0.04] border-white/[0.08] text-white hover:bg-white/[0.06] hover:text-white rounded-xl transition-all duration-200",
+                              !formData.date && "text-white/40"
                             )}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4 text-green-400" />
+                            <CalendarIcon className="mr-2 h-4 w-4 text-emerald-400" />
                             {formData.date ? (
                               new Date(formData.date + 'T00:00:00').toLocaleDateString('en-US', {
                                 month: 'long',
@@ -902,7 +920,7 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
                             )}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 bg-gray-900 border-green-500" align="start">
+                        <PopoverContent className="w-auto p-0 bg-gray-900 border-white/10 rounded-xl" align="start">
                           <Calendar
                             mode="single"
                             selected={formData.date ? new Date(formData.date + 'T00:00:00') : undefined}
@@ -915,7 +933,7 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
                             }}
                             disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                             initialFocus
-                            className="rounded-md"
+                            className="rounded-xl"
                           />
                         </PopoverContent>
                       </Popover>
@@ -929,27 +947,30 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
                     <CollapsibleTrigger asChild>
                       <button
                         type="button"
-                        className="w-full flex items-center justify-between text-left group"
+                        className="w-full flex items-center justify-between text-left group active:scale-[0.99] transition-transform duration-100"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-green-500/10 rounded-lg">
-                            <User className="w-5 h-5 text-green-400" />
+                          <div className="p-2.5 bg-emerald-500/10 rounded-xl">
+                            <User className="w-5 h-5 text-emerald-400" />
                           </div>
                           <div>
-                            <h3 className="text-green-400 font-semibold text-lg flex items-center gap-2">
-                              Contact Information
-                              <Check className="w-4 h-4 text-green-500" />
+                            <h3 className="text-emerald-400 font-semibold text-base flex items-center gap-2">
+                              Contact Info
+                              <div className="flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                                <Check className="w-3 h-3 text-emerald-400" />
+                                <span className="text-emerald-400 text-xs font-medium">Ready</span>
+                              </div>
                             </h3>
-                            <p className="text-gray-500 text-sm">
-                              Pulled from your profile. Update anytime.
+                            <p className="text-white/40 text-sm mt-0.5">
+                              Pulled from your profile
                             </p>
                           </div>
                         </div>
-                        <div className="p-2 rounded-lg bg-gray-800/50 group-hover:bg-gray-700/50 transition-colors">
+                        <div className="p-2 rounded-xl bg-white/[0.04] group-hover:bg-white/[0.06] transition-colors">
                           {contactSectionOpen ? (
-                            <ChevronUp className="w-5 h-5 text-gray-400" />
+                            <ChevronUp className="w-5 h-5 text-white/40" />
                           ) : (
-                            <ChevronDown className="w-5 h-5 text-gray-400" />
+                            <ChevronDown className="w-5 h-5 text-white/40" />
                           )}
                         </div>
                       </button>
@@ -957,19 +978,20 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
 
                     {/* Summary when collapsed - 3 column grid */}
                     {!contactSectionOpen && (
-                      <div className="ml-12 p-4 bg-gray-900/30 rounded-lg border border-gray-800">
+                      <div className="ml-[52px] p-4 bg-white/[0.02] rounded-xl border border-green-400/20 opacity-85">
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div className="space-y-1">
-                            <span className="text-gray-500 text-xs uppercase tracking-wide">Name</span>
-                            <p className="text-gray-200 font-medium">{formData.name || 'Not set'}</p>
+                            <span className="text-white/40 text-xs uppercase tracking-wide">Name</span>
+                            <p className="text-white/80 font-medium text-sm">{formData.name || 'Not set'}</p>
                           </div>
                           <div className="space-y-1">
-                            <span className="text-gray-500 text-xs uppercase tracking-wide">Email</span>
-                            <p className="text-gray-200 font-medium">{formData.email || 'Not set'}</p>
+                            <span className="text-white/40 text-xs uppercase tracking-wide">Email</span>
+                            <p className="text-white/80 font-medium text-sm">{formData.email || 'Not set'}</p>
                           </div>
                           <div className="space-y-1">
-                            <span className="text-gray-500 text-xs uppercase tracking-wide">Phone</span>
-                            <p className="text-gray-200 font-medium">{formData.phone || 'Not set'}</p>
+                            <span className="text-white/40 text-xs uppercase tracking-wide">Phone</span>
+                            <p className="text-white/80 font-medium text-sm">{formData.phone || 'Not set'}</p>
                           </div>
                         </div>
                       </div>
@@ -977,42 +999,52 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
 
                     {/* Expanded inputs - matching 3 column grid */}
                     <CollapsibleContent className="space-y-4">
-                      <div className="ml-12 p-4 bg-gray-900/30 rounded-lg border border-gray-800">
+                      <div className="ml-[52px] p-5 bg-white/[0.02] rounded-xl border border-green-400/20">
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="name" className="text-gray-500 text-xs uppercase tracking-wide">Name *</Label>
+                            <Label htmlFor="name" className="text-white/40 text-xs uppercase tracking-wide">Name *</Label>
                             <Input
                               id="name"
                               type="text"
                               value={formData.name}
                               onChange={(e) => handleChange('name', e.target.value)}
-                              className={`bg-gray-900/80 text-white ${errors.name ? 'border-red-500' : 'border-gray-700 focus:border-green-500'}`}
+                              className={cn(
+                                "bg-white/[0.04] text-white rounded-xl border transition-all duration-200",
+                                errors.name ? 'border-red-500/60' : 'border-white/[0.08] focus:border-emerald-500/50'
+                              )}
                               placeholder="Enter your full name"
                             />
                             {errors.name && <FormError error={errors.name} />}
                           </div>
 
                           <div className="space-y-2">
-                            <Label htmlFor="email" className="text-gray-500 text-xs uppercase tracking-wide">Email *</Label>
+                            <Label htmlFor="email" className="text-white/40 text-xs uppercase tracking-wide">Email *</Label>
                             <Input
                               id="email"
                               type="email"
                               value={formData.email}
                               onChange={(e) => handleChange('email', e.target.value)}
-                              className={`bg-gray-900/80 text-white ${errors.email ? 'border-red-500' : 'border-gray-700 focus:border-green-500'}`}
+                              className={cn(
+                                "bg-white/[0.04] text-white rounded-xl border transition-all duration-200",
+                                errors.email ? 'border-red-500/60' : 'border-white/[0.08] focus:border-emerald-500/50'
+                              )}
                               placeholder="you@example.com"
                             />
                             {errors.email && <FormError error={errors.email} />}
                           </div>
 
                           <div className="space-y-2">
-                            <Label htmlFor="phone" className="text-gray-500 text-xs uppercase tracking-wide">Phone</Label>
+                            <Label htmlFor="phone" className="text-white/40 text-xs uppercase tracking-wide">Phone</Label>
                             <Input
                               id="phone"
                               type="tel"
                               value={formData.phone}
                               onChange={(e) => handleChange('phone', e.target.value)}
-                              className={`bg-gray-900/80 text-white ${errors.phone ? 'border-red-500' : 'border-gray-700 focus:border-green-500'}`}
+                              className={cn(
+                                "bg-white/[0.04] text-white rounded-xl border transition-all duration-200",
+                                errors.phone ? 'border-red-500/60' : 'border-white/[0.08] focus:border-emerald-500/50'
+                              )}
                               placeholder="(123) 456-7890"
                             />
                             {errors.phone && <FormError error={errors.phone} />}
@@ -1024,12 +1056,15 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
                 </Collapsible>
               )}
 
+              {/* Section Divider */}
+              <div className="border-t border-white/[0.04]" />
+
               {/* ============================================================= */}
               {/* SERVICE TYPE SECTION */}
               {/* ============================================================= */}
               
-              <div className="space-y-4" ref={serviceTypeRef}>
-                <h3 className="text-green-400 font-semibold text-lg border-b border-green-500/30 pb-2">
+              <div className="space-y-5" ref={serviceTypeRef}>
+                <h3 className="text-emerald-400 font-semibold text-base border-b border-white/[0.06] pb-3">
                   Service Type
                 </h3>
                 
@@ -1039,105 +1074,119 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
                   className="grid grid-cols-1 md:grid-cols-2 gap-4"
                 >
                   <div className={cn(
-                    "flex items-center space-x-3 p-4 rounded-lg border cursor-pointer transition-all",
+                    "flex items-center space-x-3 p-5 rounded-2xl border cursor-pointer transition-all duration-150 active:scale-[0.98]",
                     formData.serviceType === 'one-time' 
-                      ? "border-green-500 bg-green-500/10" 
-                      : "border-gray-700 hover:border-green-500/50"
+                      ? "border-green-400/40 bg-green-500/10 shadow-[0_0_10px_rgba(34,197,94,0.25)]" 
+                      : "border-green-400/20 hover:border-green-400/30 hover:bg-white/5 active:bg-white/10 bg-white/[0.02]"
                   )}>
-                    <RadioGroupItem value="one-time" id="one-time" className="border-green-500 text-green-500" />
-                    <Label htmlFor="one-time" className="text-white cursor-pointer">One-time service</Label>
+                    <RadioGroupItem value="one-time" id="one-time" />
+                    <Label htmlFor="one-time" className="text-white cursor-pointer font-medium">One-time service</Label>
                   </div>
                   <div className={cn(
-                    "flex items-center space-x-3 p-4 rounded-lg border cursor-pointer transition-all",
+                    "flex items-center space-x-3 p-5 rounded-2xl border cursor-pointer transition-all duration-150 active:scale-[0.98]",
                     formData.serviceType === 'ongoing' 
-                      ? "border-green-500 bg-green-500/10" 
-                      : "border-gray-700 hover:border-green-500/50"
+                      ? "border-green-400/40 bg-green-500/10 shadow-[0_0_10px_rgba(34,197,94,0.25)]" 
+                      : "border-green-400/20 hover:border-green-400/30 hover:bg-white/5 active:bg-white/10 bg-white/[0.02]"
                   )}>
-                    <RadioGroupItem value="ongoing" id="ongoing" className="border-green-500 text-green-500" />
-                    <Label htmlFor="ongoing" className="text-white cursor-pointer">Ongoing / scheduled maintenance</Label>
+                    <RadioGroupItem value="ongoing" id="ongoing" />
+                    <Label htmlFor="ongoing" className="text-white cursor-pointer font-medium">Ongoing maintenance</Label>
                   </div>
+
                 </RadioGroup>
 
 
                 {formData.serviceType === 'ongoing' && (
-                  <div className="pl-4 border-l-2 border-green-500/30 mt-4">
-                    <Label className="text-green-400 font-semibold mb-3 block">Preferred Frequency</Label>
+                  <div className="pl-5 border-l-2 border-emerald-500/20 mt-5">
+                    <Label className="text-white/60 font-medium text-sm mb-3 block">Preferred Frequency</Label>
                     <RadioGroup 
                       value={formData.serviceFrequency} 
                       onValueChange={(value) => handleChange('serviceFrequency', value)}
-                      className="flex flex-wrap gap-4"
+                      className="flex flex-wrap gap-3"
                     >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="weekly" id="weekly" className="border-green-500 text-green-500" />
-                        <Label htmlFor="weekly" className="text-gray-300 cursor-pointer">Weekly</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="bi-weekly" id="bi-weekly" className="border-green-500 text-green-500" />
-                        <Label htmlFor="bi-weekly" className="text-gray-300 cursor-pointer">Bi-weekly</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="monthly" id="monthly" className="border-green-500 text-green-500" />
-                        <Label htmlFor="monthly" className="text-gray-300 cursor-pointer">Monthly</Label>
-                      </div>
+                      {['weekly', 'bi-weekly', 'monthly'].map((freq) => (
+                        <div 
+                          key={freq}
+                          className={cn(
+                            "flex items-center space-x-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all duration-150 active:scale-[0.97]",
+                            formData.serviceFrequency === freq
+                              ? "border-green-400/40 bg-green-500/10 shadow-[0_0_10px_rgba(34,197,94,0.25)]"
+                              : "border-green-400/20 bg-white/[0.02] hover:border-green-400/30 hover:bg-white/5 active:bg-white/10"
+                          )}
+                        >
+                          <RadioGroupItem value={freq} id={freq} />
+                          <Label htmlFor={freq} className="text-white/80 cursor-pointer text-sm capitalize">
+                            {freq === 'bi-weekly' ? 'Bi-weekly' : freq.charAt(0).toUpperCase() + freq.slice(1)}
+                          </Label>
+                        </div>
+                      ))}
+
                     </RadioGroup>
                   </div>
                 )}
               </div>
+
+              {/* Section Divider */}
+              <div className="border-t border-white/[0.04]" />
 
               {/* ============================================================= */}
               {/* PREFERRED START DATE - Always visible in client mode */}
               {/* ============================================================= */}
               
               {mode === 'client' && (
-                <div className="space-y-4">
-                  <h3 className="text-green-400 font-semibold text-lg border-b border-green-500/30 pb-2">
-                    Preferred Start Date
-                  </h3>
-                  <div className="max-w-sm">
-                    <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal bg-gray-900/80 border-gray-700 text-white hover:bg-gray-800/80 hover:text-white hover:border-green-500/50",
-                            !formData.date && "text-gray-400"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4 text-green-400" />
-                          {formData.date ? (
-                            new Date(formData.date + 'T00:00:00').toLocaleDateString('en-US', {
-                              weekday: 'long',
-                              month: 'long',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })
-                          ) : (
-                            <span>Select a preferred start date</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 bg-gray-900 border-green-500" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={formData.date ? new Date(formData.date + 'T00:00:00') : undefined}
-                          onSelect={(date) => {
-                            if (date) {
-                              const formattedDate = date.toISOString().split('T')[0];
-                              handleChange('date', formattedDate);
-                              setCalendarOpen(false);
-                            }
-                          }}
-                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                          initialFocus
-                          className="rounded-md"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Optional. Let us know when you'd like to start.
-                    </p>
+                <>
+                  <div className="space-y-4">
+                    <h3 className="text-emerald-400 font-semibold text-base border-b border-white/[0.06] pb-3">
+                      Preferred Start Date
+                    </h3>
+                    <div className="max-w-sm">
+                      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal bg-white/[0.04] border-white/[0.08] text-white hover:bg-white/[0.06] hover:text-white hover:border-white/[0.12] rounded-xl transition-all duration-200",
+                              !formData.date && "text-white/40"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4 text-emerald-400" />
+                            {formData.date ? (
+                              new Date(formData.date + 'T00:00:00').toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                month: 'long',
+                                day: 'numeric',
+                                year: 'numeric'
+                              })
+                            ) : (
+                              <span>Select a preferred start date</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 bg-gray-900 border-white/10 rounded-xl" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={formData.date ? new Date(formData.date + 'T00:00:00') : undefined}
+                            onSelect={(date) => {
+                              if (date) {
+                                const formattedDate = date.toISOString().split('T')[0];
+                                handleChange('date', formattedDate);
+                                setCalendarOpen(false);
+                              }
+                            }}
+                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                            initialFocus
+                            className="rounded-xl"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <p className="text-xs text-white/40 mt-2">
+                        Optional — let us know when you'd like to start.
+                      </p>
+                    </div>
                   </div>
-                </div>
+
+                  {/* Section Divider */}
+                  <div className="border-t border-white/[0.04]" />
+                </>
               )}
 
 
@@ -1146,11 +1195,11 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
               {/* SERVICES SELECTION */}
               {/* ============================================================= */}
               
-              <div className="space-y-4">
-                <h3 className="text-green-400 font-semibold text-lg border-b border-green-500/30 pb-2">
+              <div className="space-y-5">
+                <h3 className="text-emerald-400 font-semibold text-base border-b border-white/[0.06] pb-3">
                   Services Needed *
                 </h3>
-                <div className={`${errors.services ? 'ring-2 ring-red-500 rounded-lg' : ''}`}>
+                <div className={`${errors.services ? 'ring-2 ring-red-500/40 rounded-2xl' : ''}`}>
                   <ServiceCheckboxList
                     selectedServices={formData.selectedServices}
                     otherService={formData.otherService}
@@ -1161,12 +1210,15 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
                 {errors.services && <FormError error={errors.services} />}
               </div>
 
+              {/* Section Divider */}
+              <div className="border-t border-white/[0.04]" />
+
               {/* ============================================================= */}
               {/* PROPERTY INFORMATION */}
               {/* ============================================================= */}
               
-              <div className="space-y-4">
-                <h3 className="text-green-400 font-semibold text-lg border-b border-green-500/30 pb-2">
+              <div className="space-y-5">
+                <h3 className="text-emerald-400 font-semibold text-base border-b border-white/[0.06] pb-3">
                   Property Information
                 </h3>
                 
@@ -1174,22 +1226,25 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
                 {mode === 'client' && savedProfile?.address && !useDifferentAddress ? (
                   // Client mode with saved address
                   <div>
-                    <Label className="text-green-400 font-semibold">Service Address *</Label>
-                    <div className="mt-2 p-4 bg-gray-900/50 border border-green-500/30 rounded-lg">
+                    <Label className="text-white/70 font-medium text-sm">Service Address *</Label>
+                    <div className="mt-2 p-5 bg-white/[0.02] border border-green-400/20 rounded-2xl">
+
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                          <MapPin className="w-5 h-5 text-green-400 flex-shrink-0" />
+                          <div className="p-2 bg-emerald-500/10 rounded-xl">
+                            <MapPin className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                          </div>
                           <div>
-                            <p className="text-white">{formData.propertyAddress}</p>
-                            <p className="text-gray-500 text-sm">Primary address from your profile</p>
+                            <p className="text-white font-medium text-sm">{formData.propertyAddress}</p>
+                            <p className="text-white/40 text-xs mt-0.5">From your profile</p>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={handleUseDifferentAddress}
-                          className="text-sm text-green-400 hover:text-green-300 underline"
+                          className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
                         >
-                          Use a different address
+                          Change
                         </button>
                       </div>
                     </div>
@@ -1199,12 +1254,12 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
                   // Guest mode OR client using different address
                   <div>
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="propertyAddress" className="text-green-400 font-semibold">Service Address *</Label>
+                      <Label htmlFor="propertyAddress" className="text-white/70 font-medium text-sm">Service Address *</Label>
                       {mode === 'client' && useDifferentAddress && savedProfile?.address && (
                         <button
                           type="button"
                           onClick={handleUseSavedAddress}
-                          className="text-sm text-green-400 hover:text-green-300 underline"
+                          className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
                         >
                           Use saved address
                         </button>
@@ -1215,39 +1270,42 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
                       type="text"
                       value={formData.propertyAddress}
                       onChange={(e) => handleChange('propertyAddress', e.target.value)}
-                      className={`bg-gray-900/80 text-white ${errors.propertyAddress ? 'border-red-500' : 'border-green-500'}`}
+                      className={cn(
+                        "mt-2 bg-white/[0.04] text-white rounded-xl border transition-all duration-200",
+                        errors.propertyAddress ? 'border-red-500/60' : 'border-white/[0.08] focus:border-emerald-500/50'
+                      )}
                       placeholder="123 Main Street, City, State, ZIP"
                     />
                     {errors.propertyAddress && <FormError error={errors.propertyAddress} />}
-                    <p className="text-xs text-gray-500 mt-1">
-                      Your address helps us evaluate your property for accurate estimating.
+                    <p className="text-xs text-white/40 mt-2">
+                      Helps us evaluate your property for accurate pricing.
                     </p>
                   </div>
                 )}
 
                 <div>
-                  <Label htmlFor="propertySize" className="text-green-400 font-semibold">
+                  <Label htmlFor="propertySize" className="text-white/70 font-medium text-sm">
                     Approximate Property Size
-                    <span className="text-gray-400 font-normal ml-2">(helps with accurate estimating)</span>
+                    <span className="text-white/40 font-normal ml-2">(helps us price your job)</span>
                   </Label>
                   <Select 
                     value={formData.propertySize} 
                     onValueChange={(value) => handleChange('propertySize', value)}
                   >
-                    <SelectTrigger className="bg-gray-900/80 border-green-500 text-white">
+                    <SelectTrigger className="mt-2 bg-white/[0.04] border-white/[0.08] text-white rounded-xl hover:border-white/[0.12] transition-all duration-200">
                       <SelectValue placeholder="Select approximate lot size" />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-900 border-green-500">
-                      <SelectItem value="under-quarter" className="text-white hover:bg-gray-800">
-                        Under ¼ acre
+                    <SelectContent className="bg-gray-900 border-white/10 rounded-xl">
+                      <SelectItem value="under-quarter" className="text-white hover:bg-white/[0.06] rounded-lg">
+                        Under 1/4 acre
                       </SelectItem>
-                      <SelectItem value="quarter-half" className="text-white hover:bg-gray-800">
-                        ¼ – ½ acre
+                      <SelectItem value="quarter-half" className="text-white hover:bg-white/[0.06] rounded-lg">
+                        1/4 - 1/2 acre
                       </SelectItem>
-                      <SelectItem value="half-one" className="text-white hover:bg-gray-800">
-                        ½ – 1 acre
+                      <SelectItem value="half-one" className="text-white hover:bg-white/[0.06] rounded-lg">
+                        1/2 - 1 acre
                       </SelectItem>
-                      <SelectItem value="over-one" className="text-white hover:bg-gray-800">
+                      <SelectItem value="over-one" className="text-white hover:bg-white/[0.06] rounded-lg">
                         1+ acre
                       </SelectItem>
                     </SelectContent>
@@ -1255,43 +1313,47 @@ export default function RequestServiceForm({ mode }: RequestServiceFormProps) {
                 </div>
               </div>
 
+              {/* Section Divider */}
+              <div className="border-t border-white/[0.04]" />
+
               {/* ============================================================= */}
               {/* ADDITIONAL DETAILS */}
               {/* ============================================================= */}
               
-              <div className="space-y-4">
-                <h3 className="text-green-400 font-semibold text-lg border-b border-green-500/30 pb-2">
-                  Additional Details
+              <div className="space-y-5">
+                <h3 className="text-emerald-400 font-semibold text-base border-b border-white/[0.06] pb-3">
+                  Anything else we should know?
                 </h3>
                 <div>
-                  <Label htmlFor="comments" className="text-green-400 font-semibold">Project Details & Special Requests</Label>
+                  <Label htmlFor="comments" className="text-white/70 font-medium text-sm">Project Details & Special Requests</Label>
                   <Textarea
                     id="comments"
                     value={formData.comments}
                     onChange={(e) => handleChange('comments', e.target.value)}
-                    className="bg-gray-900/80 border-green-500 text-white min-h-[120px]"
-                    placeholder="Describe your project goals, any specific concerns, access considerations, or questions for our team..."
+                    className="mt-2 bg-white/[0.04] border-white/[0.08] text-white min-h-[120px] rounded-xl focus:border-emerald-500/50 transition-all duration-200 placeholder:text-white/30"
+                    placeholder="Describe your project goals, any specific concerns, or questions for our team..."
                   />
                 </div>
               </div>
 
               {/* Evaluation Notice */}
-              <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
-                <p className="text-gray-300 text-sm">
-                  <span className="text-green-400 font-semibold">What happens next?</span> After you submit this request, our team will review your property details and prepare a professional estimate. We'll contact you within 24-48 hours with pricing tailored to your specific property and service needs.
+              <div className="bg-emerald-500/[0.06] border border-green-400/20 rounded-2xl p-5">
+
+                <p className="text-white/60 text-sm leading-relaxed">
+                  <span className="text-emerald-400 font-semibold">What happens next?</span> Our team will review your property details and prepare a professional estimate. We'll reach out within 24-48 hours with pricing tailored to your needs.
                 </p>
               </div>
 
               <StandardizedButton
                 type="submit"
                 disabled={loading}
-                label={loading ? "Submitting Request..." : "Submit Estimate Request"}
-                className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold py-4 px-8 rounded-lg shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed text-lg border border-emerald-400/20 hover:border-emerald-400/40"
+                label={loading ? "Submitting..." : "Get My Estimate"}
+                className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold py-4 px-8 rounded-2xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-300 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed text-lg border-0"
                 loading={loading}
               />
               
-              <p className="text-center text-gray-400 text-sm">
-                * Required fields. Your information is secure and will only be used to prepare your estimate.
+              <p className="text-center text-white/40 text-xs">
+                Your information is secure and will only be used to prepare your estimate.
               </p>
             </form>
           </CardContent>

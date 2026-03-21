@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
-import { MapPin, Calendar, DollarSign, CheckCircle, XCircle, RefreshCw, Lock, Shield } from "lucide-react";
+import { MapPin, Calendar, DollarSign, CheckCircle, XCircle, RefreshCw, Lock, Shield, AlertTriangle } from "lucide-react";
 import { 
   jobRequiresInsurance, 
   landscaperHasVerifiedInsurance,
   canLandscaperAcceptJob,
   INSURANCE_REQUIRED_ERROR 
 } from "@/lib/insuranceRequirements";
+import { isLandscaperAvailable, UNAVAILABLE_ERROR_MESSAGE } from "@/lib/landscaperAvailability";
 import { InsuranceRequiredBadge, InsuranceRequiredBanner, LockedJobOverlay } from "@/components/landscaper/InsuranceRequiredBadge";
 import {
   Tooltip,
@@ -15,6 +16,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+
+
 
 interface Job {
   id: string;
@@ -46,12 +49,14 @@ export default function AvailableJobs() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          // Load landscaper profile including insurance_verified
+          // Load landscaper profile including insurance_verified + available
+          // AVAILABILITY ENFORCEMENT: `available` column gates marketplace visibility
           const { data: landscaper } = await supabase
             .from('landscapers')
-            .select('id, user_id, business_name, approved, insurance_verified')
+            .select('id, user_id, business_name, approved, insurance_verified, available')
             .eq('user_id', user.id)
             .maybeSingle();
+
           
           const approved = landscaper?.approved || false;
           const insuranceVerified = landscaperHasVerifiedInsurance(landscaper || {});
@@ -102,6 +107,17 @@ export default function AvailableJobs() {
   const handleAcceptJob = async (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
+
+    // AVAILABILITY GATE: Block job acceptance if landscaper is unavailable.
+    // Uses centralized check from landscaperAvailability.ts
+    if (!isLandscaperAvailable(landscaperProfile)) {
+      toast({
+        title: "Unavailable",
+        description: UNAVAILABLE_ERROR_MESSAGE,
+        variant: "destructive"
+      });
+      return;
+    }
 
     // Frontend check for insurance requirement
     const { canAccept, reason } = canLandscaperAcceptJob(job, landscaperProfile || {});

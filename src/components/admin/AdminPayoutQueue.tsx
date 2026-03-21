@@ -3,7 +3,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
+import { invokeEdgeFunction } from '@/lib/edgeFunctionClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { PAYOUT_RELEASABLE_STATUSES } from '@/lib/jobLifecycleContract';
 import { 
   DollarSign, 
   CheckCircle, 
@@ -16,8 +18,11 @@ import {
   PauseCircle,
   Eye,
   X,
-  ShieldAlert
+  ShieldAlert,
+  AlertTriangle,
+  XCircle
 } from 'lucide-react';
+
 
 
 interface PayoutEligibleJob {
@@ -54,7 +59,7 @@ interface PayoutEligibleJob {
 interface PayoutStats {
   totalEligible: number;
   totalAmount: number;
-  pendingCount: number;
+  releasableCount: number;
   heldCount: number;
 }
 
@@ -66,15 +71,39 @@ export default function AdminPayoutQueue() {
   const [stats, setStats] = useState<PayoutStats>({
     totalEligible: 0,
     totalAmount: 0,
-    pendingCount: 0,
+    releasableCount: 0,
     heldCount: 0
   });
   const [selectedJob, setSelectedJob] = useState<PayoutEligibleJob | null>(null);
   const [filter, setFilter] = useState<'all' | 'unpaid' | 'ready_for_release' | 'on_hold'>('all');
 
-  // Only 'ready_for_release' is eligible for payout release per DB constraint:
-  // jobs_payout_status_check: unpaid | ready_for_release | processing | paid | failed | on_hold
-  const isReleasable = (status: string) => status === 'ready_for_release';
+  // LIFECYCLE ENFORCEMENT: Payout release button only appears for statuses
+  // that match the release-job-payout edge function's PAYOUT_ELIGIBLE_STATUSES.
+  // Aligned with PAYOUT_RELEASABLE_STATUSES from jobLifecycleContract.
+  const isReleasable = (status: string) =>
+    (PAYOUT_RELEASABLE_STATUSES as readonly string[]).includes(status);
+
+  // LIFECYCLE ENFORCEMENT: Full payout eligibility check matching edge function.
+  // ALL conditions must be true for the Release button to be enabled.
+  const canReleasePayout = (job: PayoutEligibleJob) => {
+    if (!isReleasable(job.payout_status)) return false;
+    if (!job.client_paid) return false;
+    const amt = job.landscaper_payout || job.payout_amount || 0;
+    if (amt <= 0) return false;
+    return true;
+  };
+
+  // Returns the specific reason a payout can't be released (for UI display)
+  const getBlockingReason = (job: PayoutEligibleJob): string | null => {
+    if (!isReleasable(job.payout_status)) {
+      return `Payout status "${job.payout_status}" is not releasable. Must be: ${(PAYOUT_RELEASABLE_STATUSES as readonly string[]).join(', ')}`;
+    }
+    if (!job.client_paid) return 'Client payment not confirmed.';
+    const amt = job.landscaper_payout || job.payout_amount || 0;
+    if (amt <= 0) return 'Payout amount is $0.';
+    return null;
+  };
+
 
 
   const fetchPayoutQueue = useCallback(async () => {
@@ -113,10 +142,11 @@ export default function AdminPayoutQueue() {
 
       if (!jobsData || jobsData.length === 0) {
         setJobs([]);
-        setStats({ totalEligible: 0, totalAmount: 0, pendingCount: 0, heldCount: 0 });
+        setStats({ totalEligible: 0, totalAmount: 0, releasableCount: 0, heldCount: 0 });
         setLoading(false);
         return;
       }
+
 
 
       const jobIds = jobsData.map(j => j.id);
@@ -269,15 +299,17 @@ export default function AdminPayoutQueue() {
       setJobs(filteredJobs);
 
       const totalAmount = enrichedJobs.reduce((sum, j) => sum + (j.landscaper_payout || j.payout_amount || 0), 0);
-      const pendingCount = enrichedJobs.filter(j => j.payout_status === 'unpaid').length;
+      // LIFECYCLE FIX: Count jobs that are actually releasable (match edge function requirements)
+      const releasableCount = enrichedJobs.filter(j => canReleasePayout(j)).length;
       const heldCount = enrichedJobs.filter(j => j.payout_status === 'on_hold').length;
 
       setStats({
         totalEligible: enrichedJobs.length,
         totalAmount,
-        pendingCount,
+        releasableCount,
         heldCount
       });
+
 
 
     } catch (error) {
@@ -301,16 +333,14 @@ export default function AdminPayoutQueue() {
     setActionLoading(job.id);
 
     try {
-      const { data, error } = await supabase.functions.invoke('release-job-payout', {
-        body: {
-          jobId: job.id,
-          adminUserId: user.id
-        }
+      const { data, error } = await invokeEdgeFunction('release-job-payout', {
+        jobId: job.id,
+        adminUserId: user.id
       });
 
       if (error) {
-        console.error('[PAYOUT] Edge function invocation error:', error);
-        alert('Failed to release payout. Please try again.');
+        console.error('[PAYOUT] Edge function error:', error);
+        alert(error);
         return;
       }
 
@@ -332,6 +362,7 @@ export default function AdminPayoutQueue() {
       setActionLoading(null);
     }
   };
+
 
 
   const handleHoldPayout = async (job: PayoutEligibleJob) => {
@@ -461,12 +492,13 @@ export default function AdminPayoutQueue() {
         <Card className="bg-black/60 border-purple-500/25 p-2.5 sm:p-3 md:p-4">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <p className="text-gray-400 text-[10px] sm:text-xs md:text-sm truncate">Pending</p>
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-300">{stats.pendingCount}</p>
+              <p className="text-gray-400 text-[10px] sm:text-xs md:text-sm truncate">Releasable</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-300">{stats.releasableCount}</p>
             </div>
-            <Clock className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-purple-400 flex-shrink-0" />
+            <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-purple-400 flex-shrink-0" />
           </div>
         </Card>
+
 
         <Card className="bg-black/60 border-yellow-500/25 p-2.5 sm:p-3 md:p-4">
           <div className="flex items-center justify-between gap-2">
@@ -738,46 +770,51 @@ export default function AdminPayoutQueue() {
               </div>
 
               {/* Action Buttons */}
-              {selectedJob.payout_status !== 'paid' && (
-                <div className="space-y-3 pt-4 border-t border-emerald-500/20">
-                  {/* Defense-in-depth: warn if client_paid is somehow false */}
-                  {!selectedJob.client_paid && (
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-2">
-                      <ShieldAlert className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-red-300 font-medium text-sm">Client Payment Not Confirmed</p>
-                        <p className="text-red-400/70 text-xs mt-0.5">Payout release is blocked until client payment is verified.</p>
+              {selectedJob.payout_status !== 'paid' && (() => {
+                const releasable = canReleasePayout(selectedJob);
+                const blockReason = getBlockingReason(selectedJob);
+                return (
+                  <div className="space-y-3 pt-4 border-t border-emerald-500/20">
+                    {/* Show blocking reason if not releasable */}
+                    {blockReason && (
+                      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-2">
+                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-red-300 font-medium text-sm">Not Eligible for Release</p>
+                          <p className="text-red-400/70 text-xs mt-0.5">{blockReason}</p>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                    {selectedJob.payout_status !== 'on_hold' && (
-                      <Button
-                        variant="outline"
-                        onClick={() => handleHoldPayout(selectedJob)}
-                        disabled={actionLoading === selectedJob.id}
-                        className="flex-1 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
-                      >
-                        <PauseCircle className="w-4 h-4 mr-2" />
-                        Hold Payout
-                      </Button>
                     )}
-                    
-                    <Button
-                      onClick={() => handleReleasePayout(selectedJob)}
-                      disabled={actionLoading === selectedJob.id || !selectedJob.client_paid}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {actionLoading === selectedJob.id ? (
-                        <RefreshCw className="w-4 h-4 animate-spin mr-2" />
-                      ) : (
-                        <DollarSign className="w-4 h-4 mr-2" />
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                      {selectedJob.payout_status !== 'on_hold' && (
+                        <Button
+                          variant="outline"
+                          onClick={() => handleHoldPayout(selectedJob)}
+                          disabled={actionLoading === selectedJob.id}
+                          className="flex-1 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
+                        >
+                          <PauseCircle className="w-4 h-4 mr-2" />
+                          Hold Payout
+                        </Button>
                       )}
-                      Release Payout
-                    </Button>
+                      
+                      <Button
+                        onClick={() => handleReleasePayout(selectedJob)}
+                        disabled={actionLoading === selectedJob.id || !releasable}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {actionLoading === selectedJob.id ? (
+                          <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <DollarSign className="w-4 h-4 mr-2" />
+                        )}
+                        {releasable ? 'Release Payout' : 'Not Eligible'}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
+
 
 
               {selectedJob.payout_status === 'paid' && selectedJob.payout_released_at && (

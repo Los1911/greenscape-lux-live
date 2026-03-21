@@ -52,8 +52,18 @@ const log = (msg: string, data?: any) => {
  * - address (street) exists and is non-empty
  * - city exists and is non-empty
  * - state exists and is non-empty
- * - zip exists and is non-empty
  */
+
+/**
+ * FIX (2026-03-18): Admin email allowlist — last-resort safety net.
+ * If role resolution somehow fails or is delayed, admins with known
+ * emails are NEVER blocked by the client onboarding flow.
+ */
+const ADMIN_EMAILS = [
+  'admin.1@greenscapelux.com',
+  'bgreen@greenscapelux.com'
+];
+
 export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ 
   children, 
   onComplete 
@@ -66,6 +76,8 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({
     profileData: null,
     errorMessage: null,
   });
+
+
 
   
   const mountedRef = useRef(true);
@@ -189,6 +201,28 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({
       }
       return;
     }
+
+    // ──────────────────────────────────────────────────────────────────
+    // FIX (2026-03-18): Safety-net for admin emails.  If role resolved
+    // as 'client' (e.g. because the RPC overwrote profiles.role) but
+    // the user's email is in the admin allowlist, bypass onboarding.
+    // This prevents known admins from ever seeing the client onboarding
+    // screen regardless of what the profiles table says.
+    // ──────────────────────────────────────────────────────────────────
+    if (user?.email && ADMIN_EMAILS.includes(user.email)) {
+      log(`Admin email detected (${user.email}) — bypassing onboarding`);
+      if (mountedRef.current) {
+        setState(prev => ({
+          ...prev,
+          status: 'complete',
+          personalInfoComplete: true,
+          serviceAddressComplete: true,
+        }));
+      }
+      return;
+    }
+
+
 
 
     checkInProgressRef.current = true;

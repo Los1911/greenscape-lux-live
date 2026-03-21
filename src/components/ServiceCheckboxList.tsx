@@ -92,61 +92,74 @@ function CollapsibleSection({
   const selectedCount = services.filter(s => selectedServices.includes(s)).length;
 
   return (
-    <div className="border border-green-500/30 rounded-lg overflow-hidden bg-gray-900/30">
+    <div className="border border-green-400/20 rounded-2xl overflow-hidden bg-white/[0.02] hover:border-green-400/30 transition-colors duration-150">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800/50 transition-colors"
+        className="w-full flex items-center justify-between p-5 text-left hover:bg-white/5 transition-all duration-150 active:scale-[0.99] active:bg-white/10"
       >
         <div className="flex items-center gap-3">
-          <h3 className="text-green-400 font-bold text-sm uppercase tracking-wide">
+          <h3 className="text-emerald-400 font-semibold text-sm uppercase tracking-wide">
             {title}
           </h3>
           {selectedCount > 0 && (
-            <span className="bg-green-600 text-white text-xs px-2 py-0.5 rounded-full">
+            <span className="bg-emerald-500/15 text-emerald-400 text-xs font-medium px-2.5 py-0.5 rounded-full">
               {selectedCount} selected
             </span>
           )}
         </div>
         {isOpen ? (
-          <ChevronUp className="w-5 h-5 text-green-400" />
+          <ChevronUp className="w-5 h-5 text-white/40" />
         ) : (
-          <ChevronDown className="w-5 h-5 text-green-400" />
+          <ChevronDown className="w-5 h-5 text-white/40" />
         )}
       </button>
       
       {isOpen && (
-        <div className="px-4 pb-4 pt-2 border-t border-green-500/20">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="px-5 pb-5 pt-2 border-t border-white/[0.04]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
             {services.map((service) => {
               const requiresEvaluation = EVALUATION_REQUIRED_SERVICES.includes(service);
               const serviceDescription = SERVICE_DESCRIPTIONS[service];
+              const isSelected = selectedServices.includes(service);
               return (
-                <div key={service} className="flex flex-col">
-                  <div className="flex items-start space-x-2">
+                <div 
+                  key={service} 
+                  className={`flex flex-col p-3 rounded-xl border transition-all duration-150 cursor-pointer active:scale-[0.98] ${
+                    isSelected 
+                      ? 'border-green-400/40 bg-green-500/10 shadow-[0_0_10px_rgba(34,197,94,0.25)]' 
+                      : 'border-transparent hover:bg-white/5 active:bg-white/10'
+                  }`}
+                  onClick={() => onServiceChange(service, !isSelected)}
+                >
+                  <div className="flex items-start space-x-3">
                     <Checkbox
                       id={service}
-                      checked={selectedServices.includes(service)}
+                      checked={isSelected}
                       onCheckedChange={(checked) => onServiceChange(service, checked as boolean)}
-                      className="border-green-500 data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600 mt-0.5"
+                      className="mt-0.5"
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <div className="flex flex-col">
                       <Label 
                         htmlFor={service} 
-                        className="text-sm text-gray-300 hover:text-green-400 cursor-pointer transition-colors leading-tight"
+                        className={`text-sm cursor-pointer transition-colors leading-tight ${
+                          isSelected ? 'text-white font-medium' : 'text-white/70 hover:text-white/90'
+                        }`}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         {service}
                       </Label>
                       {serviceDescription && (
-                        <span className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                          <Info className="w-3 h-3" />
+                        <span className="flex items-center gap-1.5 text-xs text-white/40 mt-1.5">
+                          <Info className="w-3 h-3 flex-shrink-0" />
                           {serviceDescription}
                         </span>
                       )}
                       {requiresEvaluation && (
-                        <span className="flex items-center gap-1 text-xs text-amber-400/80 mt-1">
-                          <AlertCircle className="w-3 h-3" />
-                          Requires site evaluation before pricing
+                        <span className="flex items-center gap-1.5 text-xs text-amber-400/70 mt-1.5">
+                          <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                          Requires site evaluation
                         </span>
                       )}
                     </div>
@@ -169,7 +182,7 @@ export default function ServiceCheckboxList({
   onOtherServiceChange 
 }: ServiceCheckboxListProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {Object.entries(serviceCategories).map(([category, services], index) => (
         <CollapsibleSection
           key={category}
@@ -182,17 +195,16 @@ export default function ServiceCheckboxList({
       ))}
       
       {/* Other service input */}
-      <div className="border border-green-500/30 rounded-lg p-4 bg-gray-900/30">
-        <div className="flex items-center space-x-2">
+      <div className="border border-green-400/20 rounded-2xl p-5 bg-white/[0.02] hover:border-green-400/30 transition-colors duration-150">
+        <div className="flex items-center space-x-3">
           <Checkbox
             id="other"
             checked={otherService.length > 0}
             onCheckedChange={(checked) => {
               if (!checked) onOtherServiceChange('');
             }}
-            className="border-green-500 data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
           />
-          <Label htmlFor="other" className="text-sm text-gray-300 font-semibold">
+          <Label htmlFor="other" className="text-sm text-white/70 font-semibold">
             Other Service Not Listed
           </Label>
         </div>
@@ -201,13 +213,14 @@ export default function ServiceCheckboxList({
             placeholder="Describe your service needs..."
             value={otherService}
             onChange={(e) => onOtherServiceChange(e.target.value)}
-            className="bg-gray-900 border-green-500/50 text-white text-sm mt-3 focus:border-green-500"
+            className="bg-white/[0.04] border-white/[0.08] text-white text-sm mt-3 focus:border-emerald-500/50 rounded-xl transition-all duration-200 placeholder:text-white/30"
           />
         )}
-        <p className="text-xs text-gray-500 mt-2">
-          Custom requests will be reviewed by our team during site evaluation.
+        <p className="text-xs text-white/40 mt-2.5">
+          Custom requests will be reviewed during site evaluation.
         </p>
       </div>
     </div>
   );
 }
+

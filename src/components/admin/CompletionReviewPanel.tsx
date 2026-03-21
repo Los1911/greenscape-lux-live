@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { invokeJobExecution } from '@/lib/edgeFunctionClient';
+
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -286,24 +288,24 @@ export default function CompletionReviewPanel({
     };
   }, [job.landscaper_email, job.landscaper_id, job.assigned_to]);
 
-  const invokeJobExecution = async (payload: {
+  const callJobExecution = async (payload: {
     action: 'admin_approve' | 'admin_reject';
     jobId: string;
     rejectionReason?: string;
   }) => {
-    const { data, error: fnError } = await supabase.functions.invoke('job-execution', {
-      body: payload,
-    });
+    // Uses direct fetch() via edgeFunctionClient to bypass supabase-js
+    // FunctionsFetchError issues with verify_jwt gateway interception
+    const { data, error: fnErr } = await invokeJobExecution(payload);
 
-    if (fnError) throw fnError;
-
-    if (data && typeof data === 'object' && (data as any).success === false) {
-      const msg = (data as any).error || 'Edge function failed';
-      throw new Error(msg);
+    if (fnErr) {
+      throw new Error(fnErr);
     }
 
     return data;
   };
+
+
+
 
   const handleApprove = async () => {
     if (!hasAfterPhoto) return;
@@ -387,6 +389,12 @@ export default function CompletionReviewPanel({
       return;
     }
 
+    // LIFECYCLE ENFORCEMENT: Only allow return-to-active from completed_pending_review
+    if (job.status !== 'completed_pending_review') {
+      setError(`Cannot return to active. Job status is "${job.status}", must be "completed_pending_review".`);
+      return;
+    }
+
     setActionLoading('return');
     setError(null);
 
@@ -396,8 +404,10 @@ export default function CompletionReviewPanel({
         .update({
           status: 'active',
           admin_review_notes: adminNote.trim(),
+          completed_at: null, // Clear completion timestamp on return
         })
-        .eq('id', job.id);
+        .eq('id', job.id)
+        .eq('status', 'completed_pending_review'); // Double-check status in WHERE clause
 
       if (err) throw err;
 
@@ -421,6 +431,7 @@ export default function CompletionReviewPanel({
       setActionLoading(null);
     }
   };
+
 
   const isLoading = !!actionLoading;
 
